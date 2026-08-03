@@ -31,29 +31,33 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
   it("handles error event type", () => {
     const a = new AnthropicStreamAdapter();
     const events = a.push({ type: "error", error: { type: "overloaded_error" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("provider_error");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("provider_error");
   });
 
   it("handles message_delta with max_tokens stop_reason", () => {
     const a = new AnthropicStreamAdapter();
     const events = a.push({ type: "message_delta", delta: { stop_reason: "max_tokens" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("length");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("length");
   });
 
   it("handles message_delta with unknown stop_reason", () => {
     const a = new AnthropicStreamAdapter();
     const events = a.push({ type: "message_delta", delta: { stop_reason: "some_future_reason" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("unknown");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("unknown");
   });
 
   it("handles message_delta with tool_use stop_reason", () => {
     const a = new AnthropicStreamAdapter();
     const events = a.push({ type: "message_delta", delta: { stop_reason: "tool_use" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("complete");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("complete");
   });
 
   it("ignores events after finished", () => {
@@ -78,8 +82,9 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
   it("finish() emits stream_end if not yet finished", () => {
     const a = new AnthropicStreamAdapter();
     const events = a.finish({ reason: "cancelled" });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("cancelled");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("cancelled");
   });
 
   it("finish() is idempotent after already finished", () => {
@@ -175,8 +180,9 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
   it("finish() returns stream_end event", () => {
     const g = new GeminiStreamAdapter();
     const events = g.finish({ reason: "network_error" });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("network_error");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("network_error");
   });
 
   it("finish() is idempotent", () => {
@@ -247,22 +253,25 @@ describe("OpenAIStreamAdapter — Responses API", () => {
   it("handles response.completed", () => {
     const a = new OpenAIStreamAdapter();
     const events = a.push({ type: "response.completed", response: { status: "completed" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("complete");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("complete");
   });
 
   it("handles response.incomplete", () => {
     const a = new OpenAIStreamAdapter();
     const events = a.push({ type: "response.incomplete", response: { status: "incomplete" } });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("cancelled");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("cancelled");
   });
 
   it("handles error type in Responses API", () => {
     const a = new OpenAIStreamAdapter();
     const events = a.push({ type: "error" });
-    expect(events[0]?.type).toBe("provider_stream_end");
-    expect(events[0]?.reason).toBe("provider_error");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("provider_error");
   });
 
   it("handles legacy function_call format name delta", () => {
@@ -297,7 +306,7 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
     a.push({ choices: [{ finish_reason: "tool_calls" }] });
     const events = a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] });
     expect(events[0]?.type).toBe("provider_diagnostic");
-    expect(events[0]?.code).toBe("W_EVENT_AFTER_STREAM_END");
+    expect((events[0] as { code?: string })?.code).toBe("W_EVENT_AFTER_STREAM_END");
   });
 
   it("handles tool_call with missing index", () => {
@@ -556,7 +565,7 @@ describe("DefaultToolCallStreamCoordinator — uncovered branches", () => {
     const c = new DefaultToolCallStreamCoordinator();
     c.push(makeStartEvent("k1", "search"));
     c.push(makeArgsEvent("k1", '{"q":"test"}'));
-    c.push(makeStreamEnd("cancelled" as const));
+    c.push({ type: "provider_stream_end", sequence: 99, provider: "openai-compatible", reason: "cancelled" });
     const events = c.drainEvents();
     const finished = events.find((e) => e.type === "tool_call_finished");
     expect((finished as { outcome: string })?.outcome).toBe("cancelled");
