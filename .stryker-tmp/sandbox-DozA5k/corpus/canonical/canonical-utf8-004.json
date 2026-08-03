@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "canonical-utf8-004",
+  "title": "Incomplete unicode escape at stream end",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"char\":\"\\u00"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {},
+    "finalValue": {},
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_INCOMPLETE_UNICODE_ESCAPE",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

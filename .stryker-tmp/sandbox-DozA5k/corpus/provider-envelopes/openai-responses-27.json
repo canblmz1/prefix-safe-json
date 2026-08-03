@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "id": "openai-responses-27",
+  "title": "Provider Fixture openai-responses-27",
+  "category": "openai-responses",
+  "provider": "openai",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"id\":\"fc_2\",\"call_id\":\"c_2\",\"name\":\"foo\"}}\\n{\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_2\",\"delta\":\"{\\\"c\\\":2}\"}\\n{\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_2\",\"arguments\":\"{\\\"c\\\":2}\"}\\n{\"type\":\"response.output_item.done\",\"item\":{\"id\":\"fc_2\"}}\\n{\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "line-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": [
+      {
+        "type": "tool_call_start",
+        "sequence": 1,
+        "provider": "openai",
+        "callRef": {
+          "sourceKey": "output-item:fc_2"
+        },
+        "toolCallId": "c_2",
+        "name": "foo"
+      },
+      {
+        "type": "tool_call_arguments_delta",
+        "sequence": 2,
+        "provider": "openai",
+        "callRef": {
+          "sourceKey": "output-item:fc_2"
+        },
+        "delta": "{\"c\":2}"
+      },
+      {
+        "type": "tool_call_end",
+        "sequence": 3,
+        "provider": "openai",
+        "callRef": {
+          "sourceKey": "output-item:fc_2"
+        },
+        "reason": "complete"
+      },
+      {
+        "type": "provider_stream_end",
+        "sequence": 4,
+        "provider": "openai",
+        "reason": "complete",
+        "providerReason": "completed"
+      }
+    ]
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

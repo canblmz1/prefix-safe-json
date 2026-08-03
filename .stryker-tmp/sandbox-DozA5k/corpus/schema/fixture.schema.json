@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "category": { "type": "string", "enum": ["canonical", "malformed", "unicode", "truncation", "fuzz", "provider-envelope", "anthropic", "gemini", "openai-compatible", "openai-responses", "openrouter", "cross-provider"] },
+    "provider": { "type": "string" },
+    "input": {
+      "type": "object",
+      "properties": {
+        "encoding": { "type": "string", "enum": ["utf8-text", "base64-bytes"] },
+        "data": { "type": "string" }
+      },
+      "required": ["encoding", "data"]
+    },
+    "stream": {
+      "type": "object",
+      "properties": {
+        "endReason": { "type": "string", "enum": ["complete", "length", "network_error", "provider_error", "cancelled", "unknown"] },
+        "chunkStrategies": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["endReason", "chunkStrategies"]
+    },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "syntax": { "type": "string", "enum": ["empty", "incomplete", "root_complete", "invalid"] },
+        "outcome": { "type": "string", "enum": ["valid", "truncated", "salvaged", "invalid"] },
+        "stableValue": {},
+        "finalValue": {},
+        "executable": { "type": "boolean" },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "severity": { "type": "string", "enum": ["info", "warning", "error", "fatal"] },
+              "recoverable": { "type": "boolean" }
+            },
+            "required": ["code", "severity", "recoverable"]
+          }
+        },
+        "repairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "impact": { "type": "string", "enum": ["representation_preserving", "root_preserving", "structural", "lossy"] }
+            },
+            "required": ["code", "impact"]
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "path": { "type": "string" },
+              "operation": { "type": "string" },
+              "value": {}
+            },
+            "required": ["type"]
+          }
+        }
+      },
+      "required": ["syntax", "outcome", "executable", "diagnostics", "repairs", "events"]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "source": { "type": "string", "enum": ["synthetic", "provider-doc", "open-source-issue", "anonymized-trace"] },
+        "reference": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["source"]
+    }
+  },
+  "required": ["version", "id", "title", "category", "input", "stream", "expected", "provenance"]
+}

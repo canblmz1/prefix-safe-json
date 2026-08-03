@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "canonical-trailing-001",
+  "title": "Extra text after valid JSON",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"a\":1}some trailing text"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "invalid",
+    "stableValue": {
+      "a": 1
+    },
+    "finalValue": {
+      "a": 1
+    },
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_TRAILING_DATA",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "canonical-utf8-001",
+  "title": "2-byte UTF-8",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"name\":\"José\"}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "stableValue": {
+      "name": "José"
+    },
+    "finalValue": {
+      "name": "José"
+    },
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

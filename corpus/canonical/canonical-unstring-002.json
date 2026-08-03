@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "canonical-unstring-002",
+  "title": "Unclosed string key",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"key\":1,\"incomp"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {
+      "key": 1
+    },
+    "finalValue": {
+      "key": 1
+    },
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_UNTERMINATED_STRING",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic",
+    "notes": "First field committed (number 1 terminated by comma), second key incomplete"
+  }
+}

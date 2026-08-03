@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "fuzz-string-003",
+  "title": "Fuzz String 2",
+  "category": "fuzz",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"text\":\"hello\u0003world\"}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "invalid",
+    "outcome": "invalid",
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "W_RAW_CONTROL_CHARACTER",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

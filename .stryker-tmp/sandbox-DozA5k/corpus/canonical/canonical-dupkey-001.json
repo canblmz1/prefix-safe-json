@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "id": "canonical-dupkey-001",
+  "title": "Simple duplicate key",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"a\":1,\"b\":2,\"a\":3}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "invalid",
+    "stableValue": {
+      "a": 1,
+      "b": 2
+    },
+    "finalValue": {
+      "a": 1,
+      "b": 2
+    },
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_DUPLICATE_KEY",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic",
+    "notes": "First 'a' wins, duplicate makes document invalid"
+  }
+}

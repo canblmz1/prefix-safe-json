@@ -1,0 +1,33 @@
+// @ts-nocheck
+// ---------------------------------------------------------------------------
+// Diagnostic codes
+// ---------------------------------------------------------------------------
+
+/** All known diagnostic codes. */
+export const DiagnosticCode = {
+  // --- Errors ---
+  E_UNEXPECTED_TOKEN: "E_UNEXPECTED_TOKEN",
+  E_DUPLICATE_KEY: "E_DUPLICATE_KEY",
+  E_INCOMPLETE_UTF8: "E_INCOMPLETE_UTF8",
+  E_INVALID_UTF8: "E_INVALID_UTF8",
+  E_INCOMPLETE_UNICODE_ESCAPE: "E_INCOMPLETE_UNICODE_ESCAPE",
+  E_INVALID_UNICODE_ESCAPE: "E_INVALID_UNICODE_ESCAPE",
+  E_UNPAIRED_SURROGATE: "E_UNPAIRED_SURROGATE",
+  E_UNTERMINATED_STRING: "E_UNTERMINATED_STRING",
+  E_INCOMPLETE_NUMBER: "E_INCOMPLETE_NUMBER",
+  E_INCOMPLETE_LITERAL: "E_INCOMPLETE_LITERAL",
+  E_TRAILING_DATA: "E_TRAILING_DATA",
+  E_STREAM_TRUNCATED: "E_STREAM_TRUNCATED",
+  E_LIMIT_DEPTH: "E_LIMIT_DEPTH",
+  E_LIMIT_INPUT_BYTES: "E_LIMIT_INPUT_BYTES",
+  E_LIMIT_STRING_BYTES: "E_LIMIT_STRING_BYTES",
+  E_LIMIT_EVENT_QUEUE: "E_LIMIT_EVENT_QUEUE",
+  E_PUSH_AFTER_FINISH: "E_PUSH_AFTER_FINISH",
+
+  // --- Warnings ---
+  W_RAW_CONTROL_CHARACTER: "W_RAW_CONTROL_CHARACTER",
+  W_TRAILING_TEXT_ISOLATED: "W_TRAILING_TEXT_ISOLATED",
+} as const;
+
+export type DiagnosticCodeValue =
+  (typeof DiagnosticCode)[keyof typeof DiagnosticCode];

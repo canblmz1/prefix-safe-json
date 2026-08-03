@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "id": "canonical-string-002",
+  "title": "Incomplete string (stream truncated)",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"path\":\"/src/app.ts\",\"content\":\"hello worl"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {
+      "path": "/src/app.ts"
+    },
+    "finalValue": {
+      "path": "/src/app.ts"
+    },
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_UNTERMINATED_STRING",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

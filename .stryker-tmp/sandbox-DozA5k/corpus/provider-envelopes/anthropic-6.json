@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "id": "anthropic-6",
+  "title": "Provider Fixture anthropic-6",
+  "category": "anthropic",
+  "provider": "anthropic",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"type\":\"message_start\"}\\n{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"t5\",\"name\":\"test_tool\"}}\\n{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"a\\\": 5}\"}}\\n{\"type\":\"content_block_stop\",\"index\":0}\\n{\"type\":\"message_delta\",\"stop_reason\":\"tool_use\"}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "line-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": [
+      {
+        "type": "tool_call_start",
+        "sequence": 1,
+        "provider": "anthropic",
+        "callRef": {
+          "sourceKey": "content-block:0"
+        },
+        "toolIndex": 0,
+        "toolCallId": "t5",
+        "name": "test_tool"
+      },
+      {
+        "type": "tool_call_arguments_delta",
+        "sequence": 2,
+        "provider": "anthropic",
+        "callRef": {
+          "sourceKey": "content-block:0"
+        },
+        "delta": "{\"a\": 5}"
+      },
+      {
+        "type": "tool_call_end",
+        "sequence": 3,
+        "provider": "anthropic",
+        "callRef": {
+          "sourceKey": "content-block:0"
+        },
+        "reason": "complete"
+      },
+      {
+        "type": "provider_stream_end",
+        "sequence": 4,
+        "provider": "anthropic",
+        "reason": "complete"
+      }
+    ]
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

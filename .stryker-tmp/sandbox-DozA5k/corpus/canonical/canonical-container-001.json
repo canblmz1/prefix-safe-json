@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "id": "canonical-container-001",
+  "title": "Unclosed object with terminated values",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"a\":1,\"b\":2"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {
+      "a": 1
+    },
+    "finalValue": {
+      "a": 1
+    },
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_INCOMPLETE_NUMBER",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

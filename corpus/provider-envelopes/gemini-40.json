@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "id": "gemini-40",
+  "title": "Provider Fixture gemini-40",
+  "category": "gemini",
+  "provider": "gemini",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"foo\",\"args\":{\"d\":3}}}]}}]}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "line-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": [
+      {
+        "type": "tool_call_start",
+        "sequence": 1,
+        "provider": "gemini",
+        "callRef": {
+          "sourceKey": "candidate:0/part:0"
+        },
+        "name": "foo"
+      },
+      {
+        "type": "tool_call_arguments_delta",
+        "sequence": 2,
+        "provider": "gemini",
+        "callRef": {
+          "sourceKey": "candidate:0/part:0"
+        },
+        "delta": "{\"d\":3}"
+      },
+      {
+        "type": "tool_call_end",
+        "sequence": 3,
+        "provider": "gemini",
+        "callRef": {
+          "sourceKey": "candidate:0/part:0"
+        },
+        "reason": "complete"
+      },
+      {
+        "type": "provider_stream_end",
+        "sequence": 4,
+        "provider": "gemini",
+        "reason": "complete"
+      }
+    ]
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

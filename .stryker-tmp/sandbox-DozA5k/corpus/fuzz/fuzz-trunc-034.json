@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "fuzz-trunc-034",
+  "title": "Fuzz Truncation len=1",
+  "category": "fuzz",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

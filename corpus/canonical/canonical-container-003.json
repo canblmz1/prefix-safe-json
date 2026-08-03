@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "canonical-container-003",
+  "title": "Deeply nested unclosed",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"a\":{\"b\":{\"c\":1"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {},
+    "finalValue": {},
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_INCOMPLETE_NUMBER",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

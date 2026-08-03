@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "canonical-valid-002",
+  "title": "Nested object",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"user\":{\"name\":\"Bob\",\"scores\":[1,2,3]}}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": ["single", "byte-per-chunk", "char-per-chunk"]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "stableValue": {"user": {"name": "Bob", "scores": [1, 2, 3]}},
+    "diagnostics": [],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

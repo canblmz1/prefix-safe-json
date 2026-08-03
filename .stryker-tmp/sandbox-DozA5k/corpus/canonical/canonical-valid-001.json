@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "id": "canonical-valid-001",
+  "title": "Simple flat object",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"name\":\"Alice\",\"age\":30}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": ["single", "byte-per-chunk", "char-per-chunk"]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "stableValue": {"name": "Alice", "age": 30},
+    "diagnostics": [],
+    "repairs": [],
+    "events": [
+      { "type": "value_committed", "path": "/name", "value": "Alice" },
+      { "type": "value_committed", "path": "/age", "value": 30 },
+      { "type": "container_closed", "path": "/" }
+    ]
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

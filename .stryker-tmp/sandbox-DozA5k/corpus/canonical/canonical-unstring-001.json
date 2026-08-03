@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "id": "canonical-unstring-001",
+  "title": "Unclosed string value",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"key\":\"value never closes"
+  },
+  "stream": {
+    "endReason": "length",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "incomplete",
+    "outcome": "truncated",
+    "stableValue": {},
+    "finalValue": {},
+    "executable": false,
+    "diagnostics": [
+      {
+        "code": "E_UNTERMINATED_STRING",
+        "severity": "error",
+        "recoverable": false
+      },
+      {
+        "code": "E_STREAM_TRUNCATED",
+        "severity": "error",
+        "recoverable": false
+      }
+    ],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

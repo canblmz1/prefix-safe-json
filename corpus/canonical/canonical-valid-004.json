@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "id": "canonical-valid-004",
+  "title": "Empty containers",
+  "category": "canonical",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"empty_obj\":{},\"empty_arr\":[]}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "single",
+      "byte-per-chunk",
+      "char-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "stableValue": {
+      "empty_obj": {},
+      "empty_arr": []
+    },
+    "finalValue": {
+      "empty_obj": {},
+      "empty_arr": []
+    },
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": []
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}
