@@ -18,7 +18,7 @@ const SCHEMA_FILE = join(CORPUS_DIR, "schema", "fixture.schema.json");
 
 const DIRS = ["canonical", "malformed", "unicode", "truncation", "fuzz", "provider-envelopes"];
 
-function validateFixture(ajv: Ajv, validate: { (d: unknown): boolean; errors?: { instancePath: string; message?: string }[] | null }, data: Record<string, unknown>): string[] {
+function validateFixture(validate: { (d: unknown): boolean; errors?: { instancePath: string; message?: string }[] | null }, data: Record<string, unknown>): string[] {
   const errors: string[] = [];
   const valid = validate(data);
   
@@ -43,6 +43,7 @@ let passedFiles = 0;
 
   const schemaContent = readFileSync(SCHEMA_FILE, "utf8");
   const schema = JSON.parse(schemaContent);
+  // @ts-expect-error TS2351 - Ajv construct signature mismatch with ESM
   const ajv = new Ajv({ strict: false });
   const validate = ajv.compile(schema);
 
@@ -57,7 +58,7 @@ let passedFiles = 0;
       try {
         const content = readFileSync(filePath, "utf8");
         const data = JSON.parse(content) as Record<string, unknown>;
-        const errors = validateFixture(ajv, validate, data);
+        const errors = validateFixture(validate, data);
 
       if (errors.length > 0) {
         console.error(`❌ ${file}:`);

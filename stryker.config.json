@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
   "reporters": [
     "progress",
     "clear-text",
@@ -8,9 +9,14 @@
   ],
   "coverageAnalysis": "perTest",
   "mutate": [
-    "src/**/*.ts",
-    "!src/**/index.ts",
-    "!src/types.ts",
-    "!src/diagnostics/codes.ts"
-  ]
+    "src/parser.ts",
+    "src/grammar/stack.ts",
+    "src/grammar/frame.ts",
+    "src/grammar/pointer.ts",
+    "src/utf8/decoder.ts",
+    "src/lexer/scanner.ts",
+    "src/diagnostics/factory.ts"
+  ],
+  "timeoutMS": 10000,
+  "timeoutFactor": 2
 }

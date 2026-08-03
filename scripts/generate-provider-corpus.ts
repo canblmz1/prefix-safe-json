@@ -22,7 +22,7 @@ function generateFixture(category: string, provider: string, namePrefix: string,
     events.push(...chunkEvents);
   }
   
-  const finishEvents = adapter.finish({ reason: endReason });
+  const finishEvents = adapter.finish({ reason: endReason as "complete" | "length" | "network_error" | "provider_error" | "cancelled" | "unknown" });
   events.push(...finishEvents);
   
   // Format as fixture
@@ -35,11 +35,11 @@ function generateFixture(category: string, provider: string, namePrefix: string,
     provider,
     input: {
       encoding: "utf8-text",
-      data: chunks.map(c => JSON.stringify(c)).join("\\n") // Store each chunk as a line
+      data: chunks.map(c => JSON.stringify(c)).join("\n") // Store each chunk as a line
     },
     stream: {
-      endReason,
-      chunkStrategies: ["line-per-chunk"]
+      chunks: chunks.map(c => JSON.stringify(c)),
+      endReason
     },
     expected: {
       syntax: "root_complete", // arbitrary for provider tests

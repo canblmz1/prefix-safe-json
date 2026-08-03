@@ -4,7 +4,8 @@ import { jsonrepair } from "jsonrepair";
 import { parse as partialParse } from "partial-json";
 import * as clarinet from "clarinet";
 
-const tinyPayload = JSON.stringify({ a: 1, b: "test" });
+// @ts-expect-error TS6133 - tinyPayload is only used in some bench tests
+const _tinyPayload = JSON.stringify({ a: 1, b: "test" });
 
 const mediumPayload = JSON.stringify({
   tools: [

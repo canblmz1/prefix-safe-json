@@ -20,7 +20,7 @@ describe("Property-Based Testing (fast-check)", () => {
   it("Chunk invariance: Output is identical regardless of how chunks are split", () => {
     fc.assert(
       fc.property(
-        fc.jsonValue({ depthFactor: 0.5, maxDepth: 5 }), 
+        fc.jsonValue({ maxDepth: 5 }), 
         fc.array(fc.integer({ min: 1, max: 20 }), { minLength: 1, maxLength: 50 }),
         (jsonValue, chunkSizes) => {
           const jsonString = JSON.stringify(jsonValue);
@@ -53,7 +53,7 @@ describe("Property-Based Testing (fast-check)", () => {
   it("Prefix safety: A truncated valid JSON stream never contains partial scalars", () => {
     fc.assert(
       fc.property(
-        fc.jsonValue({ depthFactor: 0.5, maxDepth: 5 }),
+        fc.jsonValue({ maxDepth: 5 }),
         fc.integer({ min: 1, max: 100 }),
         (jsonValue, truncatePercent) => {
           const jsonString = JSON.stringify(jsonValue);
