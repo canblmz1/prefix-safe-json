@@ -110,6 +110,7 @@ export class Utf8Decoder {
 
     // If we have pending bytes from a previous chunk, try to complete the sequence
     if (this.pending.length > 0) {
+      let brokenByInvalidContinuation = false;
       while (i < bytes.length && this.pending.length < this.pendingExpected) {
         const b = bytes[i] as number;
         if ((b & 0xc0) !== 0x80) {
@@ -120,6 +121,7 @@ export class Utf8Decoder {
           });
           this.pending = [];
           this.pendingExpected = 0;
+          brokenByInvalidContinuation = true;
           // Don't consume this byte — it might be a valid start byte
           break;
         }
@@ -128,7 +130,12 @@ export class Utf8Decoder {
         this.totalOffset++;
       }
 
-      if (this.pending.length === this.pendingExpected) {
+      // brokenByInvalidContinuation resets pending.length/pendingExpected to
+      // the same value (0), which would otherwise make the check below
+      // read as "0 of 0 bytes needed - sequence complete" and spuriously
+      // decode an empty byte array, producing a second, bogus diagnostic
+      // alongside the invalid_continuation one already pushed above.
+      if (!brokenByInvalidContinuation && this.pending.length === this.pendingExpected) {
         // We have a complete sequence — decode it
         const result = this.decodeSequence(
           this.pending,
@@ -141,7 +148,7 @@ export class Utf8Decoder {
         }
         this.pending = [];
         this.pendingExpected = 0;
-      } else if (i >= bytes.length) {
+      } else if (!brokenByInvalidContinuation && i >= bytes.length) {
         // Still incomplete — wait for more data
         const consumed = this.totalOffset - startOffset;
         return { text: "", consumed, errors, strippedBom };

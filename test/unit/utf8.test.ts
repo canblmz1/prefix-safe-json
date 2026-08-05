@@ -229,4 +229,156 @@ describe("Utf8Decoder", () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
   });
+
+  describe("exact consumed byte counts (single push, no chunk split)", () => {
+    it("a 2-byte character followed by ASCII consumes exactly the right byte counts and continues correctly", () => {
+      const decoder = new Utf8Decoder();
+      // 'é' (2 bytes) + 'X' (1 byte)
+      const result = decoder.decode(new Uint8Array([0xc3, 0xa9, 0x58]));
+      expect(result.text).toBe("éX");
+      expect(result.consumed).toBe(3);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("a 3-byte character followed by ASCII consumes exactly the right byte counts and continues correctly", () => {
+      const decoder = new Utf8Decoder();
+      // '漢' (E6 BC A2, 3 bytes) + 'X'
+      const result = decoder.decode(new Uint8Array([0xe6, 0xbc, 0xa2, 0x58]));
+      expect(result.text).toBe("漢X");
+      expect(result.consumed).toBe(4);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("a 4-byte character followed by ASCII consumes exactly the right byte counts and continues correctly", () => {
+      const decoder = new Utf8Decoder();
+      // '😀' (F0 9F 98 80, 4 bytes) + 'X'
+      const result = decoder.decode(new Uint8Array([0xf0, 0x9f, 0x98, 0x80, 0x58]));
+      expect(result.text).toBe("😀X");
+      expect(result.consumed).toBe(5);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("an invalid start byte advances by exactly 1 and the correct byte offset is reported, then decoding continues", () => {
+      const decoder = new Utf8Decoder();
+      // 0xFF is never a valid start byte; 'X' should still decode after it
+      const result = decoder.decode(new Uint8Array([0xff, 0x58]));
+      expect(result.errors).toEqual([{ kind: "invalid_start_byte", byteOffset: 0 }]);
+      expect(result.text).toBe("X");
+      expect(result.consumed).toBe(2);
+    });
+  });
+
+  describe("multi-byte sequences split across pushes at every possible byte", () => {
+    it("resumes a 2-byte sequence split after the 1st byte, with exact consumed/text", () => {
+      const decoder = new Utf8Decoder();
+      const r1 = decoder.decode(new Uint8Array([0xc3]));
+      expect(r1.text).toBe("");
+      const r2 = decoder.decode(new Uint8Array([0xa9, 0x58])); // rest of é + X
+      expect(r2.text).toBe("éX");
+    });
+
+    it("resumes a 3-byte sequence split after the 1st byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xe6]));
+      const r2 = decoder.decode(new Uint8Array([0xbc, 0xa2, 0x58]));
+      expect(r2.text).toBe("漢X");
+    });
+
+    it("resumes a 3-byte sequence split after the 2nd byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xe6, 0xbc]));
+      const r2 = decoder.decode(new Uint8Array([0xa2, 0x58]));
+      expect(r2.text).toBe("漢X");
+    });
+
+    it("resumes a 4-byte sequence split after the 1st byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xf0]));
+      const r2 = decoder.decode(new Uint8Array([0x9f, 0x98, 0x80, 0x58]));
+      expect(r2.text).toBe("😀X");
+    });
+
+    it("resumes a 4-byte sequence split after the 2nd byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xf0, 0x9f]));
+      const r2 = decoder.decode(new Uint8Array([0x98, 0x80, 0x58]));
+      expect(r2.text).toBe("😀X");
+    });
+
+    it("resumes a 4-byte sequence split after the 3rd byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xf0, 0x9f, 0x98]));
+      const r2 = decoder.decode(new Uint8Array([0x80, 0x58]));
+      expect(r2.text).toBe("😀X");
+    });
+
+    it("reports the correct byte offset when a resumed sequence turns out to have an invalid continuation byte", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xe6])); // starts a 3-byte sequence at offset 0
+      const r2 = decoder.decode(new Uint8Array([0x41, 0x41])); // 'A' is not a continuation byte
+      expect(r2.errors).toHaveLength(1);
+      expect(r2.errors[0]?.kind).toBe("invalid_continuation");
+      expect(r2.errors[0]?.byteOffset).toBe(0);
+    });
+
+    it("regression: aborting a pending sequence on an invalid continuation byte does not also emit a spurious second diagnostic", () => {
+      // Root cause: the while-loop that resumes a pending sequence resets
+      // both `pending` and `pendingExpected` to 0 when it aborts on an
+      // invalid continuation byte. The immediately-following check
+      // `pending.length === pendingExpected` then read as "0 of 0 needed -
+      // sequence complete" (0 === 0), spuriously calling decodeSequence([])
+      // on the now-empty pending array and pushing a second, bogus error
+      // (whatever an empty-array bit-decode happens to produce) alongside
+      // the correct invalid_continuation one.
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xe6])); // pending: 1 of 3 bytes of a 3-byte sequence
+      const r2 = decoder.decode(new Uint8Array([0x41, 0x41]));
+      expect(r2.errors).toEqual([{ kind: "invalid_continuation", byteOffset: 0 }]);
+      expect(r2.text).toBe("AA");
+    });
+  });
+
+  describe("overlong and out-of-range codepoints report the exact byte offset", () => {
+    it("reports 'overlong' with the sequence's own start offset, not 0", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(stringToUtf8("AB")); // 2 bytes of padding to offset the sequence
+      const result = decoder.decode(new Uint8Array([0xc0, 0x80])); // overlong encoding of NUL
+      // On error, the main loop only advances by 1 byte (not the sequence's
+      // full length), so the remaining byte(s) of the rejected sequence are
+      // each re-examined as fresh potential start bytes. A lone 0x80
+      // continuation byte never validly starts a sequence, so it cascades
+      // into its own invalid_start_byte diagnostic - both are real,
+      // consistent, no wrong text is produced (codePoints stays empty).
+      expect(result.errors).toEqual([
+        { kind: "overlong", byteOffset: 2 },
+        { kind: "invalid_start_byte", byteOffset: 3 },
+      ]);
+      expect(result.text).toBe("");
+    });
+
+    it("reports 'out_of_range' with the sequence's own start offset, not 0", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(stringToUtf8("AB"));
+      const result = decoder.decode(new Uint8Array([0xf4, 0x90, 0x80, 0x80])); // > U+10FFFF
+      expect(result.errors).toEqual([
+        { kind: "out_of_range", byteOffset: 2 },
+        { kind: "invalid_start_byte", byteOffset: 3 },
+        { kind: "invalid_start_byte", byteOffset: 4 },
+        { kind: "invalid_start_byte", byteOffset: 5 },
+      ]);
+      expect(result.text).toBe("");
+    });
+  });
+
+  describe("codePointsToString chunking boundary (CHUNK_SIZE = 8192)", () => {
+    it("produces byte-identical output for exactly 8192, one under, and one over the chunk boundary", () => {
+      for (const n of [8191, 8192, 8193]) {
+        const decoder = new Utf8Decoder();
+        const input = "x".repeat(n);
+        const result = decoder.decode(stringToUtf8(input));
+        expect(result.text.length).toBe(n);
+        expect(result.text).toBe(input);
+      }
+    });
+  });
 });
