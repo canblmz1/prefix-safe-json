@@ -91,4 +91,20 @@ describe("Hostile audit fixes", () => {
       polluted: "yes",
     });
   });
+
+  it("deepClone: snapshot() does not crash at nesting depth 6000", () => {
+    const DEPTH = 6000;
+    const parser = createParser({ limits: { maxDepth: 100_000 } });
+    parser.push('{"a":'.repeat(DEPTH) + "1" + "}".repeat(DEPTH));
+
+    expect(() => parser.snapshot()).not.toThrow();
+  });
+
+  it("deepClone: finish() does not crash at nesting depth 6000", () => {
+    const DEPTH = 6000;
+    const parser = createParser({ limits: { maxDepth: 100_000 } });
+    parser.push('{"a":'.repeat(DEPTH) + "1" + "}".repeat(DEPTH));
+
+    expect(() => parser.finish({ reason: "complete" })).not.toThrow();
+  });
 });

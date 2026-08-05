@@ -224,17 +224,58 @@ function safeSet(obj: JsonObject, key: string, value: JsonValue): void {
 
 /**
  * Deep clone a JSON value.
+ * Iterative (explicit work-stack) rather than recursive: a recursive
+ * implementation overflows the JS call stack around ~5000 levels of nesting,
+ * well below values maxDepth's type otherwise permits.
  */
 function deepClone(value: JsonValue): JsonValue {
   if (value === null || typeof value !== "object") {
     return value;
   }
-  if (Array.isArray(value)) {
-    return value.map(deepClone);
+
+  const root: JsonValue = Array.isArray(value) ? [] : {};
+  const stack: Array<{ src: JsonObject | JsonArray; dst: JsonObject | JsonArray }> = [
+    { src: value as JsonObject | JsonArray, dst: root as JsonObject | JsonArray },
+  ];
+
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (!frame) continue;
+    const { src, dst } = frame;
+
+    if (Array.isArray(src)) {
+      const dstArr = dst as JsonArray;
+      for (let i = 0; i < src.length; i++) {
+        const child = src[i] as JsonValue;
+        if (child !== null && typeof child === "object") {
+          const childClone: JsonValue = Array.isArray(child) ? [] : {};
+          dstArr[i] = childClone;
+          stack.push({
+            src: child as JsonObject | JsonArray,
+            dst: childClone as JsonObject | JsonArray,
+          });
+        } else {
+          dstArr[i] = child;
+        }
+      }
+    } else {
+      const srcObj = src as JsonObject;
+      const dstObj = dst as JsonObject;
+      for (const key of Object.keys(srcObj)) {
+        const child = srcObj[key] as JsonValue;
+        if (child !== null && typeof child === "object") {
+          const childClone: JsonValue = Array.isArray(child) ? [] : {};
+          safeSet(dstObj, key, childClone);
+          stack.push({
+            src: child as JsonObject | JsonArray,
+            dst: childClone as JsonObject | JsonArray,
+          });
+        } else {
+          safeSet(dstObj, key, child);
+        }
+      }
+    }
   }
-  const result: JsonObject = {};
-  for (const key of Object.keys(value)) {
-    safeSet(result, key, deepClone((value as JsonObject)[key] as JsonValue));
-  }
-  return result;
+
+  return root;
 }
