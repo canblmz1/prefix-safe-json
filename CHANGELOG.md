@@ -100,6 +100,12 @@ this effort. The gap is disclosed here rather than closed by continuing
 to chase it — the library's `alpha`/"do not use in production" status in
 the README remains accurate and unchanged for exactly this reason.
 
+As a side effect of the tests added for the mutation-testing pass above
+(which exercised branches coverage had missed regardless of any mutant),
+statement coverage rose further: 93.10% -> **96.30%**, now past the 95%
+target in RELEASE.md. Of the two quantitative release gates, coverage is
+now met; mutation score (78.17%) is not.
+
 ### Fixed
 
 - **utf8**: `push()`-ing a single chunk containing a large string
