@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { JsonValue, JsonObject, JsonArray, ParserEvent } from "../types.js";
+import type { GrammarFrame } from "../grammar/frame.js";
 
 /**
  * Maintains the stable value by processing committed events.
@@ -11,6 +12,15 @@ import type { JsonValue, JsonObject, JsonArray, ParserEvent } from "../types.js"
 export class SnapshotBuilder {
   private root: JsonValue | undefined = undefined;
   private hasRoot = false;
+
+  /**
+   * Maps each open container's grammar frame to its corresponding node in
+   * the stable-value tree, so a newly-opened child container can attach
+   * directly to its parent in O(1) via initContainerForFrame() instead of
+   * re-parsing a JSON Pointer path string and re-walking from the root on
+   * every single container open (see initContainerForFrame).
+   */
+  private frameNodes = new WeakMap<GrammarFrame, JsonValue>();
 
   /**
    * Process a value_committed event and integrate it into the stable value.
@@ -71,63 +81,63 @@ export class SnapshotBuilder {
 
   /**
    * Initialize the root as an object container.
+   * `frame` is registered so child containers can find it in O(1).
    */
-  initRootObject(): void {
+  initRootObject(frame?: GrammarFrame): void {
     if (!this.hasRoot) {
       this.root = {};
       this.hasRoot = true;
     }
+    if (frame) this.frameNodes.set(frame, this.root as JsonValue);
   }
 
   /**
    * Initialize the root as an array container.
+   * `frame` is registered so child containers can find it in O(1).
    */
-  initRootArray(): void {
+  initRootArray(frame?: GrammarFrame): void {
     if (!this.hasRoot) {
       this.root = [];
       this.hasRoot = true;
     }
+    if (frame) this.frameNodes.set(frame, this.root as JsonValue);
   }
 
   /**
-   * Initialize a nested container at the given path.
+   * Initialize a nested container for the given (already-pushed) grammar
+   * frame, attaching it directly to its parent's node.
+   *
+   * Uses frame._parent/_segment (see grammar/frame.ts) plus the frameNodes
+   * map instead of re-parsing frame.path and walking the tree from the
+   * root on every call — that walk is O(depth), and calling it once for
+   * every one of N nested containers made opening N levels cost O(N^2)
+   * total, independent of the grammar-stack path-string fix.
    */
-  initContainer(path: string, type: "object" | "array"): void {
+  initContainerForFrame(frame: GrammarFrame, type: "object" | "array"): void {
     if (!this.hasRoot) return;
 
-    const segments = parsePointer(path);
-    if (segments.length === 0) return;
+    const parent = frame._parent;
+    const segment = frame._segment;
+    if (!parent || segment === null || segment === undefined) return;
 
-    const parentSegments = segments.slice(0, -1);
-    const lastSegment = segments[segments.length - 1];
-    if (lastSegment === undefined) return;
+    const parentNode = this.frameNodes.get(parent);
+    if (parentNode === undefined || parentNode === null) return;
 
-    let target = this.root;
-    for (const seg of parentSegments) {
-      if (target === null || target === undefined) return;
-      if (typeof target === "object" && !Array.isArray(target)) {
-        target = (target as JsonObject)[seg];
-      } else if (Array.isArray(target)) {
-        const idx = parseInt(seg, 10);
-        if (isNaN(idx)) return;
-        target = target[idx];
-      } else {
-        return;
-      }
-    }
+    const newContainer: JsonValue = type === "object" ? {} : [];
 
-    if (target === null || target === undefined) return;
-
-    const newContainer = type === "object" ? {} : [];
-
-    if (typeof target === "object" && !Array.isArray(target)) {
-      safeSet(target as JsonObject, lastSegment, newContainer);
-    } else if (Array.isArray(target)) {
-      const idx = parseInt(lastSegment, 10);
+    if (typeof parentNode === "object" && !Array.isArray(parentNode)) {
+      safeSet(parentNode as JsonObject, segment as string, newContainer);
+    } else if (Array.isArray(parentNode)) {
+      const idx =
+        typeof segment === "number" ? segment : parseInt(segment, 10);
       if (!isNaN(idx)) {
-        (target as JsonArray)[idx] = newContainer;
+        (parentNode as JsonArray)[idx] = newContainer;
       }
+    } else {
+      return;
     }
+
+    this.frameNodes.set(frame, newContainer);
   }
 
   /**

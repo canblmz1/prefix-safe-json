@@ -694,9 +694,9 @@ class Parser implements IncrementalJsonParser {
     // Init container in snapshot builder
     if (!this.grammar.isEmpty()) {
       if (this.grammar.depth === 1) {
-        this.snapshot_.initRootObject();
+        this.snapshot_.initRootObject(newFrame);
       } else {
-        this.snapshot_.initContainer(newFrame.path, "object");
+        this.snapshot_.initContainerForFrame(newFrame, "object");
       }
     }
   }
@@ -804,9 +804,9 @@ class Parser implements IncrementalJsonParser {
 
     // Init container in snapshot builder
     if (this.grammar.depth === 1) {
-      this.snapshot_.initRootArray();
+      this.snapshot_.initRootArray(newFrame);
     } else {
-      this.snapshot_.initContainer(newFrame.path, "array");
+      this.snapshot_.initContainerForFrame(newFrame, "array");
     }
   }
 

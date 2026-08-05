@@ -107,4 +107,19 @@ describe("Hostile audit fixes", () => {
 
     expect(() => parser.finish({ reason: "complete" })).not.toThrow();
   });
+
+  it("pointer construction: opening 6000 nested unclosed arrays stays fast", () => {
+    const DEPTH = 6000;
+    const parser = createParser({
+      limits: { maxDepth: 100_000, maxQueuedEvents: 1_000_000 },
+    });
+
+    const start = performance.now();
+    parser.push("[".repeat(DEPTH));
+    const elapsedMs = performance.now() - start;
+
+    // Pre-fix (O(n^2) eager path materialization) this took multiple
+    // seconds at this depth; post-fix it's a handful of milliseconds.
+    expect(elapsedMs).toBeLessThan(1500);
+  }, 20_000);
 });

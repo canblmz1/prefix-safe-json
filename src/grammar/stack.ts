@@ -55,8 +55,8 @@ export class GrammarStack {
       );
       return null;
     }
-    const path = this.currentValuePath();
-    const frame = createObjectFrame(path, byteStart);
+    const parent = this.current ?? null;
+    const frame = createObjectFrame(parent, this.currentSegment(), byteStart);
     this.stack.push(frame);
     return frame;
   }
@@ -78,8 +78,8 @@ export class GrammarStack {
       );
       return null;
     }
-    const path = this.currentValuePath();
-    const frame = createArrayFrame(path, byteStart);
+    const parent = this.current ?? null;
+    const frame = createArrayFrame(parent, this.currentSegment(), byteStart);
     this.stack.push(frame);
     return frame;
   }
@@ -137,6 +137,23 @@ export class GrammarStack {
     }
     // array
     return appendPointer(frame.path, frame.nextArrayIndex);
+  }
+
+  /**
+   * The key/index that would lead from the current frame to its next child,
+   * without flattening it into a full path string. Same underlying value
+   * currentValuePath() uses; kept as a raw segment so a newly-pushed child
+   * frame can capture it in O(1) and defer the expensive path-string join
+   * (see grammar/frame.ts) until something actually reads `.path`.
+   */
+  private currentSegment(): string | number | null {
+    const frame = this.current;
+    if (!frame) return null;
+
+    if (frame.containerType === "object") {
+      return frame.currentKey !== undefined ? frame.currentKey : null;
+    }
+    return frame.nextArrayIndex;
   }
 
   /**
