@@ -242,7 +242,7 @@ export class Utf8Decoder {
       }
     }
 
-    const text = String.fromCodePoint(...codePoints);
+    const text = codePointsToString(codePoints);
     const consumed = this.totalOffset - startOffset;
     return { text, consumed, errors, strippedBom };
   }
@@ -337,6 +337,24 @@ export class Utf8Decoder {
 
     return { codePoint };
   }
+}
+
+/**
+ * Build a string from an array of code points without spreading the whole
+ * array as call arguments — a single-call spread hits engine argument-count
+ * limits (RangeError: Maximum call stack size exceeded) once codePoints
+ * grows past roughly 100k entries, which a single large push() can trigger.
+ */
+function codePointsToString(codePoints: number[]): string {
+  const CHUNK_SIZE = 8192;
+  if (codePoints.length <= CHUNK_SIZE) {
+    return String.fromCodePoint(...codePoints);
+  }
+  let text = "";
+  for (let i = 0; i < codePoints.length; i += CHUNK_SIZE) {
+    text += String.fromCodePoint(...codePoints.slice(i, i + CHUNK_SIZE));
+  }
+  return text;
 }
 
 /**
