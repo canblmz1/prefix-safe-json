@@ -52,6 +52,20 @@ class Parser implements IncrementalJsonParser {
   private readonly allDiagnostics: Diagnostic[] = [];
   private readonly allRepairs: RepairAction[] = [];
 
+  // Sticky flags mirroring the *existence* of certain diagnostics/repairs,
+  // set unconditionally in addDiagnostic()/addRepair() regardless of
+  // whether the corresponding array is at its maxQueuedEvents cap. Several
+  // checks (isExecutable, determineOutcome) need an exact, monotonic answer
+  // to "did X ever happen for this stream" — re-deriving that by scanning
+  // allDiagnostics/allRepairs is unsound once those arrays can be truncated,
+  // since a disqualifying entry could be the one silently dropped. This is
+  // the same reasoning that already made grammar.hasDuplicate a dedicated
+  // boolean instead of an array scan.
+  private everHadFatalDiagnostic = false;
+  private everHadNonRecoverableError = false;
+  private everHadStructuralOrLossyRepair = false;
+  private everHadCloseContainerRepair = false;
+
   private phase: "collecting" | "finished" = "collecting";
   private receivedBytes = 0;
   private consumedBytes = 0;
@@ -149,8 +163,7 @@ class Parser implements IncrementalJsonParser {
          impact: "representation_preserving",
          description: "Stripped UTF-8 BOM at index 0",
        };
-       this.allRepairs.push(repair);
-       this.events.emitRepairApplied(repair);
+       this.addRepair(repair);
     }
 
     // Handle UTF-8 errors
@@ -224,8 +237,7 @@ class Parser implements IncrementalJsonParser {
               impact: "root_preserving",
               description: "Isolated trailing data after complete JSON root",
             };
-            this.allRepairs.push(repair);
-            this.events.emitRepairApplied(repair);
+            this.addRepair(repair);
           }
           
           this.trailingDataBytes += charBytes;
@@ -272,8 +284,7 @@ class Parser implements IncrementalJsonParser {
       const scanRepairs = this.scanner.takeRepairs();
       
       for (const repair of scanRepairs) {
-        this.allRepairs.push(repair);
-        this.events.emitRepairApplied(repair);
+        this.addRepair(repair);
       }
       
       for (const diag of scanDiags) {
@@ -507,8 +518,7 @@ class Parser implements IncrementalJsonParser {
            impact: "structural",
            description: `Safely closed ${frames.length} containers at stream end`,
         };
-        this.allRepairs.push(repair);
-        this.events.emitRepairApplied(repair);
+        this.addRepair(repair);
         this.rootComplete = true;
       }
 
@@ -1127,8 +1137,34 @@ class Parser implements IncrementalJsonParser {
   // -----------------------------------------------------------------------
 
   private addDiagnostic(diag: Diagnostic): void {
-    this.allDiagnostics.push(diag);
+    // Cap accumulation independently of the EventBuilder's own queue limit:
+    // a consumer who drains events after every push() keeps that queue
+    // short, which would otherwise let this array grow without bound for
+    // the lifetime of the parser (see limits.maxQueuedEvents).
+    if (diag.severity === "fatal") this.everHadFatalDiagnostic = true;
+    if (
+      (diag.severity === "error" || diag.severity === "fatal") &&
+      !diag.recoverable
+    ) {
+      this.everHadNonRecoverableError = true;
+    }
+    if (this.allDiagnostics.length < this.limits.maxQueuedEvents) {
+      this.allDiagnostics.push(diag);
+    }
     this.events.emitDiagnostic(diag);
+  }
+
+  private addRepair(repair: RepairAction): void {
+    if (repair.impact === "structural" || repair.impact === "lossy") {
+      this.everHadStructuralOrLossyRepair = true;
+    }
+    if (repair.code === "R_CLOSE_CONTAINER") {
+      this.everHadCloseContainerRepair = true;
+    }
+    if (this.allRepairs.length < this.limits.maxQueuedEvents) {
+      this.allRepairs.push(repair);
+    }
+    this.events.emitRepairApplied(repair);
   }
 
   private isExecutable(): boolean {
@@ -1149,11 +1185,7 @@ class Parser implements IncrementalJsonParser {
     if (this.grammar.hasDuplicate) return false;
     if (this.hasFatalDiagnostic()) return false;
     if (this.hasNonRecoverableError()) return false;
-    if (this.allRepairs.some(
-      (r) => r.impact === "structural" || r.impact === "lossy",
-    )) {
-      return false;
-    }
+    if (this.everHadStructuralOrLossyRepair) return false;
 
     const pendingInfo = this.scanner.getPendingInfo();
     if (pendingInfo.type !== "none") return false;
@@ -1164,14 +1196,11 @@ class Parser implements IncrementalJsonParser {
   }
 
   private hasFatalDiagnostic(): boolean {
-    return this.allDiagnostics.some((d) => d.severity === "fatal");
+    return this.everHadFatalDiagnostic;
   }
 
   private hasNonRecoverableError(): boolean {
-    return this.allDiagnostics.some(
-      (d) =>
-        (d.severity === "error" || d.severity === "fatal") && !d.recoverable,
-    );
+    return this.everHadNonRecoverableError;
   }
 
   private determineOutcome(
@@ -1182,8 +1211,7 @@ class Parser implements IncrementalJsonParser {
     if (this.grammar.hasDuplicate) return "invalid";
     
     // Check if salvaged
-    const hasSalvage = this.allRepairs.some((r) => r.code === "R_CLOSE_CONTAINER");
-    if (hasSalvage) return "salvaged";
+    if (this.everHadCloseContainerRepair) return "salvaged";
 
     if (!this.rootComplete) return "truncated";
 

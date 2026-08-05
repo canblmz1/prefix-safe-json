@@ -122,4 +122,58 @@ describe("Hostile audit fixes", () => {
     // seconds at this depth; post-fix it's a handful of milliseconds.
     expect(elapsedMs).toBeLessThan(1500);
   }, 20_000);
+
+  it("diagnostics: allDiagnostics/allRepairs stay bounded even when drained after every push", () => {
+    const CAP = 50;
+    const parser = createParser({ limits: { maxQueuedEvents: CAP } });
+
+    parser.push('{"a":1');
+    parser.drainEvents();
+
+    // Each of these repeats registers one E_DUPLICATE_KEY diagnostic. A
+    // consumer draining events after every push keeps the live event queue
+    // short, which must not let the diagnostics/repairs history grow past
+    // the configured cap regardless.
+    for (let i = 0; i < CAP * 4; i++) {
+      parser.push(',"a":1');
+      parser.drainEvents();
+    }
+    parser.push("}");
+    parser.drainEvents();
+
+    const result = parser.finish({ reason: "complete" });
+    expect(result.diagnostics.length).toBeLessThanOrEqual(CAP);
+  });
+
+  it("outcome/executable stay correct when the repairs array is saturated before a structural repair occurs", () => {
+    // Regression: determineOutcome() and isExecutable() used to re-derive
+    // "was there ever a structural repair / R_CLOSE_CONTAINER repair" by
+    // scanning allRepairs — which the maxQueuedEvents cap can truncate. If
+    // enough representation_preserving repairs (e.g. escaped raw control
+    // characters) filled the cap before a later closeContainersAtFinish
+    // salvage occurred, the salvage repair itself would be silently dropped
+    // from the array, and outcome incorrectly reported "valid" instead of
+    // "salvaged" for a stream that was actually truncated and only survived
+    // via structural salvage.
+    const CAP = 10;
+    const parser = createParser({
+      limits: { maxQueuedEvents: CAP, maxDepth: 100 },
+      repairs: { rawControlCharacters: "escape", closeContainersAtFinish: "safe-only" },
+    });
+
+    parser.push('{"a":"');
+    parser.drainEvents();
+    for (let i = 0; i < CAP + 5; i++) {
+      parser.push("\x01"); // each produces one representation_preserving repair
+      parser.drainEvents();
+    }
+    parser.push('","b":true ');
+    parser.drainEvents();
+
+    const result = parser.finish({ reason: "length" }); // truncated -> triggers safe-only salvage
+
+    expect(result.repairs.length).toBeLessThanOrEqual(CAP); // array is still capped
+    expect(result.outcome).toBe("salvaged"); // but outcome is correct regardless
+    expect(result.executable).toBe(false);
+  });
 });
