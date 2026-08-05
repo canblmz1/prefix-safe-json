@@ -55,4 +55,40 @@ describe("Hostile audit fixes", () => {
     const result = parser.finish({ reason: "complete" });
     expect(result.outcome).toBe("valid");
   });
+
+  it("__proto__: is preserved as a real own property, not silently dropped", () => {
+    const parser = createParser();
+    parser.push('{"__proto__": "hello", "safe": 1}');
+    const result = parser.finish({ reason: "complete" });
+
+    const value = result.stableValue as JsonObject;
+    expect(Object.prototype.hasOwnProperty.call(value, "__proto__")).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(value, "__proto__")?.value).toBe("hello");
+    expect(value.safe).toBe(1);
+    expect(Object.keys(value).sort()).toEqual(["__proto__", "safe"]);
+    // Compare against native JSON.parse's own output rather than a
+    // hand-written `{ __proto__: "hello" }` object literal — the literal
+    // shorthand form is itself special-cased by the JS spec to *set the
+    // prototype* rather than create an own property, and silently no-ops
+    // for a non-object value like "hello". JSON.parse doesn't have that
+    // problem (it uses CreateDataProperty), so it's a safe reference here.
+    expect(JSON.stringify(value)).toBe(
+      JSON.stringify(JSON.parse('{"__proto__":"hello","safe":1}')),
+    );
+    // Must not escalate to real prototype pollution either.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("__proto__: nested under a key does not leak into the global prototype", () => {
+    const before = ({} as Record<string, unknown>).polluted;
+    const parser = createParser();
+    parser.push('{"a":{"__proto__":{"polluted":"yes"}}}');
+    const result = parser.finish({ reason: "complete" });
+
+    expect(({} as Record<string, unknown>).polluted).toBe(before);
+    const a = (result.stableValue as JsonObject).a as JsonObject;
+    expect(Object.getOwnPropertyDescriptor(a, "__proto__")?.value).toEqual({
+      polluted: "yes",
+    });
+  });
 });

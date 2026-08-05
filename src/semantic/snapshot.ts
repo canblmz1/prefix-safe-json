@@ -60,7 +60,7 @@ export class SnapshotBuilder {
     if (target === null || target === undefined) return;
 
     if (typeof target === "object" && !Array.isArray(target)) {
-      (target as JsonObject)[lastSegment] = value;
+      safeSet(target as JsonObject, lastSegment, value);
     } else if (Array.isArray(target)) {
       const idx = parseInt(lastSegment, 10);
       if (!isNaN(idx)) {
@@ -121,7 +121,7 @@ export class SnapshotBuilder {
     const newContainer = type === "object" ? {} : [];
 
     if (typeof target === "object" && !Array.isArray(target)) {
-      (target as JsonObject)[lastSegment] = newContainer;
+      safeSet(target as JsonObject, lastSegment, newContainer);
     } else if (Array.isArray(target)) {
       const idx = parseInt(lastSegment, 10);
       if (!isNaN(idx)) {
@@ -206,6 +206,23 @@ function parsePointer(pointer: string): string[] {
 }
 
 /**
+ * Assign a JSON-derived key onto a plain object without going through the
+ * inherited `__proto__` accessor. Bracket assignment (obj[key] = value) on a
+ * plain object silently reassigns the object's prototype instead of creating
+ * an own property when key === "__proto__", which makes that field vanish
+ * from Object.keys()/JSON.stringify(). defineProperty always creates a real
+ * own data property, matching native JSON.parse's behavior for such keys.
+ */
+function safeSet(obj: JsonObject, key: string, value: JsonValue): void {
+  Object.defineProperty(obj, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+/**
  * Deep clone a JSON value.
  */
 function deepClone(value: JsonValue): JsonValue {
@@ -217,7 +234,7 @@ function deepClone(value: JsonValue): JsonValue {
   }
   const result: JsonObject = {};
   for (const key of Object.keys(value)) {
-    result[key] = deepClone((value as JsonObject)[key] as JsonValue);
+    safeSet(result, key, deepClone((value as JsonObject)[key] as JsonValue));
   }
   return result;
 }
