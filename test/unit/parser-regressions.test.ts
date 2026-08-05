@@ -230,4 +230,51 @@ describe("Hostile audit fixes", () => {
       expect(result.stableValue, `input ${text}`).toBe(expected);
     }
   });
+
+  it("maxStringBytes: enforced when configured", () => {
+    const parser = createParser({ limits: { maxStringBytes: 10 } });
+    parser.push('{"a":"this string is much longer than ten bytes"}');
+
+    const snapshot = parser.snapshot();
+    expect(snapshot.syntax).toBe("invalid");
+    expect(
+      snapshot.diagnostics.some((d) => d.code === "E_LIMIT_STRING_BYTES"),
+    ).toBe(true);
+  });
+
+  it("maxStringBytes: a string of exactly the configured length is allowed (off-by-one)", () => {
+    // Regression: the length check ran on the closing quote character too,
+    // counting it as one extra content byte, so a 5-byte string with
+    // maxStringBytes:5 was wrongly rejected.
+    const exactly = createParser({ limits: { maxStringBytes: 5 } });
+    exactly.push('{"a":"12345"}');
+    const exactResult = exactly.finish({ reason: "complete" });
+    expect(exactResult.outcome).toBe("valid");
+    expect(exactResult.stableValue).toEqual({ a: "12345" });
+
+    const oneOver = createParser({ limits: { maxStringBytes: 5 } });
+    oneOver.push('{"a":"123456"}');
+    const overResult = oneOver.finish({ reason: "complete" });
+    expect(overResult.outcome).not.toBe("valid");
+  });
+
+  it("maxStringBytes: an all-backslash-escape string still can't bypass the limit", () => {
+    // Regression-adjacent: confirms the closing-quote exemption above didn't
+    // accidentally also exempt the backslash-starts-an-escape branch, which
+    // would let a string made entirely of escapes grow unbounded.
+    const parser = createParser({
+      limits: { maxStringBytes: 20, maxQueuedEvents: 1_000_000 },
+    });
+    const payload = '{"a":"' + "\\\\".repeat(500) + '"}'; // 1000 raw bytes
+    const r = parser.push(payload);
+    expect(r.terminal).toBe(true);
+  });
+
+  it("maxStringBytes: short strings under the limit are unaffected", () => {
+    const parser = createParser({ limits: { maxStringBytes: 10 } });
+    parser.push('{"a":"ok"}');
+    const result = parser.finish({ reason: "complete" });
+    expect(result.outcome).toBe("valid");
+    expect((result.stableValue as JsonObject).a).toBe("ok");
+  });
 });

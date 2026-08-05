@@ -16,6 +16,7 @@ import type { Token } from "./tokens.js";
 import type { Diagnostic, RepairAction, ParserOptions } from "../types.js";
 import { DiagnosticCode } from "../diagnostics/codes.js";
 import { createDiagnostic } from "../diagnostics/factory.js";
+import { DEFAULT_LIMITS } from "../limits.js";
 
 /** Whitespace characters in JSON. */
 function isWhitespace(ch: string): boolean {
@@ -41,9 +42,12 @@ function isHexDigit(ch: string): boolean {
  */
 export class Scanner {
   private options: ParserOptions;
+  private maxStringBytes: number;
 
   constructor(options?: ParserOptions) {
     this.options = options ?? {};
+    this.maxStringBytes =
+      options?.limits?.maxStringBytes ?? DEFAULT_LIMITS.maxStringBytes;
   }
 
   private state: ScannerState = ScannerState.Structural;
@@ -388,6 +392,28 @@ export class Scanner {
   }
 
   private processString(ch: string, byteOffset: number, charByteLen: number): void {
+    // Checked for every character except the closing quote itself (checking
+    // here rather than only at termination means a string that never closes
+    // can't grow unboundedly before being caught; still checked on "\\" so
+    // an all-escape-sequence string can't bypass it either, since escaped
+    // characters are consumed by processEscape, not this function).
+    // byteOffset - stringByteStart counts bytes from the *opening* quote, so
+    // it equals the content length so far for any content character — but
+    // for the closing quote specifically it equals content length + 1 (the
+    // opening quote's own byte), which would wrongly reject a string of
+    // exactly maxStringBytes. Excluding '"' here fixes that off-by-one.
+    if (ch !== '"' && byteOffset - this.stringByteStart > this.maxStringBytes) {
+      this.emitDiagnostic(
+        DiagnosticCode.E_LIMIT_STRING_BYTES,
+        "fatal",
+        byteOffset,
+        `String exceeds maximum of ${this.maxStringBytes} bytes`,
+        false,
+      );
+      this.state = ScannerState.Invalid;
+      return;
+    }
+
     if (ch === "\\") {
       this.state = ScannerState.Escape;
     } else if (ch === '"') {
