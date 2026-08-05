@@ -215,6 +215,39 @@ describe("Hostile audit fixes", () => {
     expect(result.diagnostics.length).toBeGreaterThan(0);
   });
 
+  it("number grammar: bare top-level malformed number is 'invalid', not 'truncated' - same category as the wrapped case", () => {
+    // Regression: a definitively malformed number (leading zero, trailing
+    // "."/exponent) can never become valid no matter what more data
+    // arrives - unlike a genuine truncation (e.g. "123" cut off mid-stream),
+    // which could resolve into a valid number with more digits. The
+    // "invalid" branch of finish()'s number-finalization handling emitted
+    // a diagnostic but never set terminal/syntax_ (every other error branch
+    // in the file does), so determineOutcome() fell through to its generic
+    // `!rootComplete` case and mislabeled it "truncated". Only reproduced
+    // for a BARE top-level number: `{"a":01}` already correctly reported
+    // "invalid" via a different code path (the scanner's own
+    // ScannerState.Invalid transition), which is exactly why the
+    // pre-existing `.not.toBe("valid")` assertions above (true for both
+    // "invalid" and "truncated") never caught this for 10 audit rounds.
+    for (const doc of ["01", "-01", "-00", "1.", "-1.", "1e+"]) {
+      const parser = createParser();
+      parser.push(doc);
+      const result = parser.finish({ reason: "complete" });
+
+      expect(result.outcome, `input ${doc}`).toBe("invalid");
+      expect(result.executable, `input ${doc}`).toBe(false);
+    }
+  });
+
+  it("number grammar: genuine truncation (incomplete number, stream ended early) still reports 'truncated'", () => {
+    const parser = createParser();
+    parser.push("123");
+    const result = parser.finish({ reason: "length" });
+
+    expect(result.outcome).toBe("truncated");
+    expect(result.executable).toBe(false);
+  });
+
   it("number grammar: still accepts valid numbers unaffected by the fix", () => {
     const cases: Array<[string, number]> = [
       ["0", 0],

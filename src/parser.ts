@@ -399,6 +399,20 @@ class Parser implements IncrementalJsonParser {
                 false,
               ),
             );
+            // Unlike every other error branch in this method, this one
+            // never routed through commitScalar()/the scanner's own
+            // Invalid-state transition, so nothing else here sets
+            // terminal/syntax_. Without this, a definitively malformed
+            // number (leading zero, trailing "."/exponent - not fixable by
+            // more input, unlike a genuine truncation) fell through
+            // determineOutcome()'s generic `!rootComplete` case and was
+            // misreported as outcome "truncated" instead of "invalid" for
+            // a bare top-level root (e.g. plain "01" or "-01" as the whole
+            // document) - the same malformation wrapped in a container
+            // (e.g. `{"a":01}`) already reported "invalid" correctly via
+            // the scanner's ScannerState.Invalid path.
+            this.terminal = true;
+            this.syntax_ = "invalid";
           }
           // "not_ready": scanner wasn't in a finalizable number state at all
           // (e.g. buffer is just "-", or ends right at a bare "e"/"E") —
