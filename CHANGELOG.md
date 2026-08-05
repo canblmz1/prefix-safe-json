@@ -76,6 +76,30 @@ site uses `severity: "warning"`), and `determineOutcome()`'s
 `reason !== "complete" && reason !== "unknown"` branch (both it and its
 fallthrough return `"valid"`).
 
+**Final combined mutation score (all 7 mutated files together, one
+unscoped `pnpm test:mutate` run — the number that actually matters for
+the 85% bar, not per-file scoped estimates): 78.17%** (up from 58.52% at
+the start of this effort). Per file: `diagnostics/factory.ts` 100%,
+`grammar/pointer.ts` 100%, `grammar/stack.ts` 98.39%, `grammar/frame.ts`
+91.67%, `utf8/decoder.ts` 82.65%, `lexer/scanner.ts` 78.56%, `parser.ts`
+73.35%. Note the combined-run `parser.ts` number (73.35%) is lower than
+the isolated scoped-run number quoted above (81.73%) for the identical
+code and tests — Stryker clusters "static" mutants differently when one
+file is mutated in isolation versus when all 7 are mutated together in
+the same run, and the combined run carries more timeout-classified
+mutants under the heavier concurrent load. The scoped number isn't wrong,
+but the combined number is the one that reflects reality when the whole
+suite runs together, so it's the one reported as authoritative here.
+
+78.17% is still below the 85% target in RELEASE.md. Work on closing that
+gap stopped at this point: the largest remaining survivor clusters were
+individually investigated (see above) and are either genuinely
+unkillable equivalent mutants, or small (1-2 mutant) scattered survivors
+whose cost per additional point had grown high relative to the rest of
+this effort. The gap is disclosed here rather than closed by continuing
+to chase it — the library's `alpha`/"do not use in production" status in
+the README remains accurate and unchanged for exactly this reason.
+
 ### Fixed
 
 - **utf8**: `push()`-ing a single chunk containing a large string
