@@ -170,4 +170,73 @@ describe("Scanner error paths (coverage gaps)", () => {
       expect(r.diagnostics.some((d) => d.code === "E_INVALID_UTF8")).toBe(true);
     });
   });
+
+  describe("each individual whitespace character is recognized on its own", () => {
+    for (const [name, ws] of [["space", " "], ["tab", "\t"], ["newline", "\n"], ["carriage return", "\r"]] as const) {
+      it(`skips a lone ${name} between array elements`, () => {
+        const p = createParser();
+        p.push(`[1,${ws}2]`);
+        const r = p.finish({ reason: "complete" });
+        expect(r.outcome).toBe("valid");
+        expect(r.stableValue).toEqual([1, 2]);
+      });
+    }
+
+    it("a non-whitespace character where whitespace is allowed is NOT silently skipped", () => {
+      const p = createParser();
+      p.push("[1,x2]");
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).not.toBe("valid");
+    });
+  });
+
+  describe("each hex-digit range boundary in a \\u escape is recognized on its own", () => {
+    const cases: Array<[string, boolean]> = [
+      ["0", true], ["9", true],
+      ["a", true], ["f", true],
+      ["A", true], ["F", true],
+      ["g", false], ["G", false],
+      [":", false], ["/", false], ["@", false], ["`", false],
+    ];
+    for (const [digit, valid] of cases) {
+      it(`'${digit}' is ${valid ? "" : "not "}a valid hex digit in \\u0${digit}00`, () => {
+        const p = createParser();
+        p.push(`{"a":"\\u0${digit}00"}`);
+        const r = p.finish({ reason: "complete" });
+        if (valid) {
+          expect(r.outcome).toBe("valid");
+        } else {
+          expect(r.outcome).not.toBe("valid");
+          expect(r.diagnostics.some((d) => d.code === "E_INVALID_UNICODE_ESCAPE")).toBe(true);
+        }
+      });
+    }
+  });
+
+  describe("exponent-with-no-digit detection at a mid-stream terminator (not stream end)", () => {
+    // Distinct from the stream-end path (finalizeNumber): these all have a
+    // real terminator character (comma) arriving while still receiving
+    // more input, exercising commitNumber()'s own trailing-marker check.
+    it("rejects '1e+,' (sign with no digit, comma terminator)", () => {
+      const p = createParser();
+      p.push("[1e+,2]");
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).not.toBe("valid");
+    });
+
+    it("rejects '1e-,' (sign with no digit, comma terminator)", () => {
+      const p = createParser();
+      p.push("[1e-,2]");
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).not.toBe("valid");
+    });
+
+    it("accepts '1e1,' (a real exponent digit present) at a mid-stream terminator", () => {
+      const p = createParser();
+      p.push("[1e1,2]");
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).toBe("valid");
+      expect(r.stableValue).toEqual([10, 2]);
+    });
+  });
 });
