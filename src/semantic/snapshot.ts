@@ -141,54 +141,6 @@ export class SnapshotBuilder {
   }
 
   /**
-   * Remove a path from the stable value (for unclosed containers during snapshot).
-   */
-  removePath(path: string): void {
-    if (!this.hasRoot || path === "") return;
-
-    const segments = parsePointer(path);
-    if (segments.length === 0) return;
-
-    const parentSegments = segments.slice(0, -1);
-    const lastSegment = segments[segments.length - 1];
-    if (lastSegment === undefined) return;
-
-    let target = this.root;
-    let parent: unknown = null;
-    let parentKey: string | number = "";
-
-    for (const seg of parentSegments) {
-      if (target === null || target === undefined) return;
-      parent = target;
-      if (typeof target === "object" && !Array.isArray(target)) {
-        parentKey = seg;
-        target = (target as JsonObject)[seg];
-      } else if (Array.isArray(target)) {
-        const idx = parseInt(seg, 10);
-        if (isNaN(idx)) return;
-        parentKey = idx;
-        target = target[idx];
-      } else {
-        return;
-      }
-    }
-
-    if (target !== null && target !== undefined) {
-      if (typeof target === "object" && !Array.isArray(target)) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { [lastSegment]: removed, ...rest } = target as JsonObject;
-        if (parent === null) {
-          this.root = rest;
-        } else if (Array.isArray(parent)) {
-          (parent as JsonArray)[parentKey as number] = rest;
-        } else {
-          (parent as JsonObject)[parentKey as string] = rest;
-        }
-      }
-    }
-  }
-
-  /**
    * Get a deep clone of the current stable value.
    */
   getStableValue(): JsonValue | undefined {
