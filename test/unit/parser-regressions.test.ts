@@ -176,4 +176,58 @@ describe("Hostile audit fixes", () => {
     expect(result.outcome).toBe("salvaged"); // but outcome is correct regardless
     expect(result.executable).toBe(false);
   });
+
+  it("number grammar: rejects a leading zero ('01')", () => {
+    const parser = createParser();
+    parser.push("01");
+    const result = parser.finish({ reason: "complete" });
+
+    expect(result.outcome).not.toBe("valid");
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("number grammar: rejects a leading zero inside an object ('{\"a\":01}')", () => {
+    const parser = createParser();
+    parser.push('{"a":01}');
+    const result = parser.finish({ reason: "complete" });
+
+    expect(result.outcome).not.toBe("valid");
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("number grammar: rejects a trailing decimal point ('1.')", () => {
+    const parser = createParser();
+    parser.push("1.");
+    const result = parser.finish({ reason: "complete" });
+
+    expect(result.outcome).not.toBe("valid");
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("number grammar: rejects a truncated exponent ('1e+') at stream end", () => {
+    const parser = createParser();
+    parser.push("1e+");
+    const result = parser.finish({ reason: "complete" });
+
+    expect(result.outcome).not.toBe("valid");
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("number grammar: still accepts valid numbers unaffected by the fix", () => {
+    const cases: Array<[string, number]> = [
+      ["0", 0],
+      ["0.5", 0.5],
+      ["-0", -0],
+      ["1e400", Infinity],
+      ["-1", -1],
+      ["1.5e10", 1.5e10],
+    ];
+    for (const [text, expected] of cases) {
+      const parser = createParser();
+      parser.push(text);
+      const result = parser.finish({ reason: "complete" });
+      expect(result.outcome, `input ${text}`).toBe("valid");
+      expect(result.stableValue, `input ${text}`).toBe(expected);
+    }
+  });
 });

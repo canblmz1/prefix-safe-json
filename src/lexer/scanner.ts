@@ -226,16 +226,60 @@ export class Scanner {
   }
 
   /**
-   * Attempt to finalize a pending number (at end of input or finish).
-   * Returns true if a number token was emitted.
+   * Check numberBuffer against the parts of RFC 8259's number grammar that
+   * aren't already enforced by the state machine's character-by-character
+   * transitions: no leading zero in the integer part, and no trailing
+   * "." or exponent marker with no digit following it. Returns an error
+   * message if invalid, or null if the buffer is a well-formed number.
    */
-  finalizeNumber(): boolean {
+  private numberGrammarError(): string | null {
+    const buf = this.numberBuffer;
+    const last = buf[buf.length - 1];
+
+    if (last === ".") {
+      return "Number has trailing decimal point with no digits";
+    }
+    if (last === "e" || last === "E" || last === "+" || last === "-") {
+      return "Number has exponent with no digits";
+    }
+
+    const unsigned = buf[0] === "-" ? buf.slice(1) : buf;
+    let intPart = "";
+    for (const c of unsigned) {
+      if (c >= "0" && c <= "9") {
+        intPart += c;
+      } else {
+        break;
+      }
+    }
+    if (intPart.length > 1 && intPart[0] === "0") {
+      return "Number has leading zero";
+    }
+
+    return null;
+  }
+
+  /**
+   * Attempt to finalize a pending number (at end of input or finish()).
+   *  - "finalized": a valid number token was emitted.
+   *  - "invalid": there was a complete-looking buffer, but it violates JSON
+   *    number grammar (leading zero, trailing "." or exponent marker with
+   *    no digit after it). Nothing is emitted; numberBuffer is left as-is.
+   *  - "not_ready": scanner isn't in a finalizable number state at all
+   *    (e.g. buffer is just "-", or ends right at a bare "e"/"E" with no
+   *    sign or digit yet) — unchanged pre-existing behavior, callers should
+   *    not newly diagnose this case.
+   */
+  finalizeNumber(): "finalized" | "invalid" | "not_ready" {
     if (
       this.state === ScannerState.NumberInteger ||
       this.state === ScannerState.NumberFraction ||
       this.state === ScannerState.NumberExponent
     ) {
       if (this.numberHasDigit) {
+        if (this.numberGrammarError() !== null) {
+          return "invalid";
+        }
         this.emitToken(
           TokenType.Number,
           this.numberBuffer,
@@ -243,10 +287,10 @@ export class Scanner {
           this.currentByteOffset + 1,
         );
         this.state = ScannerState.TrailingWhitespace;
-        return true;
+        return "finalized";
       }
     }
-    return false;
+    return "not_ready";
   }
 
   /**
@@ -743,6 +787,22 @@ export class Scanner {
   }
 
   private commitNumber(endByteOffset: number): void {
+    // NumberFraction/NumberExponent's terminator branches already reject
+    // trailing "."/exponent-with-no-digit before calling this; leading zero
+    // is not caught by any state transition, so it's checked uniformly here
+    // for all three call sites (integer, fraction, exponent terminators).
+    const error = this.numberGrammarError();
+    if (error !== null) {
+      this.emitDiagnostic(
+        DiagnosticCode.E_UNEXPECTED_TOKEN,
+        "error",
+        this.numberByteStart,
+        error,
+        false,
+      );
+      this.state = ScannerState.Invalid;
+      return;
+    }
     this.emitToken(
       TokenType.Number,
       this.numberBuffer,

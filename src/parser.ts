@@ -384,12 +384,25 @@ class Parser implements IncrementalJsonParser {
         if (reason === "complete") {
           // Stream ended normally — the number terminator is implicit EOF
           const finalized = this.scanner.finalizeNumber();
-          if (finalized) {
+          if (finalized === "finalized") {
             const tokens = this.scanner.takeTokens();
             for (const token of tokens) {
               this.processToken(token);
             }
+          } else if (finalized === "invalid") {
+            this.addDiagnostic(
+              createDiagnostic(
+                DiagnosticCode.E_UNEXPECTED_TOKEN,
+                "error",
+                pendingInfo.byteStart,
+                `Invalid number at stream end: ${pendingInfo.buffer}`,
+                false,
+              ),
+            );
           }
+          // "not_ready": scanner wasn't in a finalizable number state at all
+          // (e.g. buffer is just "-", or ends right at a bare "e"/"E") —
+          // preserved exactly as before: no diagnostic added here.
         } else {
           // Truncated — number is incomplete
           this.addDiagnostic(
