@@ -39,6 +39,43 @@ rounded up. One real bug was found in the course of writing these tests
 (not a mutant itself - surfaced while testing an edge case): see the
 `utf8` entry below.
 
+A second `parser.ts`-focused pass (still the largest gap by far) added
+tests for a previously entirely-uncovered branch (`push()` after the
+parser has already gone terminal was never tested at all — 60 mutants
+with zero coverage on that one guard), the unexpected-token guards for
+`[`, `{`, `:`, and a bare string inside an array, duplicate-key scalar
+skip resumption (the existing tests only ever skipped a duplicate as the
+*last* key, never followed by more real keys), the `reason==="complete"`
+gate on finalizing a fully-typed-but-unterminated literal (`"true"` with
+no trailing character is a different case from `"true"` followed by
+something), exact UTF-8 byte-length boundary codepoints (U+007F/U+07FF/
+U+FFFF, where `<=` and `<` disagree — prior tests only used interior
+codepoints like é/漢, which can't distinguish the two), the structural
+salvage guard's individual clauses, and exact diagnostic-field checks for
+several stream-end conditions (unterminated \u escape, unpaired
+surrogate, oversized input, mismatched `]`). `parser.ts`: 67.07% -> 81.73%
+(survived mutants 291 -> 159). Also deleted one more confirmed-dead code
+path found in the process: an `if` block in `push()` whose entire body
+was comments with no executable code.
+
+Several additional survivor clusters were investigated and left
+deliberately unkilled as confirmed equivalent mutants, given real
+invariants elsewhere in the code make them unobservable via any
+black-box test: `isExecutable()`'s `this.terminal || this.syntax_ ===
+"invalid"` (every one of the 24 sites that sets `syntax_ = "invalid"`
+also sets `terminal = true` in the same statement pair, with no
+exception), `everHadFatalDiagnostic`/`everHadStructuralOrLossyRepair`
+(every real code path that could set either flag already independently
+forces `isExecutable()` false first, via `terminal`/`syntax_` or the
+`reason` check — `R_CLOSE_CONTAINER`'s only construction site is gated on
+`reason !== "complete"`, which `isExecutable()` already rejects outright),
+the `!diag.recoverable` clause in the non-recoverable-error check (no
+diagnostic in the codebase is ever constructed with `severity` in
+`{error, fatal}` *and* `recoverable: true` — the one `recoverable: true`
+site uses `severity: "warning"`), and `determineOutcome()`'s
+`reason !== "complete" && reason !== "unknown"` branch (both it and its
+fallthrough return `"valid"`).
+
 ### Fixed
 
 - **utf8**: `push()`-ing a single chunk containing a large string
@@ -127,6 +164,10 @@ rounded up. One real bug was found in the course of writing these tests
 - **utf8**: deleted `Utf8Decoder.reset()` and the `totalBytesProcessed`
   getter — unused anywhere in `src/` or `test/`, and `Utf8Decoder` isn't
   part of the public API.
+- **parser**: deleted an `if` block in `push()` (trailing-data detection)
+  whose entire body was comments explaining why no code was needed there
+  — found while investigating why its condition survived mutation testing
+  with zero possible observable effect.
 - **docs**: removed the "adoption lab" and "maintainer pack" content
   (`adapters/`, `reports/*.md`, `architecture.md`, `comparison.md`,
   `maintainer-package/`, and the corresponding test file). It claimed

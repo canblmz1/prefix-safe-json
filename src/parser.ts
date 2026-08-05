@@ -307,17 +307,6 @@ class Parser implements IncrementalJsonParser {
         }
       }
 
-      // After processing tokens, check if rootComplete was just set
-      // and handle trailing data detection
-      if (this.rootComplete && !this.trailingDataSeen) {
-        // The scanner may still be in Structural state after root close.
-        // We don't need to do anything here — the scanner's processStructural
-        // will handle further characters. But we need the scanner to know
-        // it should be in trailing whitespace mode.
-        // Actually, the scanner doesn't manage this for container closes.
-        // We'll detect trailing data in subsequent characters.
-      }
-
       // Process grammar diagnostics
       const grammarDiags = this.grammar.takeDiagnostics();
       for (const diag of grammarDiags) {
