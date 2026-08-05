@@ -21,6 +21,34 @@ This library parses each chunk incrementally and provides:
 
 > The parser never fabricates missing data. It clearly distinguishes what is definite, what is pending, what was deterministically repaired, and what is lost.
 
+## Why not a general "partial JSON" parser?
+
+Most streaming JSON helpers (including ones already used in the wild for
+LLM tool-call arguments) are designed to show *something* as early as
+possible, even if that means guessing. Concretely, given a stream that has
+so far delivered `{"city":"Tok` (the model is still typing "Tokyo"):
+
+| | `city` field after this chunk |
+|---|---|
+| [vercel/ai's `fixJson`](https://github.com/vercel/ai/blob/main/packages/ai/src/util/fix-json.ts) | `"Tok"` — closes the open string as-is and reports a successful parse |
+| [langchain's `parsePartialJson`](https://github.com/langchain-ai/langchainjs/blob/main/libs/langchain-core/src/utils/json.ts) | `"Tok"` — its recursive-descent parser returns whatever string content it collected before running out of input |
+| **this library** (`snapshot().stableValue`) | *(absent — `city` is not committed yet)* |
+
+Both of those are real, current, well-engineered implementations — verified
+by cloning `vercel/ai` (commit `fbb154a0`) and `langchain-ai/langchainjs`
+(commit `555d6f14`) and running their actual code side-by-side with this
+library. Neither is a bug: they're built for progressively rendering a
+value in a UI, where showing `"Tok"` and then `"Tokyo"` a moment later is
+good UX. This library is built for the different question — *is it safe to
+act on this value yet* — where treating `"Tok"` as the city would be
+wrong. It's why `city` only appears in `stableValue` once its closing
+quote genuinely arrives, and why `executable` only becomes `true` once the
+whole document is unambiguously, definitively complete.
+
+If you need live "filling in..." UI text, a partial-JSON renderer is the
+right tool. If you need to know precisely when it's safe to execute a tool
+call with the parsed arguments, that's what this library is for.
+
 ## Current Status (Alpha)
 
 ### Implemented
@@ -31,14 +59,14 @@ This library parses each chunk incrementally and provides:
 - Semantic event emission for committed scalar values
 - Duplicate key detection and rejection
 - `push()` / `snapshot()` / `drainEvents()` / `finish()` API
-- Configurable resource limits (depth, input size, string length)
+- Configurable resource limits (depth, input size, string length, queued events)
 - Machine-readable test corpus with 25+ canonical fixtures
 - Chunk invariance verification
+- Provider stream adapters for OpenAI (legacy `function_call` and Responses API), Anthropic, Gemini, OpenRouter, and generic OpenAI-compatible endpoints, plus a coordinator for tracking multiple concurrent tool-call streams
 
 ### Not Yet Implemented
 
 - Advanced repair engine (structural/lossy repairs)
-- Provider-specific adapters
 - JSON Schema validation
 - CLI tool
 - Network/SSE client integration
