@@ -1,4 +1,4 @@
-import { IncrementalJsonParser } from "../types.js";
+import { IncrementalJsonParser, ParserOptions } from "../types.js";
 import { createParser } from "../parser.js";
 import { NormalizedToolStreamEvent, ProviderName, StreamEndReason } from "./protocol.js";
 import {
@@ -37,6 +37,7 @@ class CoordinatorCallState {
 
 export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinator {
   private readonly limits: CoordinatorLimits;
+  private readonly parserOptions: ParserOptions | undefined;
   private calls: Map<string, CoordinatorCallState> = new Map();
   private sourceKeyToInternalId: Map<string, string> = new Map();
   private callCounter = 0;
@@ -45,9 +46,17 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   private eventsProcessed = 0;
   private globalSequence = 0;
   private isFinished = false;
-  
-  constructor(limits?: Partial<CoordinatorLimits>) {
+
+  /**
+   * @param limits Coordinator-level limits (concurrent tool calls, tool name
+   *   size, etc.) — distinct from `parserOptions`, which configures each
+   *   underlying per-call IncrementalJsonParser (limits, repairs). Previously
+   *   there was no way to pass the latter through at all; every parser the
+   *   coordinator created was hardcoded to library defaults.
+   */
+  constructor(limits?: Partial<CoordinatorLimits>, parserOptions?: ParserOptions) {
     this.limits = { ...DEFAULT_COORDINATOR_LIMITS, ...limits };
+    this.parserOptions = parserOptions;
   }
 
   push(event: NormalizedToolStreamEvent): CoordinatorPushResult {
@@ -124,7 +133,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     const internalId = `call-${this.callCounter++}`;
     this.sourceKeyToInternalId.set(sourceKey, internalId);
 
-    const parser = createParser(); // Using default parser limits for now
+    const parser = createParser(this.parserOptions);
     const call = new CoordinatorCallState(internalId, event.provider, parser);
     
     if (event.toolCallId !== undefined) call.toolCallId = event.toolCallId;
@@ -443,6 +452,9 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   }
 }
 
-export function createToolCallStreamCoordinator(limits?: Partial<CoordinatorLimits>): ToolCallStreamCoordinator {
-  return new DefaultToolCallStreamCoordinator(limits);
+export function createToolCallStreamCoordinator(
+  limits?: Partial<CoordinatorLimits>,
+  parserOptions?: ParserOptions,
+): ToolCallStreamCoordinator {
+  return new DefaultToolCallStreamCoordinator(limits, parserOptions);
 }

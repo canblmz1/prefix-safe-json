@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createParser } from "../../src/parser.js";
+import { createToolCallStreamCoordinator } from "../../src/coordinator/coordinator.js";
+import type { NormalizedToolStreamEvent } from "../../src/coordinator/protocol.js";
 import type { JsonObject } from "../../src/types.js";
 
 describe("Parser Regressions", () => {
@@ -276,5 +278,53 @@ describe("Hostile audit fixes", () => {
     const result = parser.finish({ reason: "complete" });
     expect(result.outcome).toBe("valid");
     expect((result.stableValue as JsonObject).a).toBe("ok");
+  });
+
+  it("coordinator: parserOptions passed to the factory reach the underlying parser", () => {
+    const coord = createToolCallStreamCoordinator(undefined, {
+      limits: { maxDepth: 2 },
+    });
+    const callRef = { internalId: "id0" };
+    coord.push({
+      type: "tool_call_start",
+      callRef,
+      toolIndex: 0,
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+    // Three levels of nesting — over the configured maxDepth of 2.
+    coord.push({
+      type: "tool_call_arguments_delta",
+      callRef,
+      toolIndex: 0,
+      delta: '{"a":{"b":{"c":1',
+    } as unknown as NormalizedToolStreamEvent);
+
+    const call = coord.snapshot().calls[0];
+    expect(call).toBeDefined();
+    expect(
+      call?.parser.diagnostics.some((d) => d.code === "E_LIMIT_DEPTH"),
+    ).toBe(true);
+  });
+
+  it("coordinator: omitting parserOptions still works with library defaults", () => {
+    const coord = createToolCallStreamCoordinator();
+    const callRef = { internalId: "id0" };
+    coord.push({
+      type: "tool_call_start",
+      callRef,
+      toolIndex: 0,
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+    coord.push({
+      type: "tool_call_arguments_delta",
+      callRef,
+      toolIndex: 0,
+      delta: '{"a":{"b":{"c":1}}}',
+    } as unknown as NormalizedToolStreamEvent);
+
+    const call = coord.snapshot().calls[0];
+    expect(call?.parser.diagnostics.some((d) => d.code === "E_LIMIT_DEPTH")).toBe(
+      false,
+    );
   });
 });
