@@ -14,6 +14,18 @@ mutation testing (Stryker), memory/leak testing, resource-limit boundary
 testing, and manual review. 13 real defects were found and fixed, each with
 a regression test proven to fail before the fix and pass after.
 
+Separately, a coverage-improvement pass fixed a `vitest.config.ts` bug
+(`coverage` was a sibling of `test`, not nested inside it, so the exclude
+list was silently never applied), removed an accidentally-committed
+206-file stale Stryker sandbox directory, deleted three more confirmed-dead
+code paths (`Scanner.processObjectKey()`/`ScannerState.ObjectKey`,
+`SnapshotBuilder.processEvent()`'s unreachable root-scalar branch,
+`Utf8Decoder.reset()`/`totalBytesProcessed`), and added real regression
+tests for previously-unexercised error paths in the scanner, decoder, and
+coordinator. Statement coverage: 77.75% -> 93.10% (target 95%, see
+RELEASE.md) — almost entirely from fixing the measurement itself and
+removing dead code, not from padding tests.
+
 ### Fixed
 
 - **utf8**: `push()`-ing a single chunk containing a large string
@@ -81,6 +93,16 @@ a regression test proven to fail before the fix and pass after.
   unreachable (zero callers anywhere in source, tests, or compiled `dist/`
   output) via exhaustive repository-wide search. Never part of the public
   API (not exported from `src/index.ts`).
+- **lexer**: deleted `Scanner.processObjectKey()` and the
+  `ScannerState.ObjectKey` enum member — confirmed nothing in `src/`
+  ever assigns that state, so the dispatch case and method were dead.
+- **semantic**: deleted the unreachable `path === ""` branch in
+  `SnapshotBuilder.processEvent()` — the one event that could carry an
+  empty path (a root-level scalar) is handled entirely through
+  `Parser.rootScalarValue` and never reaches `processEvent()` at all.
+- **utf8**: deleted `Utf8Decoder.reset()` and the `totalBytesProcessed`
+  getter — unused anywhere in `src/` or `test/`, and `Utf8Decoder` isn't
+  part of the public API.
 - **docs**: removed the "adoption lab" and "maintainer pack" content
   (`adapters/`, `reports/*.md`, `architecture.md`, `comparison.md`,
   `maintainer-package/`, and the corresponding test file). It claimed
