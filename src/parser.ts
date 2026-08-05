@@ -24,7 +24,7 @@ import type {
   StreamEndReason,
 } from "./types.js";
 import { DiagnosticCode } from "./diagnostics/codes.js";
-import { DEFAULT_LIMITS } from "./limits.js";
+import { DEFAULT_LIMITS, sanitizeLimit } from "./limits.js";
 import { Utf8Decoder, stringToUtf8 } from "./utf8/decoder.js";
 import { Scanner } from "./lexer/scanner.js";
 import { ScannerState } from "./lexer/states.js";
@@ -89,14 +89,23 @@ class Parser implements IncrementalJsonParser {
   constructor(options?: ParserOptions) {
     const userLimits = options?.limits ?? {};
     this.limits = {
-      maxInputBytes: userLimits.maxInputBytes ?? DEFAULT_LIMITS.maxInputBytes,
-      maxDepth: userLimits.maxDepth ?? DEFAULT_LIMITS.maxDepth,
-      maxStringBytes:
-        userLimits.maxStringBytes ?? DEFAULT_LIMITS.maxStringBytes,
-      maxQueuedEvents:
-        userLimits.maxQueuedEvents ?? DEFAULT_LIMITS.maxQueuedEvents,
-      maxTrailingDataBytes:
-        userLimits.maxTrailingDataBytes ?? DEFAULT_LIMITS.maxTrailingDataBytes,
+      maxInputBytes: sanitizeLimit(
+        userLimits.maxInputBytes,
+        DEFAULT_LIMITS.maxInputBytes,
+      ),
+      maxDepth: sanitizeLimit(userLimits.maxDepth, DEFAULT_LIMITS.maxDepth),
+      maxStringBytes: sanitizeLimit(
+        userLimits.maxStringBytes,
+        DEFAULT_LIMITS.maxStringBytes,
+      ),
+      maxQueuedEvents: sanitizeLimit(
+        userLimits.maxQueuedEvents,
+        DEFAULT_LIMITS.maxQueuedEvents,
+      ),
+      maxTrailingDataBytes: sanitizeLimit(
+        userLimits.maxTrailingDataBytes,
+        DEFAULT_LIMITS.maxTrailingDataBytes,
+      ),
     };
     
     this.repairs = {
@@ -1164,6 +1173,15 @@ class Parser implements IncrementalJsonParser {
   // -----------------------------------------------------------------------
 
   private addDiagnostic(diag: Diagnostic): void {
+    // Freeze before storing: snapshot()/finish() freeze the ARRAY they
+    // return (Object.freeze([...this.allDiagnostics])), but that's shallow
+    // - it doesn't protect the Diagnostic objects themselves, which are the
+    // *same* references stored here. Without this, a consumer mutating a
+    // field on a diagnostic object obtained from one snapshot()/finish()
+    // call corrupts this parser's internal history, silently visible in
+    // every later snapshot()/finish() call.
+    Object.freeze(diag);
+
     // Cap accumulation independently of the EventBuilder's own queue limit:
     // a consumer who drains events after every push() keeps that queue
     // short, which would otherwise let this array grow without bound for
@@ -1182,6 +1200,14 @@ class Parser implements IncrementalJsonParser {
   }
 
   private addRepair(repair: RepairAction): void {
+    // See addDiagnostic()'s matching comment: freeze before storing so
+    // external mutation of a repair object obtained from a prior
+    // snapshot()/finish() call can't corrupt this parser's internal
+    // history. byteRange is a nested array - Object.freeze on the repair
+    // itself doesn't reach into it, so it needs its own freeze.
+    Object.freeze(repair.byteRange);
+    Object.freeze(repair);
+
     if (repair.impact === "structural" || repair.impact === "lossy") {
       this.everHadStructuralOrLossyRepair = true;
     }

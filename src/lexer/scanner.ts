@@ -16,7 +16,7 @@ import type { Token } from "./tokens.js";
 import type { Diagnostic, RepairAction, ParserOptions } from "../types.js";
 import { DiagnosticCode } from "../diagnostics/codes.js";
 import { createDiagnostic } from "../diagnostics/factory.js";
-import { DEFAULT_LIMITS } from "../limits.js";
+import { DEFAULT_LIMITS, sanitizeLimit } from "../limits.js";
 
 /** Whitespace characters in JSON. */
 function isWhitespace(ch: string): boolean {
@@ -46,8 +46,10 @@ export class Scanner {
 
   constructor(options?: ParserOptions) {
     this.options = options ?? {};
-    this.maxStringBytes =
-      options?.limits?.maxStringBytes ?? DEFAULT_LIMITS.maxStringBytes;
+    this.maxStringBytes = sanitizeLimit(
+      options?.limits?.maxStringBytes,
+      DEFAULT_LIMITS.maxStringBytes,
+    );
   }
 
   private state: ScannerState = ScannerState.Structural;

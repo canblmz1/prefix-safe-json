@@ -400,3 +400,62 @@ describe("Round 10 audit fixes", () => {
     }
   });
 });
+
+describe("Round 12 audit fixes", () => {
+  it("diagnostic/repair objects returned by snapshot()/finish() are frozen and can't corrupt later results", () => {
+    // Regression: snapshot()/finish() froze the ARRAY they return
+    // (Object.freeze([...this.allDiagnostics])) but not each element -
+    // those were the same object references stored internally. A consumer
+    // mutating a field on a returned diagnostic/repair object silently
+    // corrupted the parser's own history, visible in every later
+    // snapshot()/finish() call.
+    const parser = createParser({ limits: { maxStringBytes: 3 } });
+    parser.push('{"a":"toolong"');
+    const snap = parser.snapshot();
+
+    expect(snap.diagnostics.length).toBeGreaterThan(0);
+    expect(() => {
+      (snap.diagnostics[0] as { message: string }).message = "HACKED";
+    }).toThrow();
+
+    const result = parser.finish({ reason: "complete" });
+    expect(result.diagnostics[0]?.message).not.toBe("HACKED");
+  });
+
+  it("repair objects are frozen too, including the nested byteRange tuple", () => {
+    const parser = createParser();
+    parser.push("﻿"); // triggers R_STRIP_UTF8_BOM
+    parser.push('{"a":1}');
+    const snap = parser.snapshot();
+
+    expect(snap.repairs.length).toBeGreaterThan(0);
+    expect(() => {
+      (snap.repairs[0] as { description: string }).description = "HACKED";
+    }).toThrow();
+    expect(() => {
+      (snap.repairs[0]?.byteRange as unknown as number[])[0] = 999;
+    }).toThrow();
+
+    const result = parser.finish({ reason: "complete" });
+    expect(result.repairs[0]?.description).not.toBe("HACKED");
+  });
+
+  it("non-finite limit values (NaN) fall back to the default instead of silently disabling the limit", () => {
+    // Regression: `userLimits.maxDepth ?? DEFAULT_LIMITS.maxDepth` only
+    // rejects null/undefined - NaN passes straight through, and every
+    // limit check in the codebase is a plain `>`/`>=` comparison, which is
+    // always false against NaN. A NaN limit (e.g. from a caller's own
+    // division-by-zero bug while computing it) silently disabled that
+    // resource limit entirely, with no error and no warning.
+    const withDefault = createParser({ limits: { maxDepth: 128 } });
+    withDefault.push("[".repeat(200) + "1" + "]".repeat(200));
+    const rDefault = withDefault.finish({ reason: "complete" });
+
+    const withNaN = createParser({ limits: { maxDepth: NaN } });
+    withNaN.push("[".repeat(200) + "1" + "]".repeat(200));
+    const rNaN = withNaN.finish({ reason: "complete" });
+
+    expect(rNaN.outcome).toBe(rDefault.outcome);
+    expect(rNaN.outcome).toBe("invalid");
+  });
+});
