@@ -1183,6 +1183,15 @@ class Parser implements IncrementalJsonParser {
   private isExecutable(): boolean {
     if (this.phase !== "finished") return false;
     if (!this.rootComplete) return false;
+    // this.terminal/syntax_ is the same authoritative "something went
+    // wrong" signal determineOutcome() checks first (syntax_ === "invalid").
+    // Some fatal conditions — e.g. EventBuilder's own event-queue-capacity
+    // cutoff (see semantic/builder.ts's enqueue()) — set these directly
+    // without going through addDiagnostic(), so they don't set
+    // everHadFatalDiagnostic below. Checking them explicitly here closes
+    // that gap instead of only catching diagnostics that happen to have
+    // been routed through addDiagnostic().
+    if (this.terminal || this.syntax_ === "invalid") return false;
 
     const reason = this.finishMeta?.reason ?? "unknown";
     if (

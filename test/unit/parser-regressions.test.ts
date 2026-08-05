@@ -328,3 +328,42 @@ describe("Hostile audit fixes", () => {
     );
   });
 });
+
+describe("Round 10 audit fixes", () => {
+  it("executable is false whenever outcome is invalid, even when the event queue caps out exactly at root completion", () => {
+    // Regression: EventBuilder's own event-queue-capacity cutoff (see
+    // semantic/builder.ts's enqueue()) sets parser-level terminal/syntax_
+    // state directly, bypassing addDiagnostic() entirely - so it never set
+    // everHadFatalDiagnostic, and isExecutable() (which only checked
+    // hasFatalDiagnostic()/hasNonRecoverableError()/repair flags, never
+    // terminal/syntax_ itself) returned true for a stream determineOutcome()
+    // simultaneously and correctly reported as "invalid". Narrow window:
+    // only reproduces when the queue fills on the *last* event or two of a
+    // stream (root completion races the cutoff) - a document with many more
+    // elements past the cap instead truncates mid-stream and was already
+    // handled correctly via E_STREAM_TRUNCATED.
+    const CAP = 10;
+    for (const n of [10, 11]) {
+      const parser = createParser({ limits: { maxQueuedEvents: CAP } });
+      const arr = "[" + Array(n).fill("1").join(",") + "]";
+      parser.push(arr);
+      const result = parser.finish({ reason: "complete" });
+
+      expect(result.outcome, `n=${n}`).toBe("invalid");
+      expect(result.executable, `n=${n}`).toBe(false);
+    }
+  });
+
+  it("executable/outcome stay consistent (both valid) just under the same boundary", () => {
+    const CAP = 10;
+    for (const n of [8, 9]) {
+      const parser = createParser({ limits: { maxQueuedEvents: CAP } });
+      const arr = "[" + Array(n).fill("1").join(",") + "]";
+      parser.push(arr);
+      const result = parser.finish({ reason: "complete" });
+
+      expect(result.outcome, `n=${n}`).toBe("valid");
+      expect(result.executable, `n=${n}`).toBe(true);
+    }
+  });
+});
