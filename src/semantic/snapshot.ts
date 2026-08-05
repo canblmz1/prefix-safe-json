@@ -30,13 +30,6 @@ export class SnapshotBuilder {
 
     const { path, value } = event;
 
-    if (path === "") {
-      // Root value
-      this.root = value;
-      this.hasRoot = true;
-      return;
-    }
-
     // Parse the JSON Pointer path to navigate to the parent
     const segments = parsePointer(path);
     if (segments.length === 0) return;

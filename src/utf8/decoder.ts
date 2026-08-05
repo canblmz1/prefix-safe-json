@@ -261,21 +261,6 @@ export class Utf8Decoder {
     return this.totalOffset - this.pending.length;
   }
 
-  /**
-   * Reset decoder state.
-   */
-  reset(): void {
-    this.pending = [];
-    this.pendingExpected = 0;
-    this.totalOffset = 0;
-  }
-
-  /**
-   * Total bytes processed (including any pending).
-   */
-  get totalBytesProcessed(): number {
-    return this.totalOffset;
-  }
 
   /**
    * Decode a complete multi-byte UTF-8 sequence into a code point.

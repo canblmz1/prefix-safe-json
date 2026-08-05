@@ -188,4 +188,45 @@ describe("Utf8Decoder", () => {
       expect(text).toBe(input);
     });
   });
+
+  describe("BOM split across chunk boundaries", () => {
+    it("waits for more data when only the first BOM byte has arrived", () => {
+      const decoder = new Utf8Decoder();
+      const result = decoder.decode(new Uint8Array([0xef]));
+      expect(result.text).toBe("");
+      expect(result.strippedBom).toBe(false);
+    });
+
+    it("waits for more data when only the first two BOM bytes have arrived", () => {
+      const decoder = new Utf8Decoder();
+      const result = decoder.decode(new Uint8Array([0xef, 0xbb]));
+      expect(result.text).toBe("");
+      expect(result.strippedBom).toBe(false);
+    });
+
+    it("strips a BOM delivered one byte at a time", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xef]));
+      decoder.decode(new Uint8Array([0xbb]));
+      const result = decoder.decode(new Uint8Array([0xbf, 0x61])); // 'a' after BOM
+      expect(result.strippedBom).toBe(true);
+      expect(result.text).toBe("a");
+    });
+  });
+
+  describe("malformed 3-byte and 4-byte sequences", () => {
+    it("reports an error for an invalid 3-byte continuation sequence", () => {
+      const decoder = new Utf8Decoder();
+      // 0xE0 starts a 3-byte sequence but is followed by non-continuation bytes
+      const result = decoder.decode(new Uint8Array([0xe0, 0x41, 0x41]));
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it("reports an error for an invalid 4-byte continuation sequence", () => {
+      const decoder = new Utf8Decoder();
+      // 0xF0 starts a 4-byte sequence but is followed by non-continuation bytes
+      const result = decoder.decode(new Uint8Array([0xf0, 0x41, 0x41, 0x41]));
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+  });
 });
