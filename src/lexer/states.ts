@@ -6,9 +6,6 @@ export const enum ScannerState {
   /** Expecting a structural character or value start. */
   Structural = 0,
 
-  /** Inside an object, expecting a key string or closing brace. */
-  ObjectKey = 1,
-
   /** Inside a string (value or key). */
   InString = 2,
 

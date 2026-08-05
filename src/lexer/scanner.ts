@@ -103,9 +103,6 @@ export class Scanner {
       case ScannerState.Structural:
         this.processStructural(ch, byteOffset, charByteLength);
         break;
-      case ScannerState.ObjectKey:
-        this.processObjectKey(ch, byteOffset);
-        break;
       case ScannerState.InString:
         this.processString(ch, byteOffset, charByteLength);
         break;
@@ -366,27 +363,6 @@ export class Scanner {
         "error",
         byteOffset,
         `Unexpected character: ${JSON.stringify(ch)}`,
-        false,
-      );
-      this.state = ScannerState.Invalid;
-    }
-  }
-
-  private processObjectKey(ch: string, byteOffset: number): void {
-    if (isWhitespace(ch)) return;
-
-    if (ch === '"') {
-      this.nextStringIsKey = true;
-      this.beginString(byteOffset);
-    } else if (ch === "}") {
-      // Empty object or trailing comma -> close
-      this.emitToken(TokenType.ObjectEnd, "}", byteOffset, byteOffset + 1);
-    } else {
-      this.emitDiagnostic(
-        DiagnosticCode.E_UNEXPECTED_TOKEN,
-        "error",
-        byteOffset,
-        `Expected object key (string) or '}', got: ${JSON.stringify(ch)}`,
         false,
       );
       this.state = ScannerState.Invalid;
