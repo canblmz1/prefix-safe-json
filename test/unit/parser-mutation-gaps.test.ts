@@ -83,6 +83,24 @@ describe("Diagnostic sticky flags (addDiagnostic)", () => {
   });
 });
 
+describe("pending-literal-at-stream-end buffer states", () => {
+  // finish()'s handling of a pending literal token checks the buffer value
+  // against a convoluted condition that special-cases exactly "tru"/"fal"
+  // (one character short of "true"/"false"). Empirically, every partial
+  // buffer correctly reports truncated/E_INCOMPLETE_LITERAL regardless -
+  // finalizeLiteral() itself catches the ones this outer condition doesn't
+  // filter out - but nothing previously pinned down that full state space.
+  for (const buf of ["tru", "fal", "nul", "t", "n", "f", "tr", "fa", "nu"]) {
+    it(`a pending literal buffer of "${buf}" at stream end reports truncated, not valid`, () => {
+      const p = createParser();
+      p.push(buf);
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).toBe("truncated");
+      expect(r.diagnostics.some((d) => d.code === "E_INCOMPLETE_LITERAL")).toBe(true);
+    });
+  }
+});
+
 describe("getUtf8ByteLength (via trailing-data byte counting)", () => {
   // getUtf8ByteLength isn't exported; exercised indirectly by configuring a
   // tight maxTrailingDataBytes and checking the limit trips at exactly the
