@@ -26,6 +26,19 @@ coordinator. Statement coverage: 77.75% -> 93.10% (target 95%, see
 RELEASE.md) — almost entirely from fixing the measurement itself and
 removing dead code, not from padding tests.
 
+A follow-up mutation-testing pass targeted the largest surviving-mutant
+clusters (identified via scoped Stryker runs, one file at a time) across
+all 7 mutated files: `diagnostics/factory.ts` 100%, `grammar/pointer.ts`
+100%, `grammar/frame.ts` 95.83% (2 confirmed-equivalent survivors),
+`grammar/stack.ts` 62.10% -> 99.19%, `utf8/decoder.ts` 63.32% -> 84.69%,
+`lexer/scanner.ts` 73.48% -> 80.68%, `parser.ts` 59.10% -> 67.07% (by far
+the largest file - 2258 mutants, more than the other 6 combined -
+substantial gaps remain, not claimed resolved). Target is 85% (see
+RELEASE.md); not yet reached overall, reported honestly rather than
+rounded up. One real bug was found in the course of writing these tests
+(not a mutant itself - surfaced while testing an edge case): see the
+`utf8` entry below.
+
 ### Fixed
 
 - **utf8**: `push()`-ing a single chunk containing a large string
@@ -67,6 +80,17 @@ removing dead code, not from padding tests.
   against `NaN`), for all four parser-level limits plus the scanner's own
   independently-resolved `maxStringBytes`. Added `sanitizeLimit()`,
   applied everywhere a limit is resolved from user input.
+- **utf8**: resuming a multi-byte sequence left pending from a previous
+  chunk, when the resumption byte turned out not to be a valid
+  continuation byte, emitted a correct `invalid_continuation` diagnostic
+  but then spuriously emitted a *second*, bogus diagnostic alongside it —
+  the abort path reset both `pending` and `pendingExpected` to 0, which
+  the very next check read as "0 of 0 bytes needed, sequence complete,"
+  triggering a decode of the now-empty pending array. No wrong decoded
+  *text* was ever produced (the spurious call always hit its own error
+  branch), so this was strictly an extra incorrect diagnostic, not silent
+  data corruption. Found while writing a mutation-testing regression test,
+  not by a mutant itself.
 
 ### Performance
 
