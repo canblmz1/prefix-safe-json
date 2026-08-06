@@ -146,6 +146,20 @@ const result = parser.finish({ reason: "complete" });
 console.log(result.executable); // true if safe to execute
 ```
 
+### End-to-end example (real API, no mocked internals)
+
+The snippet above is illustrative; for a runnable, verified demonstration
+against the actual provider-adapter + coordinator public API — including
+the exact truncation scenario described above — see
+[`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs)
+(`node examples/anthropic-truncation-safety.mjs` after `pnpm run build`).
+It feeds `AnthropicStreamAdapter` a realistic Anthropic Messages API SSE
+sequence — including one cut off mid-argument by `max_tokens`, matching
+Anthropic's real streaming shape — through `createToolCallStreamCoordinator()`,
+and asserts the truncated call is never reported executable while a
+genuinely complete one is. This example runs in CI on every push, so it
+can't silently rot into a stale claim.
+
 ## License
 
 Licensed under either of:
