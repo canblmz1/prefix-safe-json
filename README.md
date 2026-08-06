@@ -49,6 +49,51 @@ If you need live "filling in..." UI text, a partial-JSON renderer is the
 right tool. If you need to know precisely when it's safe to execute a tool
 call with the parsed arguments, that's what this library is for.
 
+### A concrete case where this matters: silent execution on truncated data
+
+The risk above isn't hypothetical. [Cline](https://github.com/cline/cline)
+(a coding agent that writes files and runs terminal commands from LLM tool
+calls — verified by cloning it, commit `81cce3d70e1`) wires a JSON-repair
+step directly into tool execution:
+[`sdk/packages/llms/src/providers/ai-sdk.ts:1332`](https://github.com/cline/cline/blob/81cce3d70e10244cdde40dbd0eb0bb711c93006d/sdk/packages/llms/src/providers/ai-sdk.ts#L1332)
+registers `repairMalformedToolCall` as the Vercel AI SDK's
+`experimental_repairToolCall` hook — whatever it returns *is* the tool call
+that runs. That function's own docstring names its target: "truncated
+payloads ... common with weaker models." Its repair path
+([`sdk/packages/shared/src/parse/json.ts:42`](https://github.com/cline/cline/blob/81cce3d70e10244cdde40dbd0eb0bb711c93006d/sdk/packages/shared/src/parse/json.ts#L42))
+runs the raw argument text through
+[`jsonrepair`](https://github.com/josdejong/jsonrepair), which — like the
+two implementations above — closes an unterminated string as-is rather
+than rejecting it.
+
+Feeding `parseJsonStream` (copied verbatim from that file) and this
+library the same truncated `write_file` tool call — a `content` argument
+cut off mid-value, the exact scenario the docstring describes:
+
+```
+input: {"path":"config/database.yml","content":"production:\n  host: db.prod.internal\n  password: correct-horse-battery-sta
+
+Cline's parseJsonStream() -> jsonrepair:
+  { "path": "config/database.yml",
+    "content": "production:\n  host: db.prod.internal\n  password: correct-horse-battery-sta" }
+  No error, no warning. This is what gets written to disk.
+
+This library:
+  outcome: "truncated", executable: false
+  stableValue: { "path": "config/database.yml" }   // content is absent, not guessed
+```
+
+To be clear about scope: `jsonrepair` also fixes things this library
+intentionally doesn't (single quotes, trailing commas, unquoted keys) — it
+isn't a strict RFC 8259 parser and isn't trying to be, so this library
+can't simply replace it there. The gap is narrower and specific: nothing
+in that repair path currently distinguishes *"the model's JSON syntax is
+wrong"* from *"the model's JSON was cut off mid-value and the rest is
+unknown"* — `jsonrepair` handles both the same way, silently. This library
+draws exactly that distinction (`outcome: "truncated"`) and could gate
+execution on it without touching the syntax-repair behavior for the other
+case.
+
 ## Current Status (Alpha)
 
 ### Implemented
