@@ -4,6 +4,10 @@
 
 Incremental LLM tool-call JSON parser and deterministic repair engine.
 
+![Demo: a tool call truncated mid-argument is correctly reported non-executable, while the same call delivered in full is reported executable](examples/demo.gif)
+
+*(Real terminal output from [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs) — not staged. Same script CI runs on every push.)*
+
 ## Problem
 
 LLM providers (OpenAI, Anthropic, Gemini, OpenRouter) stream tool-call arguments as small JSON chunks. During streaming, the JSON is frequently incomplete: strings split mid-word, UTF-8 characters split mid-byte, containers left unclosed, numbers terminated at chunk boundaries.
