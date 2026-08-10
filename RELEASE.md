@@ -1,6 +1,6 @@
 # Release Checklist
 
-When preparing a release for `@internal/incremental-tool-json`, ensure the following steps are taken:
+When preparing a release for `prefix-safe-json`, ensure the following steps are taken:
 
 ## 1. Quality Assurance
 - [ ] Ensure all CI tests pass (`npm test`, `npm run typecheck`, `npm run lint`).

@@ -1,4 +1,4 @@
-# @internal/incremental-tool-json
+# prefix-safe-json
 
 > ⚠️ **Alpha** — This project is under active development. APIs may change without notice. Do not use in production.
 
@@ -119,14 +119,13 @@ case.
 ## Installation
 
 ```bash
-# Not yet published to npm
-pnpm install
+npm install prefix-safe-json
 ```
 
 ## Quick Start
 
 ```typescript
-import { createParser } from "@internal/incremental-tool-json";
+import { createParser } from "prefix-safe-json";
 
 const parser = createParser();
 
