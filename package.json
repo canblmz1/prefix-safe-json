@@ -16,11 +16,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/canblmz1/incremental-tool-json.git"
+    "url": "git+https://github.com/canblmz1/prefix-safe-json.git"
   },
-  "homepage": "https://github.com/canblmz1/incremental-tool-json#readme",
+  "homepage": "https://github.com/canblmz1/prefix-safe-json#readme",
   "bugs": {
-    "url": "https://github.com/canblmz1/incremental-tool-json/issues"
+    "url": "https://github.com/canblmz1/prefix-safe-json/issues"
   },
   "packageManager": "pnpm@10.33.1",
   "exports": {
