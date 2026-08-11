@@ -1,0 +1,98 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "package.json"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # npm refuses to publish over an existing version, so this is the
+      # actual gate - without it, every push touching package.json
+      # (a new devDependency, a script tweak, anything) would attempt a
+      # publish and fail loudly instead of just skipping quietly.
+      - name: Check whether the local version is unpublished
+        id: version-check
+        run: |
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npm view prefix-safe-json version 2>/dev/null || echo "none")
+          echo "Local version: $LOCAL_VERSION"
+          echo "Published version: $PUBLISHED_VERSION"
+          echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL_VERSION" != "$PUBLISHED_VERSION" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Typecheck
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run typecheck
+
+      - name: Lint
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run lint --max-warnings=0
+
+      - name: Test
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run test
+
+      - name: Build
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run build
+
+      - name: Run end-to-end example
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run example:anthropic
+
+      - name: Pack check
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run pack:check
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: npm publish --access public --tag latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Tag the release
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: |
+          git tag "v${{ steps.version-check.outputs.version }}"
+          git push origin "v${{ steps.version-check.outputs.version }}"
+
+      - name: Create GitHub release
+        if: steps.version-check.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version-check.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "v${{ steps.version-check.outputs.version }}" \
+            --prerelease \
+            --generate-notes
