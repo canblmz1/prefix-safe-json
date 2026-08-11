@@ -142,6 +142,32 @@ describe("Utf8Decoder", () => {
       expect(expectDefined(result.errors[0]).kind).toBe("overlong");
     });
 
+    it("rejects an encoded UTF-16 surrogate half (U+D800) as out_of_range", () => {
+      const decoder = new Utf8Decoder();
+      // ED A0 80 arithmetically decodes to U+D800 - a lone high surrogate.
+      // Surrogate halves (U+D800-U+DFFF) are not valid Unicode scalar
+      // values and RFC 3629 prohibits encoding them directly in UTF-8;
+      // they exist only as a UTF-16 encoding artifact. Neither the
+      // overlong check (3 bytes is the correct minimal length for this
+      // range) nor the >0x10FFFF check catches this - it needs its own
+      // range check.
+      const result = decoder.decode(new Uint8Array([0xed, 0xa0, 0x80]));
+      expect(result.errors.length).toBeGreaterThanOrEqual(1);
+      expect(expectDefined(result.errors[0]).kind).toBe("out_of_range");
+    });
+
+    it("rejects the full encoded surrogate range boundaries (U+D800 and U+DFFF) but accepts just outside it", () => {
+      const lowSurrogateStart = new Utf8Decoder().decode(new Uint8Array([0xed, 0xa0, 0x80])); // U+D800
+      const highSurrogateEnd = new Utf8Decoder().decode(new Uint8Array([0xed, 0xbf, 0xbf])); // U+DFFF
+      expect(lowSurrogateStart.errors[0]?.kind).toBe("out_of_range");
+      expect(highSurrogateEnd.errors[0]?.kind).toBe("out_of_range");
+
+      const justBelow = new Utf8Decoder().decode(new Uint8Array([0xed, 0x9f, 0xbf])); // U+D7FF
+      const justAbove = new Utf8Decoder().decode(new Uint8Array([0xee, 0x80, 0x80])); // U+E000
+      expect(justBelow.errors).toHaveLength(0);
+      expect(justAbove.errors).toHaveLength(0);
+    });
+
     it("detects invalid continuation across chunk boundary", () => {
       const decoder = new Utf8Decoder();
       // Start 2-byte sequence

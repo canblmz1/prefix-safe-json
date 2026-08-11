@@ -169,6 +169,26 @@ describe("Scanner error paths (coverage gaps)", () => {
       expect(r.outcome).not.toBe("valid");
       expect(r.diagnostics.some((d) => d.code === "E_INVALID_UTF8")).toBe(true);
     });
+
+    it("rejects an encoded UTF-16 surrogate half inside a string value", () => {
+      const p = createParser();
+      // {"a":"<ED A0 80>"} - ED A0 80 arithmetically decodes to U+D800, a
+      // lone high surrogate. Illegal in UTF-8 per RFC 3629; must not be
+      // silently accepted as a valid string character.
+      const prefix = new TextEncoder().encode('{"a":"');
+      const surrogate = new Uint8Array([0xed, 0xa0, 0x80]);
+      const suffix = new TextEncoder().encode('"}');
+      const bytes = new Uint8Array(prefix.length + surrogate.length + suffix.length);
+      bytes.set(prefix, 0);
+      bytes.set(surrogate, prefix.length);
+      bytes.set(suffix, prefix.length + surrogate.length);
+
+      p.push(bytes);
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).toBe("invalid");
+      expect(r.diagnostics.some((d) => d.code === "E_INVALID_UTF8")).toBe(true);
+      expect(r.stableValue).toBeUndefined();
+    });
   });
 
   describe("each individual whitespace character is recognized on its own", () => {

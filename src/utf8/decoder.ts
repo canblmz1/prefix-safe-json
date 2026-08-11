@@ -319,8 +319,13 @@ export class Utf8Decoder {
       };
     }
 
-    // Check valid Unicode range
-    if (codePoint > 0x10ffff) {
+    // Check valid Unicode range. Surrogate halves (U+D800-U+DFFF) are not
+    // valid Unicode scalar values and must never appear directly encoded in
+    // UTF-8 (RFC 3629) - they exist only as a UTF-16 encoding artifact. A
+    // 3-byte sequence can arithmetically land in this range (e.g. ED A0 80
+    // decodes to U+D800) without tripping the overlong or >0x10FFFF checks,
+    // so it needs its own check.
+    if (codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)) {
       return {
         codePoint: 0,
         error: { kind: "out_of_range", byteOffset: offset },

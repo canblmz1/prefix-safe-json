@@ -8,6 +8,25 @@ the quantitative bar (mutation score, coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- **utf8**: encoded UTF-16 surrogate halves (`U+D800`-`U+DFFF`) were
+  accepted as valid UTF-8 and decoded into the corresponding lone
+  surrogate, instead of being rejected. RFC 3629 prohibits encoding
+  surrogate halves directly in UTF-8 - they exist only as a UTF-16
+  encoding artifact and are not valid Unicode scalar values. A 3-byte
+  sequence can land arithmetically in this range (e.g. `ED A0 80` decodes
+  to `U+D800`) without tripping the existing overlong or `>0x10FFFF`
+  checks, so it needs its own explicit range check. Found via an
+  independent third-party audit of the published package (constructed the
+  adversarial byte sequence, confirmed Node's own strict `TextDecoder`
+  correctly rejects it while this decoder did not); reproduced and fixed
+  here, not taken on faith - see `test/unit/utf8.test.ts` and
+  `test/unit/scanner-error-paths.test.ts` for the regression tests,
+  including boundary checks just outside the surrogate range.
+
+## [0.0.1-alpha.0] - 2026-08-10
+
 Result of an extended, multi-round adversarial audit: differential testing
 against `JSON.parse`, fuzz testing, exhaustive chunk-boundary testing,
 mutation testing (Stryker), memory/leak testing, resource-limit boundary
