@@ -1,6 +1,6 @@
 {
   "name": "prefix-safe-json",
-  "version": "0.0.1-alpha.1",
+  "version": "0.0.1-alpha.2",
   "description": "Incremental LLM tool-call JSON parser and deterministic repair engine — never reports a value until it's unambiguously complete",
   "keywords": [
     "json",
@@ -38,6 +38,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -64,7 +67,6 @@
     "@types/clarinet": "^0.12.3",
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "^2.1.9",
-    "ajv": "^8.20.0",
     "clarinet": "^0.12.6",
     "eslint": "^9.8.0",
     "fast-check": "^4.9.0",

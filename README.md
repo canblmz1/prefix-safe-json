@@ -112,13 +112,42 @@ case.
 - Machine-readable test corpus with 25+ canonical fixtures
 - Chunk invariance verification
 - Provider stream adapters for OpenAI (legacy `function_call` and Responses API), Anthropic, Gemini, OpenRouter, and generic OpenAI-compatible endpoints, plus a coordinator for tracking multiple concurrent tool-call streams
+- Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
 
 ### Not Yet Implemented
 
-- Advanced repair engine (structural/lossy repairs)
-- JSON Schema validation
 - CLI tool
 - Network/SSE client integration
+
+`Advanced repair engine (structural/lossy repairs)` was previously listed here and has been removed — "lossy repair" (fabricating/guessing a value to fill a gap) is the opposite of this library's core principle, not a missing feature.
+
+### JSON Schema validation
+
+`createToolCallStreamCoordinator()` optionally accepts a third argument: a map of tool name → JSON Schema (draft-07). When a call for a registered tool reaches a structurally complete outcome, its `stableValue` is validated against that schema.
+
+This is a genuinely different check from prefix-safety. `executable` from the core parser only means *"this value is not truncated or fabricated."* It says nothing about whether the value matches what the tool actually needs — a model can finish generating a syntactically complete object that's still missing a required field, or has the wrong type for one. Schema validation catches that separate class of problem. The coordinator's own `executable` (on `tool_call_finished` and `ToolCallState.parser`) is only `true` when *both* hold.
+
+```typescript
+import { createToolCallStreamCoordinator } from "prefix-safe-json";
+
+const coordinator = createToolCallStreamCoordinator(undefined, undefined, {
+  write_file: {
+    type: "object",
+    properties: {
+      path: { type: "string" },
+      content: { type: "string" },
+    },
+    required: ["path", "content"],
+  },
+});
+
+// ...push provider events...
+
+const call = coordinator.snapshot().calls[0];
+call.schemaValid; // true | false | undefined (undefined = no schema registered for this tool)
+```
+
+A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATION_FAILED`) with ajv's own error detail. Malformed schemas are compiled eagerly at construction time, so a bad schema fails fast rather than mid-stream.
 
 ## Installation
 

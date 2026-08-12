@@ -34,7 +34,29 @@ export interface ToolCallState {
     | "salvaged"
     | "invalid"
     | "cancelled";
+
+  /**
+   * Result of validating `parser.stableValue` against the JSON Schema
+   * registered for this call's tool name (see `toolSchemas` on
+   * `createToolCallStreamCoordinator`). `undefined` when no schema was
+   * registered for this tool, or the call never reached a "complete"
+   * outcome (there's nothing meaningful to validate). This is a *separate*
+   * concern from `parser.executable` — that flag means "the data is
+   * structurally complete and wasn't fabricated by truncation"; this one
+   * means "the data matches the shape the tool declared it needs." Both
+   * must hold for the coordinator's own `executable` (on the
+   * `tool_call_finished` event) to be true.
+   */
+  readonly schemaValid?: boolean;
 }
+
+/**
+ * A JSON Schema object (draft-07, matching ajv's default). Kept as `object`
+ * rather than a specific type-checked shape so callers can pass whatever
+ * JSON Schema library/types they already have without a forced dependency
+ * on this package's own schema typings.
+ */
+export type JsonSchemaLike = object;
 
 export interface ToolCallCoordinatorSnapshot {
   readonly calls: readonly ToolCallState[];

@@ -3,8 +3,36 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-This project is pre-1.0 (`0.0.1-alpha.1`); see [RELEASE.md](RELEASE.md) for
+This project is pre-1.0 (`0.0.1-alpha.2`); see [RELEASE.md](RELEASE.md) for
 the quantitative bar (mutation score, coverage) a version bump requires.
+
+## [0.0.1-alpha.2] - 2026-08-12
+
+### Added
+
+- **coordinator**: `createToolCallStreamCoordinator()` accepts an optional
+  third argument, a map of tool name → JSON Schema (draft-07). When a call
+  for a registered tool reaches a structurally complete outcome, its
+  `stableValue` is validated against that schema via `ajv`. Structural
+  prefix-safety and schema validity are independent concerns — a value can
+  be genuinely complete and still not match what the tool declared it
+  needs (a required field the model never provided at all, a wrong type).
+  Both must hold for the coordinator's `executable` to be `true`. Exposed
+  as `ToolCallState.schemaValid` (`true`/`false`/`undefined` — undefined
+  when no schema was registered for that tool) and, on mismatch, a new
+  `E_SCHEMA_VALIDATION_FAILED` coordinator diagnostic with ajv's own error
+  detail. Schemas are compiled eagerly at construction time so a malformed
+  schema fails fast rather than mid-stream. `ajv` moves from a devDependency
+  (previously unused - the feature had never actually been built) to a
+  real dependency.
+
+### Removed
+
+- **docs**: removed "Advanced repair engine (structural/lossy repairs)"
+  from the README's roadmap. "Lossy repair" means fabricating or guessing
+  a value to fill a gap — the opposite of this library's core principle,
+  not a missing feature to build toward. Leftover from early planning that
+  no longer fit once the actual design solidified.
 
 ## [0.0.1-alpha.1] - 2026-08-11
 

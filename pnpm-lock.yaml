@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
     devDependencies:
       '@eslint/js':
         specifier: ^9.8.0
@@ -26,9 +30,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2.1.9
         version: 2.1.9(vitest@2.1.9(@types/node@26.1.2))
-      ajv:
-        specifier: ^8.20.0
-        version: 8.20.0
       clarinet:
         specifier: ^0.12.6
         version: 0.12.6

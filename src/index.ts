@@ -48,7 +48,11 @@ export { DiagnosticCode } from "./diagnostics/codes.js";
  * Creates a stream coordinator for mapping overlapping multi-tool streams.
  */
 export { createToolCallStreamCoordinator } from "./coordinator/coordinator.js";
-export type { ToolCallStreamCoordinator } from "./coordinator/types.js";
+export type {
+  ToolCallStreamCoordinator,
+  ToolCallState,
+  JsonSchemaLike,
+} from "./coordinator/types.js";
 export type { NormalizedToolStreamEvent } from "./coordinator/protocol.js";
 
 // Provider API
