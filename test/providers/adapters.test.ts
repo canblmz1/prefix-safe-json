@@ -8,6 +8,7 @@ import { OpenAICompatibleStreamAdapter } from "../../src/providers/openai-compat
 import { OpenAIStreamAdapter } from "../../src/providers/openai.js";
 import { GeminiStreamAdapter } from "../../src/providers/gemini.js";
 import { OpenRouterStreamAdapter } from "../../src/providers/openrouter.js";
+import { AiSdkStreamAdapter } from "../../src/providers/ai-sdk.js";
 import { ProviderStreamAdapter } from "../../src/providers/adapter.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +22,7 @@ function getAdapter(provider: string): ProviderStreamAdapter<unknown> {
     case "openai": return new OpenAIStreamAdapter();
     case "gemini": return new GeminiStreamAdapter();
     case "openrouter": return new OpenRouterStreamAdapter();
+    case "ai-sdk": return new AiSdkStreamAdapter();
     default: throw new Error(`Unknown provider ${provider}`);
   }
 }

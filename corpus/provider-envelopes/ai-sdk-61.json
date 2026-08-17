@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "id": "ai-sdk-61",
+  "title": "Provider Fixture ai-sdk-61",
+  "category": "ai-sdk",
+  "provider": "ai-sdk",
+  "input": {
+    "encoding": "utf8-text",
+    "data": "{\"type\":\"tool-input-start\",\"id\":\"call_1\",\"toolName\":\"test_tool\"}\\n{\"type\":\"tool-input-delta\",\"id\":\"call_1\",\"delta\":\"{\\\"a\\\": 1}\"}\\n{\"type\":\"tool-input-end\",\"id\":\"call_1\"}\\n{\"type\":\"finish\",\"finishReason\":\"tool-calls\"}"
+  },
+  "stream": {
+    "endReason": "complete",
+    "chunkStrategies": [
+      "line-per-chunk"
+    ]
+  },
+  "expected": {
+    "syntax": "root_complete",
+    "outcome": "valid",
+    "executable": true,
+    "diagnostics": [],
+    "repairs": [],
+    "events": [
+      {
+        "type": "tool_call_start",
+        "sequence": 1,
+        "provider": "ai-sdk",
+        "callRef": {
+          "sourceKey": "tool-input:call_1"
+        },
+        "toolCallId": "call_1",
+        "name": "test_tool"
+      },
+      {
+        "type": "tool_call_arguments_delta",
+        "sequence": 2,
+        "provider": "ai-sdk",
+        "callRef": {
+          "sourceKey": "tool-input:call_1"
+        },
+        "delta": "{\"a\": 1}"
+      },
+      {
+        "type": "tool_call_end",
+        "sequence": 3,
+        "provider": "ai-sdk",
+        "callRef": {
+          "sourceKey": "tool-input:call_1"
+        },
+        "reason": "complete"
+      },
+      {
+        "type": "provider_stream_end",
+        "sequence": 4,
+        "provider": "ai-sdk",
+        "reason": "complete",
+        "providerReason": "tool-calls"
+      }
+    ]
+  },
+  "provenance": {
+    "source": "synthetic"
+  }
+}

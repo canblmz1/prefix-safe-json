@@ -12,6 +12,7 @@ export default defineConfig({
         "**/dist/**",
         "**/.stryker-tmp/**",
         "**/scripts/**",
+        "**/examples/**",
         "**/test/**",
         "**/types.ts",
         "**/protocol.ts",

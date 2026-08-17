@@ -15,7 +15,10 @@
     "src/grammar/pointer.ts",
     "src/utf8/decoder.ts",
     "src/lexer/scanner.ts",
-    "src/diagnostics/factory.ts"
+    "src/diagnostics/factory.ts",
+    "src/gate/decide.ts",
+    "src/gate/gate.ts",
+    "src/providers/ai-sdk.ts"
   ],
   "timeoutMS": 10000,
   "timeoutFactor": 2
