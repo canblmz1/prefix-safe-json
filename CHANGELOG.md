@@ -3,8 +3,113 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-This project is pre-1.0 (`0.0.1-alpha.2`); see [RELEASE.md](RELEASE.md) for
+This project is pre-1.0 (`0.0.1-alpha.3`); see [RELEASE.md](RELEASE.md) for
 the quantitative bar (mutation score, coverage) a version bump requires.
+
+## [0.0.1-alpha.3] - 2026-08-17
+
+### Added
+
+- **gate**: `createToolCallExecutionGate()` — a fail-closed, high-level
+  execution-decision layer built by composition on top of
+  `createToolCallStreamCoordinator()`. Maps each tool call's settled state
+  to an `ExecutionDecision` (`action: "execute" | "retry" | "reject"`, plus
+  a machine-readable `reason`) via a deterministic, priority-ordered
+  decision table (`src/gate/decide.ts`) — every fail-closed disqualifier
+  (resource limits, provider errors, content-policy terminations, schema
+  mismatches, positively-observed truncation) is evaluated before the
+  single `execute` branch, which is reached only once nothing above has
+  ruled it out. `ExecutionDecision` is a discriminated union
+  (`ExecuteDecision | NonExecutableDecision`): `value` exists (and is
+  guaranteed non-`undefined`) only on the `execute` branch — TypeScript
+  itself rejects code that reads `decision.value` without first narrowing
+  on `decision.action === "execute"`. The status→decision switch has no
+  `default` case, so `noImplicitReturns` fails the build if a future
+  coordinator status isn't explicitly handled here, rather than silently
+  falling through. No re-parsing: the gate reads already-computed
+  coordinator/parser state, adding only the stream-end reason it tracks
+  itself. See `docs/EXECUTION_GATE.md` for the full decision table,
+  provider finish-reason mapping, fail-closed guarantees, and disclosed
+  limitations.
+- **providers**: `AiSdkStreamAdapter` (`ProviderName` gains `"ai-sdk"`) for
+  the [Vercel AI SDK](https://ai-sdk.dev)'s `fullStream` tool-call shape
+  (`tool-input-start` / `tool-input-delta` / `tool-input-end` / `finish`),
+  verified against the published `ai@7.0.66` type declarations rather than
+  guessed from an older API version. Follows the same pattern as the other
+  five adapters — hand-rolled local interfaces for the wire shape, zero
+  import of the `ai` package — so it adds no runtime dependency. Critically,
+  it only ever feeds raw `tool-input-delta` text into this library's own
+  parser and never reads the SDK's own resolved `tool-call.input`, which may
+  already be silently repaired from a truncated stream by the SDK's
+  internal `fixJson` (the exact class of problem this library exists to
+  catch, documented in the README's Cline analysis, one layer further
+  upstream). `finishReason: "content-filter"` is deliberately not mapped to
+  a generic cancellation: it also emits a stream-wide `provider_diagnostic`
+  with a new code, `E_CONTENT_FILTERED`
+  (`src/coordinator/diagnostic-codes.ts`), which the gate matches on to
+  report `reason: "content_filtered"` specifically — a policy/safety
+  termination should not be retried the same way an incomplete stream
+  would be. This required no changes to the core `StreamEndReason` type
+  (still 6 values) or the parser's executable contract, by design — see
+  decision-log.md #12.
+- **coordinator**: `CoordinatorLimits` and `CoordinatorDiagnostic` are now
+  exported from the package root (`src/index.ts`) — previously only
+  referenceable structurally, never by name, despite
+  `createToolCallStreamCoordinator()`'s first parameter already using the
+  former.
+- **examples**: `examples/ai-sdk-execution-gate.mjs` (`pnpm run
+  example:ai-sdk`) — the same truncated-vs-complete `write_file` scenario as
+  `examples/anthropic-truncation-safety.mjs`, through the AI SDK adapter and
+  the new execution gate, against the real published `dist/` API. Wired
+  into CI alongside the existing Anthropic example.
+- **docs**: `docs/EXECUTION_GATE.md` — threat model, `execute`/`retry`/
+  `reject` semantics and the full decision table, per-provider finish-reason
+  mapping, schema interaction, a runnable example, fail-closed guarantees,
+  and an honest limitations section (including a real, pre-existing
+  `GrammarStack.canSafelyCloseAll()` reach limit found while writing this
+  phase's tests — see below).
+
+### Documentation
+
+- **README**: repositioned around execution integrity rather than leading
+  with parser internals. New opening states the library's purpose in one
+  sentence ("Don't execute incomplete AI tool calls") with a before/after
+  diagram, followed immediately by the execution-gate quick start. All
+  existing technical content (the parser problem statement, the
+  `vercel/ai`/`langchain` comparison, the Cline `jsonrepair` case study) is
+  preserved verbatim, now framed as the lower-level foundation the gate is
+  built on. New "Scope: what this does and doesn't protect against" section
+  states plainly that this is not a prompt-injection defense, an
+  authorization layer, a sandbox, or malicious-tool-choice detection.
+- **decision-log.md**: four new entries (#9–#12) documenting why the gate is
+  built by composition rather than a new state machine, why
+  `ExecutionDecision` is a discriminated union rather than one type with an
+  optional field, why fail-closed disqualifiers are evaluated before the
+  positive `execute` branch (with an exhaustive, `default`-free switch as
+  the enforcement mechanism), and why content-filter detection is a
+  diagnostic code rather than a new `StreamEndReason` literal.
+- **architecture.md**: added a short "Layers above the parser" section
+  documenting the (already-existing but previously undocumented)
+  coordinator, plus the new gate.
+
+### Known limitation (disclosed, not fixed this phase)
+
+- **grammar**: `GrammarStack.canSafelyCloseAll()` (used by
+  `closeContainersAtFinish: "safe-only"`) only inspects each container
+  frame's own expectation. An ancestor object whose value is itself an
+  in-progress-but-closeable child container is treated as "still missing a
+  value," which blocks the safe-close repair for the *entire* stack, not
+  just that frame. A single unclosed container (e.g. `["a","b"`) salvages
+  correctly; two nested unclosed containers (e.g. `{"commands":["a","b"` —
+  the literal example from this phase's spec) currently reports
+  `"truncated"` rather than `"salvaged"`. This does not weaken any safety
+  guarantee — the execution gate refuses to execute either way, proven by a
+  dedicated regression test — but it means the gate's more specific
+  `stream_incomplete` reason doesn't fire for every case the JSON shape
+  could in principle support. Found while writing this phase's tests (see
+  `test/unit/execution-gate.test.ts`), not fixed here: a core
+  `GrammarStack` change is out of scope for this API-layer phase. Tracked
+  as a Phase 2 candidate.
 
 ## [0.0.1-alpha.2] - 2026-08-12
 

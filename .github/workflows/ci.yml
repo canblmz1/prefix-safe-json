@@ -45,8 +45,11 @@ jobs:
     - name: Build
       run: pnpm run build
 
-    - name: Run end-to-end example
+    - name: Run end-to-end example (Anthropic)
       run: pnpm run example:anthropic
+
+    - name: Run end-to-end example (AI SDK execution gate)
+      run: pnpm run example:ai-sdk
 
     - name: Pack Check
       run: pnpm run pack:check
