@@ -2,13 +2,77 @@
 
 > ⚠️ **Alpha** — This project is under active development. APIs may change without notice. Do not use in production.
 
-Incremental LLM tool-call JSON parser and deterministic repair engine.
+**Don't execute incomplete AI tool calls.**
+
+`prefix-safe-json` is a fail-closed integrity layer for streamed LLM tool
+calls. It distinguishes complete, unfabricated arguments from truncated
+ones — including ones a syntax-level JSON repairer can make *look* complete
+— before they reach a tool with real side effects (writing a file, running a
+command, sending a request).
+
+```
+model output truncated
+        ↓
+    json repair
+        ↓
+    looks valid
+        ↓
+❌ dangerous execution
+```
+
+```
+   prefix-safe-json
+        ↓
+      truncated
+        ↓
+  executable: false
+        ↓
+        retry
+```
 
 ![Demo: a tool call truncated mid-argument is correctly reported non-executable, while the same call delivered in full is reported executable](examples/demo.gif)
 
 *(Real terminal output from [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs) — not staged. Same script CI runs on every push.)*
 
-## Problem
+## Quick start: the execution safety gate
+
+The highest-level API answers one question per tool call — is it safe to
+execute right now — without requiring you to know anything about parser
+state, coordinator events, or JSON Pointers:
+
+```typescript
+import { createToolCallExecutionGate, AnthropicStreamAdapter } from "prefix-safe-json";
+
+const gate = createToolCallExecutionGate(undefined, undefined, {
+  write_file: {
+    type: "object",
+    properties: { path: { type: "string" }, content: { type: "string" } },
+    required: ["path", "content"],
+  },
+});
+const adapter = new AnthropicStreamAdapter();
+
+for (const rawEvent of anthropicSseEvents) {
+  for (const normalized of adapter.push(rawEvent)) gate.push(normalized);
+}
+
+for (const decision of gate.finish().decisions) {
+  if (decision.action === "execute") {
+    await tools[decision.name](decision.value);
+  } else {
+    console.warn(`${decision.name}: ${decision.action} (${decision.reason})`); // "retry" or "reject"
+  }
+}
+```
+
+Provider adapters exist for OpenAI, Anthropic, Gemini, OpenRouter,
+OpenAI-compatible endpoints, and the [Vercel AI SDK](https://ai-sdk.dev)
+(`ai` package — not a dependency of this library; see
+[`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)).
+Full semantics, the decision table, and provider finish-reason mapping:
+[`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
+
+## The lower-level problem this is built on
 
 LLM providers (OpenAI, Anthropic, Gemini, OpenRouter) stream tool-call arguments as small JSON chunks. During streaming, the JSON is frequently incomplete: strings split mid-word, UTF-8 characters split mid-byte, containers left unclosed, numbers terminated at chunk boundaries.
 
@@ -98,6 +162,25 @@ draws exactly that distinction (`outcome: "truncated"`) and could gate
 execution on it without touching the syntax-repair behavior for the other
 case.
 
+## Scope: what this does and doesn't protect against
+
+This library is honestly scoped as **execution integrity** — complete,
+unfabricated, schema-valid arguments — not a general "AI security platform."
+It does **not**:
+
+- defend against prompt injection (it says nothing about whether the
+  arguments a model *chose* to send are the arguments it *should* have
+  sent — only whether they're complete and unfabricated)
+- resolve authorization (it doesn't know which caller may invoke which tool)
+- sandbox execution (`action: "execute"` means "this is genuinely the
+  complete value the model produced," not "safe to run without your own
+  validation and permissions")
+- detect a malicious or wrong tool choice (a model calling the wrong tool
+  with complete, schema-valid arguments is still reported `execute`)
+
+See [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#limitations---what-this-does-not-protect-against)
+for the full list, including known internal limitations.
+
 ## Current Status (Alpha)
 
 ### Implemented
@@ -111,8 +194,9 @@ case.
 - Configurable resource limits (depth, input size, string length, queued events)
 - Machine-readable test corpus with 25+ canonical fixtures
 - Chunk invariance verification
-- Provider stream adapters for OpenAI (legacy `function_call` and Responses API), Anthropic, Gemini, OpenRouter, and generic OpenAI-compatible endpoints, plus a coordinator for tracking multiple concurrent tool-call streams
+- Provider stream adapters for OpenAI (legacy `function_call` and Responses API), Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the Vercel AI SDK, plus a coordinator for tracking multiple concurrent tool-call streams
 - Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
+- `createToolCallExecutionGate()` — a fail-closed `execute` / `retry` / `reject` decision per tool call, built on top of the coordinator (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md))
 
 ### Not Yet Implemented
 
@@ -155,7 +239,11 @@ A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATIO
 npm install prefix-safe-json
 ```
 
-## Quick Start
+## Low-level API: Quick Start
+
+The execution gate (above) is what most consumers want. The low-level
+`createParser()` API it's built on is also fully public, for anyone who
+needs direct access to parser state:
 
 ```typescript
 import { createParser } from "prefix-safe-json";
@@ -191,6 +279,12 @@ Anthropic's real streaming shape — through `createToolCallStreamCoordinator()`
 and asserts the truncated call is never reported executable while a
 genuinely complete one is. This example runs in CI on every push, so it
 can't silently rot into a stale claim.
+
+For the same demonstration through the high-level execution gate and the
+[Vercel AI SDK](https://ai-sdk.dev)'s `fullStream` shape instead, see
+[`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)
+(`node examples/ai-sdk-execution-gate.mjs` after `pnpm run build`) — also
+run in CI on every push.
 
 ## License
 

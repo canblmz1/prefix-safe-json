@@ -32,3 +32,24 @@ The incremental JSON parser is designed with a pipeline architecture, streaming 
 ## Error Handling
 - **Diagnostics**: Used for input anomalies (e.g., malformed LLM JSON). Recorded in the snapshot and as events. They do not throw exceptions.
 - **Exceptions**: Reserved strictly for programming errors by the consumer (e.g., calling `push()` after `finish()`, invalid initialization).
+
+## Layers above the parser
+
+Two more layers sit on top of the pipeline above, each built by composition
+over the one below it - never by reimplementing it:
+
+- **Coordinator** (`createToolCallStreamCoordinator`, `src/coordinator/`):
+  tracks multiple concurrent per-call `IncrementalJsonParser` instances for a
+  single provider stream, maps provider-specific wire events (via a
+  `ProviderStreamAdapter`, `src/providers/`) into a normalized event
+  protocol, and optionally validates each call's `stableValue` against a
+  registered JSON Schema.
+- **Execution Safety Gate** (`createToolCallExecutionGate`, `src/gate/`): a
+  pure, fail-closed mapping from each `ToolCallState` (plus the stream-level
+  end reason) to an `ExecutionDecision` (`execute` / `retry` / `reject`).
+  Holds a coordinator instance internally; adds no parsing of its own. See
+  `docs/EXECUTION_GATE.md` for the full decision table.
+
+```
+Parser  ->  Coordinator  ->  Execution Safety Gate  ->  Framework adapters/examples
+```
