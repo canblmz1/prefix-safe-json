@@ -70,6 +70,17 @@ export interface ExecuteDecision extends ExecutionDecisionCommon {
   readonly executable: true;
   readonly reason: "complete";
   readonly value: JsonValue;
+
+  /**
+   * Narrowed to required here (unlike the inherited `name?: string`):
+   * the coordinator only ever transitions a call to `status: "complete"`
+   * when `name` is defined (see `DefaultToolCallStreamCoordinator.finishCall`
+   * - a call with no name is forced to `"invalid"` instead), so every
+   * `ExecuteDecision` genuinely has one. Encoding that here means
+   * `tools[decision.name](decision.value)` type-checks directly after
+   * narrowing on `action === "execute"`, with no non-null assertion needed.
+   */
+  readonly name: string;
 }
 
 /**

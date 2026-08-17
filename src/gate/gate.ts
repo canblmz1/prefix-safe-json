@@ -102,7 +102,7 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
  *   for (const normalized of adapter.push(raw)) gate.push(normalized);
  * }
  * for (const decision of gate.finish().decisions) {
- *   if (decision.action === "execute") await tools[decision.name!](decision.value);
+ *   if (decision.action === "execute") await tools[decision.name](decision.value);
  * }
  * ```
  */

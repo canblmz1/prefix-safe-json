@@ -119,10 +119,22 @@ export function decideExecution(
         return reject("schema_invalid");
       }
       // The ONLY positive branch in this entire function, reached only
-      // after every disqualifying check above has already passed.
-      if (call.parser.executable === true && call.parser.stableValue !== undefined) {
+      // after every disqualifying check above has already passed. The
+      // `call.name !== undefined` check is defensive/redundant with the
+      // coordinator's own invariant (a call only reaches status "complete"
+      // when its name is known) - narrowing on it here is what lets
+      // `ExecuteDecision.name` be typed as a required `string` instead of
+      // `string | undefined`, so it never needs re-checking at every call
+      // site. If the invariant were ever violated, this still fails closed
+      // to "stream_incomplete" rather than fabricating a name.
+      if (
+        call.parser.executable === true &&
+        call.parser.stableValue !== undefined &&
+        call.name !== undefined
+      ) {
         const decision: ExecuteDecision = {
           ...common,
+          name: call.name,
           action: "execute",
           executable: true,
           reason: "complete",

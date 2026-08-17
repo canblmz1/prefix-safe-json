@@ -87,6 +87,21 @@ describe("decideExecution — happy path", () => {
     expect(decision.action).not.toBe("execute");
     expect("value" in decision).toBe(false);
   });
+
+  it("ExecuteDecision.name is a required string, not string | undefined (compile-time)", () => {
+    const decision = decideExecution(call(), ctx());
+    if (decision.action === "execute") {
+      // If ExecuteDecision.name were still optional, indexing a
+      // Record<string, ...> with it would fail `pnpm run typecheck` with
+      // TS2538 - exactly what README.md's `tools[decision.name](...)`
+      // example did before ExecuteDecision.name was narrowed to `string`.
+      const tools: Record<string, () => void> = {};
+      const fn: (() => void) | undefined = tools[decision.name];
+      expect(fn).toBeUndefined();
+    } else {
+      throw new Error("expected an execute decision for this fixture");
+    }
+  });
 });
 
 describe("decideExecution — priority ordering (fail-closed checks run before execute)", () => {
