@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project is pre-1.0 (`0.0.1-alpha.3`); see [RELEASE.md](RELEASE.md) for
 the quantitative bar (mutation score, coverage) a version bump requires.
 
+## [Unreleased]
+
+### Fixed
+
+- **providers**: `OpenAIStreamAdapter` now reads `response.incomplete_details.reason`
+  on OpenAI Responses `response.incomplete` events instead of unconditionally
+  mapping the whole event to a generic `"cancelled"` stream-end reason.
+  `reason: "max_output_tokens"` now normalizes to `"length"` — a positively
+  observed truncation, not a generic cancellation — verified against the
+  `openai-node` SDK's `Response`/`ResponseIncompleteEvent` types, which
+  confine `incomplete_details.reason` to exactly `"max_output_tokens"` and
+  `"content_filter"`. `"content_filter"` now raises the same
+  `E_CONTENT_FILTERED` diagnostic the AI SDK adapter already raises for its
+  own `content-filter` finish reason, so the gate rejects with
+  `"content_filtered"` instead of the generic `"stream_incomplete"` it
+  would otherwise fall back to. Any other or missing reason now normalizes
+  to `"unknown"` rather than `"cancelled"`, so a future OpenAI-added reason
+  this adapter hasn't been taught yet reads as genuinely unclassified
+  rather than being mislabeled as a user/API-initiated cancellation — both
+  were already fail-closed for execution purposes (`isExecutable()` treats
+  `"cancelled"` and `"unknown"` identically), so this is a diagnostic-
+  precision fix, not a change to what does or doesn't execute.
+- **providers**: `OpenAIStreamAdapter` now handles the `response.failed`
+  event, which was previously unhandled entirely — the adapter would
+  silently return zero events and never mark the stream finished. It now
+  normalizes to `provider_stream_end` with `reason: "provider_error"`,
+  matching the existing generic `error` event type's handling.
+
+This is an observable behavior change for any caller inspecting the raw
+`reason`/`providerReason` fields on `response.incomplete`: previously
+always `"cancelled"`, now `"length"`, `"cancelled"` (content filter, with
+an accompanying diagnostic), or `"unknown"` depending on the provider's
+own `incomplete_details.reason`. It does not change any `execute` vs.
+non-`execute` outcome from the execution gate.
+
 ## [0.0.1-alpha.3] - 2026-08-17
 
 ### Added

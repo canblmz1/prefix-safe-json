@@ -258,12 +258,49 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     expect((end as { reason?: string })?.reason).toBe("complete");
   });
 
-  it("handles response.incomplete", () => {
+  it("handles response.incomplete with max_output_tokens as a length/truncation signal", () => {
+    const a = new OpenAIStreamAdapter();
+    const events = a.push({
+      type: "response.incomplete",
+      response: { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } },
+    });
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("length");
+    expect((end as { providerReason?: string })?.providerReason).toBe("max_output_tokens");
+  });
+
+  it("handles response.incomplete with content_filter as a content-filtered diagnostic", () => {
+    const a = new OpenAIStreamAdapter();
+    const events = a.push({
+      type: "response.incomplete",
+      response: { status: "incomplete", incomplete_details: { reason: "content_filter" } },
+    });
+    const diag = events.find((e) => e.type === "provider_diagnostic");
+    expect((diag as { code?: string })?.code).toBe("E_CONTENT_FILTERED");
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("cancelled");
+    expect((end as { providerReason?: string })?.providerReason).toBe("content_filter");
+  });
+
+  it("handles response.incomplete with an unrecognized reason by failing closed as unknown", () => {
+    const a = new OpenAIStreamAdapter();
+    const events = a.push({
+      type: "response.incomplete",
+      response: { status: "incomplete", incomplete_details: { reason: "some_future_reason" } },
+    });
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("unknown");
+    expect((end as { providerReason?: string })?.providerReason).toBe("some_future_reason");
+  });
+
+  it("handles response.incomplete with missing incomplete_details by failing closed as unknown", () => {
     const a = new OpenAIStreamAdapter();
     const events = a.push({ type: "response.incomplete", response: { status: "incomplete" } });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.type).toBe("provider_stream_end");
-    expect((end as { reason?: string })?.reason).toBe("cancelled");
+    expect((end as { reason?: string })?.reason).toBe("unknown");
+    expect((end as { providerReason?: string })?.providerReason).toBe("incomplete");
   });
 
   it("handles error type in Responses API", () => {
@@ -272,6 +309,18 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.type).toBe("provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("provider_error");
+  });
+
+  it("handles response.failed as a provider_error (was previously dropped entirely)", () => {
+    const a = new OpenAIStreamAdapter();
+    const events = a.push({
+      type: "response.failed",
+      response: { status: "failed", error: { code: "server_error", message: "boom" } },
+    });
+    const end = events.find((e) => e.type === "provider_stream_end");
+    expect(end?.type).toBe("provider_stream_end");
+    expect((end as { reason?: string })?.reason).toBe("provider_error");
+    expect((end as { providerReason?: string })?.providerReason).toBe("server_error");
   });
 
   it("handles legacy function_call format name delta", () => {

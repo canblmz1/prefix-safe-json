@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createToolCallExecutionGate } from "../../src/gate/gate.js";
 import { AiSdkStreamAdapter } from "../../src/providers/ai-sdk.js";
+import { OpenAIStreamAdapter } from "../../src/providers/openai.js";
 import { expectDefined } from "../utils/expect-defined.js";
 import type { ToolCallExecutionGate } from "../../src/gate/types.js";
 import type { NormalizedToolStreamEvent, StreamEndReason } from "../../src/coordinator/protocol.js";
@@ -173,6 +174,80 @@ describe("execution gate — truncation", () => {
     const decision = expectDefined(gate.finish().decisions[0]);
     expect(decision.action).toBe("retry");
     expect(decision.reason).toBe("stream_incomplete");
+  });
+});
+
+describe("execution gate — OpenAI Responses termination semantics (raw adapter, not synthetic events)", () => {
+  it("syntactically-complete arguments + response.incomplete/max_output_tokens: explicit provider truncation dominates syntax, never executes", () => {
+    // The exact case this fix exists for: {"path":"a.txt"} is fully valid,
+    // closed JSON - a naive adapter would call this "complete". But the
+    // provider itself says the response was cut short by its output-token
+    // budget, and that must win.
+    const gate = gateWith();
+    const adapter = new OpenAIStreamAdapter();
+
+    const raw = [
+      { type: "response.output_item.added", item: { type: "function_call", id: "item-1", call_id: "call-0", name: "read_file" } },
+      { type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"path":"a.txt"}' },
+      { type: "response.output_item.done", item: { id: "item-1" } },
+      { type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } } },
+    ];
+    for (const event of raw) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+    const decision = expectDefined(gate.finish().decisions[0]);
+    expect(decision.action).not.toBe("execute");
+    expect(decision.executable).toBe(false);
+    expect("value" in decision).toBe(false);
+  });
+
+  it("response.incomplete/content_filter -> reject/content_filtered, not a generic cancellation", () => {
+    const gate = gateWith();
+    const adapter = new OpenAIStreamAdapter();
+
+    const raw = [
+      { type: "response.output_item.added", item: { type: "function_call", id: "item-1", call_id: "call-0", name: "send_email" } },
+      { type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"to":"a@example.com"}' },
+      { type: "response.output_item.done", item: { id: "item-1" } },
+      { type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "content_filter" } } },
+    ];
+    for (const event of raw) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+    const decision = expectDefined(gate.finish().decisions[0]);
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("content_filtered");
+  });
+
+  it("response.incomplete with an unrecognized/future reason still never executes (fail-closed exhaustive mapping)", () => {
+    const gate = gateWith();
+    const adapter = new OpenAIStreamAdapter();
+
+    const raw = [
+      { type: "response.output_item.added", item: { type: "function_call", id: "item-1", call_id: "call-0", name: "read_file" } },
+      { type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"path":"a.txt"}' },
+      { type: "response.output_item.done", item: { id: "item-1" } },
+      { type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "some_future_reason_openai_has_not_documented_yet" } } },
+    ];
+    for (const event of raw) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+    const decision = expectDefined(gate.finish().decisions[0]);
+    expect(decision.action).not.toBe("execute");
+    expect(decision.executable).toBe(false);
+  });
+
+  it("response.failed (previously silently dropped) reaches the gate as reject/provider_error", () => {
+    const gate = gateWith();
+    const adapter = new OpenAIStreamAdapter();
+
+    const raw = [
+      { type: "response.output_item.added", item: { type: "function_call", id: "item-1", call_id: "call-0", name: "read_file" } },
+      { type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"path":"a.txt"}' },
+      { type: "response.failed", response: { status: "failed", error: { code: "server_error", message: "boom" } } },
+    ];
+    for (const event of raw) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+    const decision = expectDefined(gate.finish().decisions[0]);
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("provider_error");
   });
 });
 

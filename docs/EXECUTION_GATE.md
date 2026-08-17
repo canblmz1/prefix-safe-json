@@ -131,9 +131,14 @@ shared `StreamEndReason` (`"complete" | "length" | "network_error" |
 
 | Provider | Signal | Maps to |
 |---|---|---|
-| OpenAI / OpenAI-compatible | `finish_reason: "stop" \| "tool_calls" \| "function_call"` | `complete` |
+| OpenAI / OpenAI-compatible (Chat Completions shape) | `finish_reason: "stop" \| "tool_calls" \| "function_call"` | `complete` |
 | | `finish_reason: "length"` | `length` |
 | | `finish_reason: "cancelled"` | `cancelled` |
+| OpenAI (Responses API shape) | `response.completed` | `complete` |
+| | `response.incomplete` + `incomplete_details.reason: "max_output_tokens"` | `length` |
+| | `response.incomplete` + `incomplete_details.reason: "content_filter"` | `cancelled` **+** an `E_CONTENT_FILTERED` diagnostic, same treatment as the AI SDK adapter's `content-filter` below |
+| | `response.incomplete` with a missing/unrecognized `incomplete_details.reason` | `unknown` (never assumed to be a plain cancellation) |
+| | `response.failed` / `error` | `provider_error` |
 | Anthropic | `stop_reason: "end_turn" \| "tool_use"` | `complete` |
 | | `stop_reason: "max_tokens"` | `length` |
 | Gemini | `finishReason: "STOP"` | `complete` |

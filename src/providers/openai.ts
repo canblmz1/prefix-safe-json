@@ -1,6 +1,7 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
 import { OpenAICompatibleStreamAdapter } from "./openai-compatible.js";
+import { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
 
 interface OpenAIFunctionCallDelta {
   name?: string;
@@ -31,6 +32,18 @@ export interface OpenAIEvent {
   arguments?: string;
   response?: {
     status?: string;
+    // Only populated when status is "incomplete". Confirmed against the
+    // openai-node SDK's Response type: exactly "max_output_tokens" or
+    // "content_filter" today - any other string is a future/unrecognized
+    // value we haven't been taught to classify yet.
+    incomplete_details?: {
+      reason?: string;
+    };
+    // Only populated when status is "failed" (response.failed event).
+    error?: {
+      code?: string;
+      message?: string;
+    } | null;
   };
 }
 
@@ -83,7 +96,19 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
         this.finished = true;
         return events;
       }
-      
+
+      if (chunk.type === "response.failed") {
+        events.push({
+          type: "provider_stream_end",
+          sequence: ++this.sequence,
+          provider: this.provider,
+          reason: "provider_error",
+          providerReason: chunk.response?.error?.code ?? "response.failed",
+        });
+        this.finished = true;
+        return events;
+      }
+
       if (chunk.type === "response.output_item.added" && chunk.item?.type === "function_call" && chunk.item.id) {
         events.push({
           type: "tool_call_start",
@@ -148,13 +173,57 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
          });
          this.finished = true;
       } else if (chunk.type === "response.incomplete") {
-         events.push({
-           type: "provider_stream_end",
-           sequence: ++this.sequence,
-           provider: this.provider,
-           reason: "cancelled", // Incomplete treated as cancelled
-           providerReason: chunk.response?.status,
-         });
+         const incompleteReason = chunk.response?.incomplete_details?.reason;
+         if (incompleteReason === "max_output_tokens") {
+           // An explicit provider-native output-budget signal: a positively
+           // observed truncation, not a generic cancellation. Any call still
+           // "collecting" when this arrives must fail closed even if its own
+           // JSON happens to look syntactically complete (see isExecutable()
+           // in parser.ts) - a coincidentally-closed value from a stream the
+           // provider itself says it cut short is not confirmation of intent.
+           events.push({
+             type: "provider_stream_end",
+             sequence: ++this.sequence,
+             provider: this.provider,
+             reason: "length",
+             providerReason: incompleteReason,
+           });
+         } else if (incompleteReason === "content_filter") {
+           // A policy/safety termination, not a retryable interruption:
+           // recorded as its own diagnostic so the execution gate rejects
+           // with "content_filtered" instead of the generic "stream_incomplete"
+           // a bare "cancelled" end reason would otherwise produce. Mirrors
+           // the same finish_reason === "content-filter" handling in
+           // ai-sdk.ts.
+           events.push({
+             type: "provider_diagnostic",
+             sequence: ++this.sequence,
+             provider: this.provider,
+             code: CONTENT_FILTERED_DIAGNOSTIC_CODE,
+             severity: "error",
+             message: "Generation stopped by the model provider's content filter",
+           });
+           events.push({
+             type: "provider_stream_end",
+             sequence: ++this.sequence,
+             provider: this.provider,
+             reason: "cancelled",
+             providerReason: incompleteReason,
+           });
+         } else {
+           // incomplete_details missing, or a reason string this adapter
+           // doesn't recognize (e.g. a future OpenAI addition): fail closed
+           // on "unknown" rather than mislabeling it as "cancelled", which
+           // would wrongly imply a user/API-initiated cancellation instead
+           // of an unclassified provider-side termination.
+           events.push({
+             type: "provider_stream_end",
+             sequence: ++this.sequence,
+             provider: this.provider,
+             reason: "unknown",
+             providerReason: incompleteReason ?? chunk.response?.status,
+           });
+         }
          this.finished = true;
       }
       return events;
