@@ -52,8 +52,29 @@ export type {
   ToolCallStreamCoordinator,
   ToolCallState,
   JsonSchemaLike,
+  CoordinatorLimits,
+  CoordinatorDiagnostic,
 } from "./coordinator/types.js";
-export type { NormalizedToolStreamEvent } from "./coordinator/protocol.js";
+export type { NormalizedToolStreamEvent, ProviderName } from "./coordinator/protocol.js";
+export { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "./coordinator/diagnostic-codes.js";
+
+// Execution Safety Gate API
+/**
+ * @public (Stable)
+ * Fail-closed execution-decision layer built on top of the coordinator.
+ * Answers one question per tool call: is it safe to execute right now?
+ * See docs/EXECUTION_GATE.md.
+ */
+export { createToolCallExecutionGate } from "./gate/gate.js";
+export type {
+  ToolCallExecutionGate,
+  ToolCallExecutionGateFinalResult,
+  ExecutionDecision,
+  ExecuteDecision,
+  NonExecutableDecision,
+  ExecutionAction,
+  ExecutionReason,
+} from "./gate/types.js";
 
 // Provider API
 export type { ProviderStreamAdapter } from "./providers/adapter.js";
@@ -68,3 +89,4 @@ export { OpenAICompatibleStreamAdapter } from "./providers/openai-compatible.js"
 export { AnthropicStreamAdapter } from "./providers/anthropic.js";
 export { GeminiStreamAdapter } from "./providers/gemini.js";
 export { OpenRouterStreamAdapter } from "./providers/openrouter.js";
+export { AiSdkStreamAdapter } from "./providers/ai-sdk.js";

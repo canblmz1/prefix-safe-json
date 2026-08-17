@@ -4,6 +4,7 @@ export type ProviderName =
   | "gemini"
   | "openrouter"
   | "openai-compatible"
+  | "ai-sdk"
   | "unknown";
 
 export interface NormalizedEventBase {
