@@ -78,9 +78,26 @@ jobs:
         if: steps.version-check.outputs.should_publish == 'true'
         run: pnpm run pack:check
 
+      # A prerelease version (anything with a `-` per semver, e.g.
+      # "0.0.1-alpha.3") must never claim the "latest" dist-tag - that tag is
+      # what a bare `npm install prefix-safe-json` resolves to, and an alpha
+      # build becoming every new user's default install is exactly the
+      # failure mode this step exists to prevent. Stable versions (no `-`)
+      # keep tagging "latest" as before.
+      - name: Determine npm dist-tag
+        if: steps.version-check.outputs.should_publish == 'true'
+        id: dist-tag
+        run: |
+          VERSION="${{ steps.version-check.outputs.version }}"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
-        run: npm publish --access public --tag latest
+        run: npm publish --access public --tag ${{ steps.dist-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
