@@ -13,11 +13,12 @@ pnpm lint
 
 ## Project Principles
 
-- **Zero runtime dependencies**: The parser must have no runtime dependencies.
+- **Dependency discipline**: Keep the core parser small and deterministic. New runtime dependencies need a clear correctness or safety justification; JSON Schema validation currently uses AJV.
 - **No dynamic code execution**: Never use `eval`, `Function`, or similar constructs.
 - **Incremental processing**: Never re-parse previous input on new chunks.
 - **Amortized O(total input)**: Parser processing must be proportional to total input size.
 - **Honest diagnostics**: Never fabricate or guess missing data.
+- **Execution integrity**: A syntactically repairable or schema-shaped value must not be treated as executable unless the stream state confirms it is complete.
 
 ## Test Corpus
 
