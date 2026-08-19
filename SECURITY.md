@@ -4,9 +4,11 @@
 
 If you discover a security vulnerability, please report it responsibly.
 
-**Do not open a public issue for security vulnerabilities.**
+**Do not open a public issue containing vulnerability details.**
 
-Instead, send an email describing the vulnerability. Include:
+Use GitHub's private vulnerability reporting for this repository when available. If that option is not available, contact the maintainer through the GitHub profile before sharing sensitive reproduction details publicly.
+
+A useful report includes:
 
 - Description of the vulnerability
 - Steps to reproduce
@@ -15,12 +17,14 @@ Instead, send an email describing the vulnerability. Include:
 
 ## Scope
 
-This library parses untrusted JSON input from LLM streaming endpoints. Security-relevant concerns include:
+This library parses untrusted JSON input from LLM streaming endpoints and can be used to gate side-effecting tool execution. Security-relevant concerns include:
 
+- **Execution integrity**: Truncated, malformed, schema-invalid, provider-failed, or otherwise unconfirmed tool-call input must not be represented as safely executable.
 - **Denial of service**: Adversarial payloads designed to cause excessive memory or CPU consumption. The parser enforces configurable limits on input size, nesting depth, string length, and event queue size.
-- **Memory safety**: While TypeScript/JavaScript provides memory safety guarantees, the parser avoids unbounded allocations and ensures all loops terminate.
-- **No code execution**: The parser never uses `eval`, `Function`, or any form of dynamic code execution.
-- **No network access**: The parser is a pure computation library with zero runtime dependencies and no network I/O.
+- **Memory/resource safety**: The implementation avoids intentionally unbounded parser state and keeps resource limits explicit.
+- **No dynamic code execution**: The parser never uses `eval`, `Function`, or similar dynamic code execution.
+- **No network I/O in the library**: Provider adapters normalize events supplied by callers; the package does not make provider or tool network requests on its own.
+- **Runtime dependencies**: JSON Schema validation uses AJV. Dependency changes should be reviewed with the same safety and maintenance scrutiny as parser changes.
 
 ## Supported Versions
 
