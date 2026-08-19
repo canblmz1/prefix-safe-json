@@ -1,13 +1,16 @@
 {
   "name": "prefix-safe-json",
   "version": "0.0.1-alpha.3",
-  "description": "Incremental LLM tool-call JSON parser and deterministic repair engine — never reports a value until it's unambiguously complete",
+  "description": "Fail-closed execution integrity for streamed LLM tool calls — reject truncated or unconfirmed arguments before side effects",
   "keywords": [
     "json",
     "streaming",
     "incremental",
     "llm",
+    "ai-agents",
     "tool-calling",
+    "tool-execution",
+    "execution-safety",
     "function-calling",
     "json-repair",
     "json-parser"
