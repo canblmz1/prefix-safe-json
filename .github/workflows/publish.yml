@@ -36,18 +36,24 @@ jobs:
       # actual gate - without it, every push touching package.json
       # (a new devDependency, a script tweak, anything) would attempt a
       # publish and fail loudly instead of just skipping quietly.
+      #
+      # Check the exact local version instead of the package's default
+      # dist-tag. For prereleases, `npm view <pkg> version` can resolve
+      # `latest` (for example alpha.2) even when the local prerelease
+      # (for example alpha.3 under `next`) is already published.
       - name: Check whether the local version is unpublished
         id: version-check
         run: |
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED_VERSION=$(npm view prefix-safe-json version 2>/dev/null || echo "none")
           echo "Local version: $LOCAL_VERSION"
-          echo "Published version: $PUBLISHED_VERSION"
           echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
-          if [ "$LOCAL_VERSION" != "$PUBLISHED_VERSION" ]; then
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          else
+
+          if npm view "prefix-safe-json@$LOCAL_VERSION" version >/dev/null 2>&1; then
+            echo "Version $LOCAL_VERSION is already published; skipping publish."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version $LOCAL_VERSION is not published yet."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Typecheck
