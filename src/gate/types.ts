@@ -4,7 +4,7 @@ import {
   CoordinatorPushResult,
   ToolCallCoordinatorEvent,
 } from "../coordinator/types.js";
-import { NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
+import { NormalizedToolStreamEvent, ProviderName, StreamEndReason } from "../coordinator/protocol.js";
 
 /**
  * What to do with a tool call right now.
@@ -35,6 +35,70 @@ export type ExecutionReason =
   | "content_filtered"
   | "unknown";
 
+/**
+ * Why a decision came out the way it did - observability, not a second
+ * decision input. Every field here is read-only, derived state already held
+ * elsewhere (`ToolCallState`, the stream-level `DecisionContext`); nothing
+ * on this object ever feeds back into `decideExecution()`'s own logic, and
+ * changing what it reports can never change `action`/`executable`/`reason`.
+ *
+ * Deliberately excludes anything that would require new cross-layer
+ * plumbing to derive reliably (e.g. a received-chunk count - the parser
+ * only tracks cumulative bytes, not `push()` call counts, and adding that
+ * tracking purely to populate a metric here was judged not worth the
+ * coupling for this release).
+ */
+export interface DecisionEvidence {
+  /** Which provider adapter produced this call (`ToolCallState.provider`). */
+  readonly provider: ProviderName;
+
+  /**
+   * The provider's own, pre-normalization finish/stop reason string, when
+   * the stream-ending event carried one (e.g. `"length"`, `"max_output_tokens"`,
+   * `"content_filter"`). `undefined` when the stream never reported one, or
+   * reported one without a `providerReason` (e.g. a default `finish()` call
+   * with no `meta`).
+   */
+  readonly providerReason?: string;
+
+  /** The normalized, library-level stream-end reason applied to this call. */
+  readonly streamEndReason: StreamEndReason;
+
+  /**
+   * Whether a real `provider_stream_end` reason was ever observed, as
+   * opposed to the neutral `"unknown"` default a gate reports before any
+   * stream-end signal has arrived at all. `true` here does NOT mean the
+   * reason was safe - a confirmed `"length"` still has `terminalConfirmed:
+   * true` - only that the stream's end state is genuinely known rather than
+   * merely unclassified or never observed.
+   */
+  readonly terminalConfirmed: boolean;
+
+  /**
+   * Whether the parser's root JSON container actually closed
+   * (`ToolCallState.parser.rootComplete`) - independent of whether that
+   * closure was genuine or reached via a safe-close repair, and independent
+   * of whether the stream-end reason makes it trustworthy. A syntactically
+   * complete value cut short by `length` has `structurallyComplete: true`
+   * and `parserExecutable: false` at the same time - that combination *is*
+   * the scenario this library exists to catch.
+   */
+  readonly structurallyComplete: boolean;
+
+  /** `ToolCallState.parser.executable`, verbatim - the parser's own fail-closed verdict. */
+  readonly parserExecutable: boolean;
+
+  /**
+   * `ToolCallState.schemaValid`, verbatim. `undefined` when no schema was
+   * registered for this tool, or the call never reached a structurally
+   * complete outcome.
+   */
+  readonly schemaValid?: boolean;
+
+  /** Total bytes received for this call's argument stream (`ToolCallState.parser.receivedBytes`). */
+  readonly receivedBytes: number;
+}
+
 interface ExecutionDecisionCommon {
   /** The coordinator's internal call identifier (see `ToolCallState.internalId`). */
   readonly internalId: string;
@@ -57,6 +121,13 @@ interface ExecutionDecisionCommon {
 
   /** Coordinator-level diagnostics attributable to this call, verbatim. */
   readonly coordinatorDiagnostics: readonly CoordinatorDiagnostic[];
+
+  /**
+   * Why this decision came out the way it did. See `DecisionEvidence` -
+   * always present, purely observational, never a second source of truth
+   * for `action`/`executable`/`reason`.
+   */
+  readonly evidence: DecisionEvidence;
 }
 
 /**

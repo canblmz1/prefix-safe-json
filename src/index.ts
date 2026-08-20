@@ -74,6 +74,7 @@ export type {
   NonExecutableDecision,
   ExecutionAction,
   ExecutionReason,
+  DecisionEvidence,
 } from "./gate/types.js";
 
 // Provider API

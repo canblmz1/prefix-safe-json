@@ -31,8 +31,11 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
   // Mirrors the coordinator's own "first provider_stream_end (from push(),
   // or from finish()'s meta if none arrived) wins" rule - see push()/finish()
   // below and DefaultToolCallStreamCoordinator.finish()'s matching
-  // `if (!this.isFinished)` guard.
+  // `if (!this.isFinished)` guard. streamEndProviderReason is captured
+  // alongside streamEndReason purely for DecisionEvidence.providerReason -
+  // it is never read by decideExecution()'s own logic.
   private streamEndReason: StreamEndReason | undefined;
+  private streamEndProviderReason: string | undefined;
   private streamEndCaptured = false;
 
   constructor(
@@ -47,6 +50,7 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
     if (event.type === "provider_stream_end" && !this.streamEndCaptured) {
       this.streamEndCaptured = true;
       this.streamEndReason = event.reason;
+      this.streamEndProviderReason = event.providerReason;
     }
     return this.coordinator.push(event);
   }
@@ -59,6 +63,7 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
       // every in-flight call is still "collecting" regardless, so this
       // never influences whether something looks executable.
       streamEndReason: this.streamEndReason ?? "unknown",
+      streamEndProviderReason: this.streamEndProviderReason,
       diagnostics: snap.diagnostics,
     };
     return snap.calls.map((call) => decideExecution(call, ctx));
@@ -75,11 +80,16 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
     if (!this.streamEndCaptured) {
       this.streamEndCaptured = true;
       this.streamEndReason = meta?.reason ?? "unknown";
+      this.streamEndProviderReason = meta?.providerReason;
     }
 
     const result = this.coordinator.finish(meta);
     const diagnostics = this.coordinator.snapshot().diagnostics;
-    const ctx = { streamEndReason: this.streamEndReason ?? "unknown", diagnostics };
+    const ctx = {
+      streamEndReason: this.streamEndReason ?? "unknown",
+      streamEndProviderReason: this.streamEndProviderReason,
+      diagnostics,
+    };
     const decisions = result.calls.map((call) => decideExecution(call, ctx));
 
     return { decisions, diagnostics };

@@ -20,7 +20,7 @@ import { DiagnosticCode } from "../diagnostics/codes.js";
 import { CoordinatorDiagnostic, ToolCallState } from "../coordinator/types.js";
 import { StreamEndReason } from "../coordinator/protocol.js";
 import { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
-import { ExecuteDecision, ExecutionReason, NonExecutableDecision } from "./types.js";
+import { DecisionEvidence, ExecuteDecision, ExecutionReason, NonExecutableDecision } from "./types.js";
 
 export interface DecisionContext {
   /**
@@ -30,6 +30,14 @@ export interface DecisionContext {
    * rather than per-call state.
    */
   readonly streamEndReason: StreamEndReason;
+
+  /**
+   * The provider's own pre-normalization reason string for the stream-end
+   * event, when one was given (`ProviderStreamEndEvent.providerReason`).
+   * Observability only, mirrored onto `DecisionEvidence.providerReason` -
+   * never consulted by the decision logic itself.
+   */
+  readonly streamEndProviderReason?: string;
 
   /**
    * The coordinator's full, unfiltered diagnostics list (`snapshot().diagnostics`).
@@ -68,6 +76,17 @@ export function decideExecution(
     ...callCoordinatorDiagnostics,
   ];
 
+  const evidence: DecisionEvidence = {
+    provider: call.provider,
+    providerReason: ctx.streamEndProviderReason,
+    streamEndReason: ctx.streamEndReason,
+    terminalConfirmed: ctx.streamEndReason !== "unknown",
+    structurallyComplete: call.parser.rootComplete,
+    parserExecutable: call.parser.executable,
+    schemaValid: call.schemaValid,
+    receivedBytes: call.parser.receivedBytes,
+  };
+
   const common = {
     internalId: call.internalId,
     toolCallId: call.toolCallId,
@@ -76,6 +95,7 @@ export function decideExecution(
     stableValue: call.parser.stableValue,
     parserDiagnostics,
     coordinatorDiagnostics,
+    evidence,
   };
 
   function reject(reason: Exclude<ExecutionReason, "complete">): NonExecutableDecision {
