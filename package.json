@@ -1,6 +1,6 @@
 {
   "name": "prefix-safe-json",
-  "version": "0.0.1-alpha.3",
+  "version": "0.0.1-alpha.4",
   "description": "Fail-closed execution integrity for streamed LLM tool calls — reject truncated or unconfirmed arguments before side effects",
   "keywords": [
     "json",

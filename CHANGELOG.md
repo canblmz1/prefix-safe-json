@@ -3,10 +3,12 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-This project is pre-1.0 (`0.0.1-alpha.3`); see [RELEASE.md](RELEASE.md) for
+This project is pre-1.0 (`0.0.1-alpha.4`); see [RELEASE.md](RELEASE.md) for
 the quantitative bar (mutation score, coverage) a version bump requires.
 
 ## [Unreleased]
+
+## [0.0.1-alpha.4] - 2026-08-20
 
 ### Added
 
@@ -64,6 +66,28 @@ the quantitative bar (mutation score, coverage) a version bump requires.
 
 ### Fixed
 
+- **parser**: `finish()`'s `executable` computation used a denylist of five
+  known-bad `StreamEndReason` values (`"length"`, `"network_error"`,
+  `"provider_error"`, `"cancelled"`, `"unknown"`) rather than an allowlist
+  requiring `reason === "complete"`. `StreamEndReason` is a closed union at
+  the type level, so a well-typed caller could never trigger the gap this
+  left — but `finish()`'s `reason` argument is never validated at runtime,
+  and a caller using `createParser()` directly (the package's foundational,
+  documented API — not every integration goes through a bundled provider
+  adapter) could pass a raw, unmapped provider string straight through. Any
+  such string outside the five denylisted values fell through every check
+  and reported `executable: true` for an otherwise well-formed document,
+  even though the stream's completion was never actually confirmed. This is
+  distinct from the AI SDK adapter's own `finishReason` normalization
+  (already covered by `test/invariants/execution-priority.test.ts`'s
+  "unknown future finish reason fails closed" case, which maps an
+  unrecognized SDK literal to the safe `"unknown"` before it ever reaches
+  the parser) — this fix closes the same class of gap one layer down, at
+  the parser's own public `finish()` boundary, for any caller regardless of
+  which adapter (if any) sits in front of it. `decideExecution()` in
+  `gate/decide.ts` delegates its own `execute` branch directly to
+  `call.parser.executable`, so this fix also closes the equivalent gap at
+  the gate/guard layer without any change needed there.
 - **gate**: `ExecuteDecision.name` narrowed from `string | undefined` to a
   required `string`. The coordinator only ever transitions a call to status
   `"complete"` when its name is known (a nameless call is forced to
