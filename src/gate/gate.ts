@@ -85,8 +85,14 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
 
     const result = this.coordinator.finish(meta);
     const diagnostics = this.coordinator.snapshot().diagnostics;
+    // Unlike snapshot() above, this point is only ever reached after
+    // streamEndCaptured is guaranteed true (set on entry to this method, or
+    // already true from an earlier push()/finish() call) - and every path
+    // that sets streamEndCaptured sets streamEndReason to a defined value in
+    // the same branch, so the pre-finish "unknown" placeholder never applies
+    // here.
     const ctx = {
-      streamEndReason: this.streamEndReason ?? "unknown",
+      streamEndReason: this.streamEndReason as StreamEndReason,
       streamEndProviderReason: this.streamEndProviderReason,
       diagnostics,
     };
