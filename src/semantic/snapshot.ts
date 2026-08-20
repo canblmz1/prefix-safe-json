@@ -2,7 +2,7 @@
 // Snapshot builder — constructs stableValue from committed events
 // ---------------------------------------------------------------------------
 
-import type { JsonValue, JsonObject, JsonArray, ParserEvent } from "../types.js";
+import type { JsonValue, JsonObject, JsonArray } from "../types.js";
 import type { GrammarFrame } from "../grammar/frame.js";
 
 /**
@@ -23,11 +23,14 @@ export class SnapshotBuilder {
   private frameNodes = new WeakMap<GrammarFrame, JsonValue>();
 
   /**
-   * Process a value_committed event and integrate it into the stable value.
+   * Integrate a committed value into the stable value.
+   * Takes just `{ path, value }` rather than a full `ValueCommittedEvent` -
+   * the only two fields this method has ever read - so its four call sites
+   * in parser.ts don't need to fabricate a `sequence`/`type`/`operation`/
+   * `byteRange` (already reported separately via the real event emitted to
+   * `drainEvents()`) purely to satisfy a wider parameter type.
    */
-  processEvent(event: ParserEvent): void {
-    if (event.type !== "value_committed") return;
-
+  processEvent(event: { path: string; value: JsonValue }): void {
     const { path, value } = event;
 
     // Parse the JSON Pointer path to navigate to the parent
@@ -138,11 +141,12 @@ export class SnapshotBuilder {
    */
   getStableValue(): JsonValue | undefined {
     if (!this.hasRoot) return undefined;
-    return deepClone(this.root as JsonValue);
-  }
-
-  get hasRootValue(): boolean {
-    return this.hasRoot;
+    // `root` is only ever assigned `{}` (initRootObject) or `[]`
+    // (initRootArray) - never a bare scalar (a root-level scalar bypasses
+    // SnapshotBuilder entirely; see parser.ts's rootScalarValue) - so this
+    // is always genuinely a container once hasRoot is true, not just an
+    // assertion of convenience.
+    return deepClone(this.root as JsonObject | JsonArray);
   }
 }
 
@@ -183,14 +187,10 @@ function safeSet(obj: JsonObject, key: string, value: JsonValue): void {
  * implementation overflows the JS call stack around ~5000 levels of nesting,
  * well below values maxDepth's type otherwise permits.
  */
-function deepClone(value: JsonValue): JsonValue {
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-
+function deepClone(value: JsonObject | JsonArray): JsonValue {
   const root: JsonValue = Array.isArray(value) ? [] : {};
   const stack: Array<{ src: JsonObject | JsonArray; dst: JsonObject | JsonArray }> = [
-    { src: value as JsonObject | JsonArray, dst: root as JsonObject | JsonArray },
+    { src: value, dst: root as JsonObject | JsonArray },
   ];
 
   while (stack.length > 0) {

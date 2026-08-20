@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createParser } from "../../src/parser.js";
 import { createToolCallStreamCoordinator } from "../../src/coordinator/coordinator.js";
 import type { NormalizedToolStreamEvent } from "../../src/coordinator/protocol.js";
-import type { JsonObject } from "../../src/types.js";
+import type { JsonObject, StreamEndReason } from "../../src/types.js";
 
 describe("Parser Regressions", () => {
   const invalidInputs = [
@@ -457,5 +457,131 @@ describe("Round 12 audit fixes", () => {
 
     expect(rNaN.outcome).toBe(rDefault.outcome);
     expect(rNaN.outcome).toBe("invalid");
+  });
+});
+
+describe("numberGrammarError — each disqualifying case, with the exact raw diagnostic text", () => {
+  // numberGrammarError()'s return value is surfaced verbatim as the
+  // diagnostic message ONLY on the mid-stream termination path
+  // (commitNumber(), when a delimiter ends the number before end-of-input)
+  // - verified directly: at true stream end, finalizeNumber() instead
+  // wraps it into a generic "Invalid number at stream end: <buffer>"
+  // message and discards the specific text entirely. Delimiter-terminated
+  // ("[<number>,2]") inputs below exercise the path where the exact
+  // message is genuinely observable.
+  const cases: Array<{ label: string; input: string; message: string }> = [
+    { label: "trailing '.'", input: "[1.,2]", message: "Number has trailing decimal point with no digits" },
+    { label: "trailing '+' after exponent", input: "[1e+,2]", message: "Number has exponent with no digits" },
+    { label: "trailing '-' after exponent", input: "[1e-,2]", message: "Number has exponent with no digits" },
+    { label: "leading zero", input: "[01,2]", message: "Number has leading zero" },
+    { label: "negative leading zero", input: "[-01,2]", message: "Number has leading zero" },
+  ];
+
+  for (const { label, input, message } of cases) {
+    it(`${label} ('${input}') is rejected as invalid with the exact expected diagnostic message`, () => {
+      const parser = createParser();
+      parser.push(input);
+      const result = parser.finish({ reason: "complete" });
+
+      expect(result.outcome).toBe("invalid");
+      expect(result.executable).toBe(false);
+      expect(result.diagnostics.some((d) => d.message === message)).toBe(true);
+    });
+  }
+
+  it("bare trailing 'e'/'E' with nothing after at true stream end is genuinely truncated, not a grammar violation - contrast case", () => {
+    // Distinguishes "not_ready" (finalizeNumber's third outcome, per its
+    // own docstring: "ends right at a bare e/E with no sign or digit yet")
+    // from "invalid": unlike a trailing sign ('1e+'), a bare trailing "e"
+    // could still become a valid number ("1e5") with more input, so it's
+    // not yet diagnosable as malformed.
+    for (const input of ["1e", "1E", "-"]) {
+      const parser = createParser();
+      parser.push(input);
+      const result = parser.finish({ reason: "complete" });
+      expect(result.outcome).toBe("truncated");
+      expect(result.diagnostics).toHaveLength(0);
+    }
+  });
+
+  it("a bare 'e' immediately followed by a delimiter hits the state machine's own terminator check, not numberGrammarError", () => {
+    // A third, distinct diagnostic path: '[1e,2]' never reaches
+    // commitNumber()'s numberGrammarError() call at all - the
+    // NumberExponentStart state's own terminator branch rejects it first
+    // (see scanner.ts's comment on commitNumber: "trailing exponent-with-
+    // no-digit is already rejected before calling this").
+    const parser = createParser();
+    parser.push("[1e,2]");
+    const result = parser.finish({ reason: "complete" });
+    expect(result.outcome).toBe("invalid");
+    expect(
+      result.diagnostics.some((d) => d.message.startsWith("Expected digit or sign after exponent")),
+    ).toBe(true);
+  });
+
+  it("a lone zero ('0') is NOT a leading-zero violation - single-digit zero is valid JSON", () => {
+    const parser = createParser();
+    parser.push("0");
+    const result = parser.finish({ reason: "complete" });
+    expect(result.outcome).toBe("valid");
+    expect(result.executable).toBe(true);
+    expect(result.stableValue).toBe(0);
+  });
+
+  it("'0.5' (zero followed by a fraction, not another integer digit) is valid - not a leading-zero violation", () => {
+    const parser = createParser();
+    parser.push("0.5");
+    const result = parser.finish({ reason: "complete" });
+    expect(result.outcome).toBe("valid");
+    expect(result.stableValue).toBe(0.5);
+  });
+
+  it("chunk invariance: every 2-way split of a well-formed number produces the identical stableValue", () => {
+    const whole = "-123.456e+7";
+    for (let i = 1; i < whole.length; i++) {
+      const p = createParser();
+      p.push(whole.slice(0, i));
+      p.push(whole.slice(i));
+      const r = p.finish({ reason: "complete" });
+      expect(r.outcome).toBe("valid");
+      expect(r.stableValue).toBe(-123.456e7);
+    }
+  });
+});
+
+describe("isExecutable() must allowlist reason:'complete', not denylist known-bad reasons", () => {
+  // isExecutable() used to deny exactly five known StreamEndReason values
+  // ("length"/"network_error"/"provider_error"/"cancelled"/"unknown") and
+  // fall through to executable:true for anything else. StreamEndReason is a
+  // closed TypeScript union, so a well-typed caller can never construct the
+  // gap this leaves - but finish()'s `reason` is never validated at
+  // runtime, and real callers (provider adapters normalizing a raw
+  // finish_reason/stop_reason string from an LLM API, or any caller that
+  // bypasses the type checker) can and do pass strings outside that union.
+  // An unrecognized reason must never be silently treated as "safe" -
+  // "complete" is the only reason that means the stream genuinely finished
+  // normally, so only that one should ever unlock executable:true.
+  it("an unrecognized/unmapped stream-end reason string does NOT make an otherwise-valid stream executable", () => {
+    const p = createParser();
+    p.push('{"a":1}');
+    const r = p.finish({
+      reason: "some_unmapped_provider_reason" as unknown as StreamEndReason,
+    });
+    expect(r.outcome).toBe("valid"); // syntactically fine
+    expect(r.executable).toBe(false); // but never confirmed complete - must not execute
+  });
+
+  it("contrast: the same JSON with the genuine reason:'complete' IS executable", () => {
+    const p = createParser();
+    p.push('{"a":1}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.executable).toBe(true);
+  });
+
+  it("an empty-string reason (another value outside the union) does NOT make an otherwise-valid stream executable", () => {
+    const p = createParser();
+    p.push('{"a":1}');
+    const r = p.finish({ reason: "" as unknown as StreamEndReason });
+    expect(r.executable).toBe(false);
   });
 });

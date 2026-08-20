@@ -177,16 +177,15 @@ class Parser implements IncrementalJsonParser {
 
     // Handle UTF-8 errors
     for (const err of decoded.errors) {
-      const code =
-        err.kind === "overlong"
-          ? DiagnosticCode.E_INVALID_UTF8
-          : err.kind === "out_of_range"
-            ? DiagnosticCode.E_INVALID_UTF8
-            : err.kind === "invalid_start_byte"
-              ? DiagnosticCode.E_INVALID_UTF8
-              : DiagnosticCode.E_INVALID_UTF8;
+      // Every UTF-8 decode failure kind (overlong, out_of_range,
+      // invalid_start_byte, invalid_continuation) maps to the same
+      // machine-readable code - there is no per-kind DiagnosticCode - so
+      // `err.kind` only distinguishes the free-text message below, not the
+      // code itself. A branch here would be equivalent under every mutation
+      // (the resulting `code` value can never differ), so there is no
+      // branch to test.
       const diag = createDiagnostic(
-        code,
+        DiagnosticCode.E_INVALID_UTF8,
         "error",
         err.byteOffset,
         `Invalid UTF-8: ${err.kind} at byte ${err.byteOffset}`,
@@ -573,7 +572,7 @@ class Parser implements IncrementalJsonParser {
       }
     }
 
-    const outcome = this.determineOutcome(reason);
+    const outcome = this.determineOutcome();
     const executable = this.isExecutable();
 
     // Emit finish events
@@ -1008,14 +1007,7 @@ class Parser implements IncrementalJsonParser {
           token.byteStart,
           token.byteEnd,
         ]);
-        this.snapshot_.processEvent({
-          type: "value_committed",
-          sequence: 0,
-          path,
-          operation: "add",
-          value: token.value,
-          byteRange: [token.byteStart, token.byteEnd],
-        });
+        this.snapshot_.processEvent({ path, value: token.value });
         frame.objectExpectation = "comma_or_end";
       }
     } else if (frame.containerType === "array") {
@@ -1043,14 +1035,7 @@ class Parser implements IncrementalJsonParser {
         token.byteStart,
         token.byteEnd,
       ]);
-      this.snapshot_.processEvent({
-        type: "value_committed",
-        sequence: 0,
-        path,
-        operation: "add",
-        value: token.value,
-        byteRange: [token.byteStart, token.byteEnd],
-      });
+      this.snapshot_.processEvent({ path, value: token.value });
       this.grammar.advanceArrayIndex();
       frame.arrayExpectation = "comma_or_end";
     }
@@ -1095,14 +1080,7 @@ class Parser implements IncrementalJsonParser {
           token.byteStart,
           token.byteEnd,
         ]);
-        this.snapshot_.processEvent({
-          type: "value_committed",
-          sequence: 0,
-          path,
-          operation: "add",
-          value,
-          byteRange: [token.byteStart, token.byteEnd],
-        });
+        this.snapshot_.processEvent({ path, value });
         frame.objectExpectation = "comma_or_end";
       }
     } else if (frame.containerType === "array") {
@@ -1129,14 +1107,7 @@ class Parser implements IncrementalJsonParser {
         token.byteStart,
         token.byteEnd,
       ]);
-      this.snapshot_.processEvent({
-        type: "value_committed",
-        sequence: 0,
-        path,
-        operation: "add",
-        value,
-        byteRange: [token.byteStart, token.byteEnd],
-      });
+      this.snapshot_.processEvent({ path, value });
       this.grammar.advanceArrayIndex();
       frame.arrayExpectation = "comma_or_end";
     }
@@ -1222,14 +1193,15 @@ class Parser implements IncrementalJsonParser {
     // been routed through addDiagnostic().
     if (this.terminal || this.syntax_ === "invalid") return false;
 
+    // Allowlist, not a denylist of known-bad reasons: StreamEndReason is a
+    // closed union at the type level, but finish()'s `reason` is never
+    // validated at runtime, and real callers (a provider adapter
+    // normalizing a raw finish_reason/stop_reason string, or any caller
+    // that bypasses the type checker) can pass a string outside that union.
+    // Only an explicitly confirmed "complete" may unlock executable:true -
+    // an unrecognized reason must never be silently treated as safe.
     const reason = this.finishMeta?.reason ?? "unknown";
-    if (
-      reason === "length" ||
-      reason === "network_error" ||
-      reason === "provider_error" ||
-      reason === "cancelled" ||
-      reason === "unknown"
-    ) {
+    if (reason !== "complete") {
       return false;
     }
 
@@ -1254,25 +1226,20 @@ class Parser implements IncrementalJsonParser {
     return this.everHadNonRecoverableError;
   }
 
-  private determineOutcome(
-    reason: StreamEndReason,
-  ): FinalResult["outcome"] {
+  private determineOutcome(): FinalResult["outcome"] {
     if (this.syntax_ === "invalid") return "invalid";
     if (this.hasFatalDiagnostic()) return "invalid";
     if (this.grammar.hasDuplicate) return "invalid";
-    
+
     // Check if salvaged
     if (this.everHadCloseContainerRepair) return "salvaged";
 
     if (!this.rootComplete) return "truncated";
 
-    if (reason !== "complete" && reason !== "unknown") {
-      // Reason indicates stream was cut off, but root is magically complete?
-      // Since it's complete, the parsed JSON is fully intact.
-      // We consider it valid, but potentially non-executable depending on policy.
-      return "valid";
-    }
-
+    // A root that closed while the stream-end `reason` indicates the stream
+    // was cut off (e.g. "length") is still syntactically valid JSON - the
+    // reason only affects executable() (see isExecutable(), which checks it
+    // directly), never outcome.
     return "valid";
   }
 

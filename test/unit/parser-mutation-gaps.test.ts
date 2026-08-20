@@ -130,6 +130,30 @@ describe("Duplicate-key value-skipping (processToken's isSkippingValue path)", (
     const r = p.finish({ reason: "complete" });
     expect(r.stableValue).toEqual({ a: 1, b: 2 });
   });
+
+  it("correctly tracks skip depth through a MULTI-LEVEL nested array duplicate value, then resumes and parses a real key that follows", () => {
+    // Distinct from the single-level nested-array test above: if
+    // skipValueDepth were never incremented for TokenType.ArrayStart (only
+    // for ObjectStart), the *first* scalar inside the duplicate array would
+    // wrongly be treated as "the end of the skipped value" (skipValueDepth
+    // stuck at 0), resuming normal token processing mid-array - which
+    // desyncs the grammar and goes terminal/invalid before ever reaching
+    // "b", so "b" would never be committed. Correct depth tracking commits
+    // it.
+    const p = createParser();
+    p.push('{"a":1,"a":[1,[2,3],4],"b":5}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid"); // still invalid due to the duplicate key itself
+    expect(r.stableValue).toEqual({ a: 1, b: 5 });
+  });
+
+  it("correctly tracks skip depth through a MULTI-LEVEL nested object duplicate value, then resumes and parses a real key that follows", () => {
+    const p = createParser();
+    p.push('{"a":1,"a":{"x":{"y":1},"z":2},"b":5}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.stableValue).toEqual({ a: 1, b: 5 });
+  });
 });
 
 describe("Diagnostic sticky flags (addDiagnostic)", () => {
@@ -386,6 +410,20 @@ describe("structural salvage requires EVERY one of its guard clauses (finish()'s
     expect(r.outcome).toBe("salvaged");
     expect(r.repairs.some((rep) => rep.code === "R_CLOSE_CONTAINER")).toBe(true);
   });
+
+  it("does NOT salvage a stream that already went terminal/invalid earlier via a non-fatal grammar error (syntax_ !== 'invalid' guard)", () => {
+    // Distinct from the mid-token case above: the scanner itself is back in
+    // its Structural state here (it fully tokenized the "]"), so only the
+    // syntax_ check - not the scanner-state check - is what must reject
+    // salvage. Without it, a stream that already reported a specific
+    // "Unexpected ']'" error would get silently overwritten by a generic
+    // "salvaged" outcome instead.
+    const p = createParser({ repairs: { closeContainersAtFinish: "safe-only" } });
+    p.push('{"a":]'); // "]" is unexpected in an object - non-fatal E_UNEXPECTED_TOKEN, terminal/invalid
+    const r = p.finish({ reason: "length" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.repairs.some((rep) => rep.code === "R_CLOSE_CONTAINER")).toBe(false);
+  });
 });
 
 describe("maxInputBytes limit exact boundary (push()'s fatal input-size guard)", () => {
@@ -570,5 +608,153 @@ describe("Repair sticky flags (addRepair)", () => {
     expect(r.outcome).toBe("valid");
     expect(r.executable).toBe(false);
     expect(r.repairs.some((rep) => rep.code === "R_ISOLATE_TRAILING_DATA")).toBe(true);
+  });
+});
+
+describe("nested containers whose parent is an array (numeric segment attachment)", () => {
+  it("a nested array as an array element attaches correctly and its own children resolve too", () => {
+    const p = createParser();
+    p.push("[[1,2],[3,4]]");
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("valid");
+    expect(r.stableValue).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+  });
+
+  it("a nested object as an array element attaches correctly", () => {
+    const p = createParser();
+    p.push('[{"a":1},{"b":2}]');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("valid");
+    expect(r.stableValue).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
+  it("triple-nested containers under an array element resolve at every level", () => {
+    const p = createParser();
+    p.push('[{"a":[1,{"deep":true}]}]');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("valid");
+    expect(r.stableValue).toEqual([{ a: [1, { deep: true }] }]);
+  });
+
+  it("chunk invariance holds for nested containers under an array element", () => {
+    const whole = '[{"a":[1,{"deep":true}]},[5,6]]';
+    const oneShot = createParser();
+    oneShot.push(whole);
+    const oneShotResult = oneShot.finish({ reason: "complete" });
+
+    const byteByByte = createParser();
+    for (const ch of whole) byteByByte.push(ch);
+    const byteByByteResult = byteByByte.finish({ reason: "complete" });
+
+    expect(byteByByteResult.stableValue).toEqual(oneShotResult.stableValue);
+    expect(byteByByteResult.outcome).toBe(oneShotResult.outcome);
+  });
+});
+
+describe("finish() — incomplete UTF-8 byte sequence buffered at stream end", () => {
+  it("a multi-byte UTF-8 character cut off mid-sequence at finish() raises E_INCOMPLETE_UTF8", () => {
+    const p = createParser();
+    p.push('{"a":"');
+    // First two bytes of the three-byte encoding of "€" (U+20AC) - the
+    // decoder buffers them waiting for the final continuation byte, which
+    // never arrives.
+    p.push(Uint8Array.from([0xe2, 0x82]));
+    const r = p.finish({ reason: "complete" });
+    expect(r.diagnostics.some((d) => d.code === "E_INCOMPLETE_UTF8")).toBe(true);
+    expect(r.executable).toBe(false);
+  });
+});
+
+describe("handleObjectEnd — a '}' with no matching open object goes terminal/invalid", () => {
+  it("a bare '}' with no open container at all is rejected", () => {
+    const p = createParser();
+    const result = p.push("}");
+    expect(result.terminal).toBe(true);
+    expect(result.syntax).toBe("invalid");
+  });
+
+  it("a '}' closing an open ARRAY (mismatched bracket type, [1}) is rejected, not treated as ']'", () => {
+    const p = createParser();
+    p.push("[1}");
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+    expect(r.diagnostics.some((d) => d.code === "E_UNEXPECTED_TOKEN")).toBe(true);
+  });
+});
+
+describe("handleComma — a comma where the grammar does not expect one goes terminal/invalid", () => {
+  it("a bare comma with no active container at all ([empty grammar stack]) is rejected", () => {
+    const p = createParser();
+    const result = p.push(",");
+    expect(result.terminal).toBe(true);
+    expect(result.syntax).toBe("invalid");
+  });
+
+  it("a comma immediately after a completed root scalar (1,2) is rejected - the root is already closed", () => {
+    const p = createParser();
+    p.push("1");
+    const result = p.push(",2");
+    expect(result.terminal).toBe(true);
+    expect(result.syntax).toBe("invalid");
+  });
+
+  it("a leading comma in an object ({,\"a\":1}) is rejected, not silently skipped", () => {
+    const p = createParser();
+    p.push('{,"a":1}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+    expect(r.diagnostics.some((d) => d.code === "E_UNEXPECTED_TOKEN")).toBe(true);
+  });
+
+  it("a doubled comma in an object ({\"a\":1,,\"b\":2}) is rejected after the first comma is consumed", () => {
+    const p = createParser();
+    p.push('{"a":1,,"b":2}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+    // "a" itself was already committed before the malformed comma arrived.
+    expect(r.stableValue).toEqual({ a: 1 });
+  });
+
+  it("a comma where a colon is expected ({\"a\",1}) is rejected as an object comma error, not silently accepted", () => {
+    const p = createParser();
+    p.push('{"a",1}');
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+  });
+
+  it("a leading comma in an array ([,1]) is rejected, not silently skipped", () => {
+    const p = createParser();
+    p.push("[,1]");
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+    expect(r.diagnostics.some((d) => d.code === "E_UNEXPECTED_TOKEN")).toBe(true);
+  });
+
+  it("a doubled comma in an array ([1,,2]) is rejected after the first comma is consumed", () => {
+    const p = createParser();
+    p.push("[1,,2]");
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
+    // The one committed element survives in stableValue even though the
+    // overall document is invalid - same "partial truth, never fabricated"
+    // guarantee as the object case above.
+    expect(r.stableValue).toEqual([1]);
+  });
+
+  it("a trailing comma before an array's closing bracket ([1,2,]) is rejected, not silently tolerated", () => {
+    const p = createParser();
+    p.push("[1,2,]");
+    const r = p.finish({ reason: "complete" });
+    expect(r.outcome).toBe("invalid");
+    expect(r.executable).toBe(false);
   });
 });
