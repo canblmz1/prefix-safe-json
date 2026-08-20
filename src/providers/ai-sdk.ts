@@ -61,6 +61,11 @@ interface AiSdkErrorPart {
   error?: unknown;
 }
 
+interface AiSdkAbortPart {
+  type: "abort";
+  reason?: string;
+}
+
 export type AiSdkStreamPart =
   | AiSdkToolInputStartPart
   | AiSdkToolInputDeltaPart
@@ -69,6 +74,7 @@ export type AiSdkStreamPart =
   | AiSdkToolErrorPart
   | AiSdkFinishPart
   | AiSdkErrorPart
+  | AiSdkAbortPart
   | { type: string; [key: string]: unknown };
 
 function toolPartId(part: { id?: string; toolCallId?: string }): string | undefined {
@@ -133,6 +139,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
       delta?: string;
       finishReason?: string;
       error?: unknown;
+      reason?: string;
     };
 
     switch (part.type) {
@@ -242,6 +249,27 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
           provider: this.provider,
           reason: "provider_error",
           providerReason: stringifyError(part.error),
+        });
+        this.finished = true;
+        break;
+      }
+      case "abort": {
+        // Present on fullStream across ai@5/6/7 (verified against published
+        // type declarations for ai@5.0.240, ai@6.0.259, ai@7.0.70) - the
+        // stream was deliberately stopped (e.g. an AbortSignal), not a
+        // provider-side failure or a length/content-filter termination.
+        // Without this case it would silently fall through to `default`,
+        // leaving `finished` false - the adapter would never learn the
+        // stream ended, relying entirely on a caller's own finish() meta as
+        // the fail-closed backstop. Handling it explicitly here means an
+        // aborted stream is normalized the same way regardless of whether
+        // the caller remembers to call finish() with an explicit reason.
+        events.push({
+          type: "provider_stream_end",
+          sequence: ++this.sequence,
+          provider: this.provider,
+          reason: "cancelled",
+          providerReason: part.reason,
         });
         this.finished = true;
         break;
