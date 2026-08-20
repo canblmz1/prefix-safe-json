@@ -77,6 +77,16 @@ export type {
   DecisionEvidence,
 } from "./gate/types.js";
 
+// High-level execution guards
+/**
+ * @public (Experimental)
+ * Drop-in fail-closed execution guard for the Vercel AI SDK's `fullStream`.
+ * Composes `AiSdkStreamAdapter` and `createToolCallExecutionGate()` - see
+ * `docs/EXECUTION_GATE.md#high-level-guards`.
+ */
+export { createAiSdkExecutionGuard } from "./guard/ai-sdk.js";
+export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from "./guard/types.js";
+
 // Provider API
 export type { ProviderStreamAdapter } from "./providers/adapter.js";
 
