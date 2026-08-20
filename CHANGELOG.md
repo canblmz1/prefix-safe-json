@@ -8,8 +8,76 @@ the quantitative bar (mutation score, coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Added
+
+- **guard**: `createAiSdkExecutionGuard()` — a drop-in, fail-closed execution
+  guard for the Vercel AI SDK's `fullStream`. Composes `AiSdkStreamAdapter`
+  with `createToolCallExecutionGate()` by reference, not reimplementation —
+  no new parser, no new coordinator, no duplicated decision logic. Does not
+  depend on the `ai` package at runtime and does not import its types
+  (`push()` accepts `unknown`, same as every provider adapter). Internally
+  built on a small, currently-unexported `createProviderExecutionGuard()`
+  factory (`src/guard/provider-guard.ts`) so a second provider guard, if one
+  is added in a future release, is close to free.
+- **gate**: `DecisionEvidence` — every `ExecutionDecision` now carries an
+  `evidence` object (`provider`, `providerReason`, `streamEndReason`,
+  `terminalConfirmed`, `structurallyComplete`, `parserExecutable`,
+  `schemaValid`, `receivedBytes`) explaining why it came out the way it did.
+  Purely observational: nothing on `evidence` ever feeds back into
+  `decideExecution()`'s own logic, and it can never change
+  `action`/`executable`/`reason`. A received-chunk count was considered and
+  deliberately left out — the parser only tracks cumulative bytes, not
+  `push()` call counts, and adding that tracking solely to populate a metric
+  here was judged not worth the new cross-layer coupling for this release.
+  This is an additive field on the existing `ExecutionDecisionCommon`
+  interface; no existing field changed shape.
+- **providers**: `AiSdkStreamAdapter` now explicitly handles the `'abort'`
+  fullStream part (present on `ai@5`/`6`/`7`'s `fullStream` union) by
+  normalizing it to `provider_stream_end` / `"cancelled"`. Previously fell
+  through to the adapter's `default` case silently, relying entirely on a
+  caller's own `finish()` meta as the fail-closed backstop for a stream the
+  adapter itself never learned had ended.
+- **tests**: AI SDK v5/v6/v7 compatibility evidence
+  (`test/guard/ai-sdk-compatibility.test.ts`) — the `fullStream` `id`-based
+  tool-input-part shape and the `finishReason` literal vocabulary were
+  verified identical across the published type declarations for
+  `ai@5.0.240`, `ai@6.0.259`, and `ai@7.0.70` (downloaded and inspected
+  directly, not recalled from memory) before writing the shared fixture set
+  this file uses to justify a single cross-version test suite. Covers safe
+  (`stop`, `tool-calls`) and unsafe (`length`, `content-filter`, `error`,
+  `other`, `abort`, bare stream end with no terminal part at all) terminal
+  states, crossed with generate-like complete input, multi-chunk streamed
+  input, string truncation, container-level truncation, malformed JSON,
+  schema-invalid-but-structurally-complete input, and concurrent tool calls.
+- **tests**: cross-product execution-safety invariants and red-team
+  scenarios (`test/invariants/execution-priority.test.ts`) — schema validity
+  cannot override an unsafe terminal state, a safe terminal state cannot
+  override parser incompleteness, a complete parser state cannot override an
+  unsafe terminal state, an unrecognized future finish reason fails closed,
+  the adapter never reads the SDK's own resolved/repaired tool-call input,
+  and a `NonExecutableDecision`'s missing `value` field is enforced at the
+  type level (a `@ts-expect-error` regression test that fails `pnpm run
+  typecheck` if `value` is ever exposed there again).
+- **examples**: `examples/ai-sdk-guard.mjs` (`pnpm run example:ai-sdk-guard`)
+  — the high-level guard's own CI-run, no-network, no-API-key demonstration,
+  alongside the existing low-level `examples/ai-sdk-execution-gate.mjs`.
+
 ### Fixed
 
+- **gate**: `ExecuteDecision.name` narrowed from `string | undefined` to a
+  required `string`. The coordinator only ever transitions a call to status
+  `"complete"` when its name is known (a nameless call is forced to
+  `"invalid"` instead), so every `ExecuteDecision` genuinely has one at
+  runtime — the type didn't say so. This wasn't just a type-precision
+  nitpick: README's and `docs/EXECUTION_GATE.md`'s own quick-start example,
+  `tools[decision.name](decision.value)`, failed `tsc --noEmit` (TS2538)
+  under this repo's strict config as a result, while `gate.ts`'s own JSDoc
+  example papered over the same issue with a `decision.name!` non-null
+  assertion (now removed). `decideExecution()` additionally requires
+  `call.name !== undefined` before constructing an `ExecuteDecision` -
+  defensive/redundant with the coordinator's own invariant, so a future
+  violation of it still fails closed to `"stream_incomplete"` instead of
+  fabricating a name.
 - **providers**: `OpenAIStreamAdapter` now reads `response.incomplete_details.reason`
   on OpenAI Responses `response.incomplete` events instead of unconditionally
   mapping the whole event to a generic `"cancelled"` stream-end reason.

@@ -34,43 +34,74 @@ model output truncated
 
 *(Real terminal output from [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs) — not staged. Same script CI runs on every push.)*
 
-## Quick start: the execution safety gate
-
-The highest-level API answers one question per tool call — is it safe to
-execute right now — without requiring you to know anything about parser
-state, coordinator events, or JSON Pointers:
+## From stream to safe execution, in about 10 lines
 
 ```typescript
-import { createToolCallExecutionGate, AnthropicStreamAdapter } from "prefix-safe-json";
+import { createAiSdkExecutionGuard } from "prefix-safe-json";
 
-const gate = createToolCallExecutionGate(undefined, undefined, {
-  write_file: {
-    type: "object",
-    properties: { path: { type: "string" }, content: { type: "string" } },
-    required: ["path", "content"],
+const guard = createAiSdkExecutionGuard({
+  schemas: {
+    write_file: {
+      type: "object",
+      properties: { path: { type: "string" }, content: { type: "string" } },
+      required: ["path", "content"],
+    },
   },
 });
-const adapter = new AnthropicStreamAdapter();
 
-for (const rawEvent of anthropicSseEvents) {
-  for (const normalized of adapter.push(rawEvent)) gate.push(normalized);
-}
+for await (const part of result.fullStream) guard.push(part);
 
-for (const decision of gate.finish().decisions) {
-  if (decision.action === "execute") {
-    await tools[decision.name](decision.value);
-  } else {
-    console.warn(`${decision.name}: ${decision.action} (${decision.reason})`); // "retry" or "reject"
-  }
+for (const decision of guard.finish().decisions) {
+  if (decision.action === "execute") await tools[decision.name](decision.value);
 }
 ```
 
-Provider adapters exist for OpenAI, Anthropic, Gemini, OpenRouter,
-OpenAI-compatible endpoints, and the [Vercel AI SDK](https://ai-sdk.dev)
-(`ai` package — not a dependency of this library; see
-[`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)).
-Full semantics, the decision table, and provider finish-reason mapping:
-[`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
+`createAiSdkExecutionGuard()` is a drop-in guard for the [Vercel AI
+SDK](https://ai-sdk.dev)'s `fullStream` — not a dependency of this library
+(no `ai` import, no runtime version lock; see
+[`examples/ai-sdk-guard.mjs`](examples/ai-sdk-guard.mjs)). It's a thin
+composition over the same lower-level adapter + gate API this library has
+always exposed — nothing about the decision logic changes based on which one
+you call.
+
+**What the decisions mean**
+
+Every tool call gets exactly one verdict:
+
+- **`execute`** — complete, unfabricated, and (if a schema is registered)
+  schema-valid. `decision.value` is safe to pass to your tool.
+- **`retry`** — nothing is wrong with what arrived; there just isn't a
+  trustworthy complete value yet. Continue generation.
+- **`reject`** — the data itself is the problem (malformed JSON, a schema
+  mismatch, a resource limit, a provider error, a content-policy
+  termination). Retrying the same input won't help.
+
+**Why the model's finish reason matters as much as the JSON's shape**
+
+A tool call cut short by a token limit, a provider error, or a content
+filter can still contain syntactically complete, schema-valid JSON — the
+model was simply stopped before finishing the *rest* of its response, not
+necessarily mid-argument. Executing on JSON shape alone means trusting data
+nobody, including the model, confirmed as final. This is exactly the failure
+mode independently reported and reproduced in
+[vercel/ai#19063](https://github.com/vercel/ai/issues/19063): tool calls
+executing regardless of an unsafe finish reason, across AI SDK v5, v6, and
+v7, with fixes landing across all three release lines (v7's in `ai@7.0.70`).
+`prefix-safe-json` does not patch or depend on that fix — it's a
+provider-independent guard that requires positive proof a stream ended
+safely before treating any tool call as final, regardless of which SDK,
+provider, or framework hands it the data. See
+`test/guard/ai-sdk-compatibility.test.ts` for the cross-version test
+evidence.
+
+**Supported providers**: OpenAI (legacy `function_call` and Responses API),
+Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the
+Vercel AI SDK. High-level guards currently ship for the AI SDK; every
+provider has a public low-level adapter (see below) that composes with
+`createToolCallExecutionGate()` the same way.
+
+Full semantics, the decision table, provider finish-reason mapping, and the
+high-level guard API: [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
 ## The lower-level problem this is built on
 
@@ -197,6 +228,7 @@ for the full list, including known internal limitations.
 - Provider stream adapters for OpenAI (legacy `function_call` and Responses API), Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the Vercel AI SDK, plus a coordinator for tracking multiple concurrent tool-call streams
 - Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
 - `createToolCallExecutionGate()` — a fail-closed `execute` / `retry` / `reject` decision per tool call, built on top of the coordinator (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md))
+- `createAiSdkExecutionGuard()` — a drop-in high-level guard for the Vercel AI SDK's `fullStream`, composing a provider adapter with the execution gate; every `ExecutionDecision` also carries an `evidence` object explaining why (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#high-level-guards))
 
 ### Not Yet Implemented
 
@@ -241,8 +273,11 @@ npm install prefix-safe-json
 
 ## Low-level API: Quick Start
 
-The execution gate (above) is what most consumers want. The low-level
-`createParser()` API it's built on is also fully public, for anyone who
+The AI SDK guard (above) covers the common case. For other providers, or
+when you need the adapter/gate instance directly, `createToolCallExecutionGate()`
+and the provider adapters (`AnthropicStreamAdapter`, `OpenAIStreamAdapter`,
+etc.) are equally public — see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#example).
+The `createParser()` API both are built on is also fully public, for anyone who
 needs direct access to parser state:
 
 ```typescript
@@ -280,10 +315,14 @@ and asserts the truncated call is never reported executable while a
 genuinely complete one is. This example runs in CI on every push, so it
 can't silently rot into a stale claim.
 
-For the same demonstration through the high-level execution gate and the
+For the same demonstration through the low-level execution gate and the
 [Vercel AI SDK](https://ai-sdk.dev)'s `fullStream` shape instead, see
 [`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)
 (`node examples/ai-sdk-execution-gate.mjs` after `pnpm run build`) — also
+run in CI on every push. For the drop-in `createAiSdkExecutionGuard()` shown
+at the top of this README, see
+[`examples/ai-sdk-guard.mjs`](examples/ai-sdk-guard.mjs)
+(`node examples/ai-sdk-guard.mjs`) — same scenarios, same guarantees, also
 run in CI on every push.
 
 ## License

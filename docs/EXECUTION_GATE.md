@@ -149,6 +149,7 @@ shared `StreamEndReason` (`"complete" | "length" | "network_error" |
 | | `finishReason: "content-filter"` | `cancelled` **+** an `E_CONTENT_FILTERED` diagnostic, so the gate reports `content_filtered` specifically rather than the generic `stream_incomplete` a plain cancellation gets |
 | | `finishReason: "error"` | `provider_error` |
 | | `finishReason: "other"` / anything unrecognized | `unknown` (never assumed to mean `complete`) |
+| | `{ type: "abort" }` part (present on `ai@5`/`6`/`7`'s `fullStream`) | `cancelled` |
 
 A `"complete"`-looking `StreamEndReason` is necessary but not sufficient for
 `execute` - the gate still requires `parser.executable` and schema validity.
@@ -198,6 +199,90 @@ See `examples/anthropic-truncation-safety.mjs` and
 `examples/ai-sdk-execution-gate.mjs` for full runnable versions (no network
 calls, no API key - literal, correctly-shaped provider events, run by CI on
 every push).
+
+## High-level guards
+
+For the common case - one provider, no need to hold the adapter or gate
+instance yourself - `createAiSdkExecutionGuard()` composes
+`AiSdkStreamAdapter` and `createToolCallExecutionGate()` behind three
+methods: `push()`, `snapshot()`, `finish()`. Same decision logic, same
+fail-closed guarantees, no new parser or coordinator - it is the example
+above with the adapter/gate wiring already done for you:
+
+```ts
+import { createAiSdkExecutionGuard } from "prefix-safe-json";
+
+const guard = createAiSdkExecutionGuard({
+  schemas: {
+    write_file: {
+      type: "object",
+      properties: { path: { type: "string" }, content: { type: "string" } },
+      required: ["path", "content"],
+    },
+  },
+});
+
+for await (const part of result.fullStream) {
+  guard.push(part);
+}
+
+const final = guard.finish();
+for (const decision of final.decisions) {
+  if (decision.action === "execute") {
+    await tools[decision.name](decision.value);
+  }
+}
+```
+
+`createAiSdkExecutionGuard()` does not depend on the `ai` package at runtime
+and does not import its types - `push()` accepts `unknown`, matching every
+provider adapter's own `push()` signature. It has been verified (not merely
+documented) against the published `fullStream` part shape and finish-reason
+vocabulary of `ai@5.0.240`, `ai@6.0.259`, and `ai@7.0.70` - see
+`test/guard/ai-sdk-compatibility.test.ts` for the exact evidence and which
+fields were checked.
+
+The low-level API (adapter + gate, composed yourself) remains fully public
+and is what the high-level guard is built from - use it directly if you need
+the adapter or gate instance for something the guard doesn't expose (e.g.
+`drainEvents()` for a UI feed). The two produce identical decisions for
+identical input - `test/guard/ai-sdk-guard.test.ts` asserts this directly.
+
+### Decision evidence
+
+Every `ExecutionDecision` carries an `evidence` object explaining *why* it
+came out the way it did - purely observational, never a second input to the
+decision itself:
+
+```ts
+decision.evidence
+// {
+//   provider: "ai-sdk",
+//   providerReason: "length",
+//   streamEndReason: "length",
+//   terminalConfirmed: true,
+//   structurallyComplete: false,
+//   parserExecutable: false,
+//   schemaValid: undefined,
+//   receivedBytes: 117,
+// }
+```
+
+- `terminalConfirmed`: whether a real stream-end reason was ever observed at
+  all, regardless of whether it was safe - `"length"` has `terminalConfirmed:
+  true`; a stream that never reports why it ended has `false`.
+- `structurallyComplete`: whether the JSON's root container actually closed
+  (`ToolCallState.parser.rootComplete`), independent of whether the
+  stream-end reason makes that closure trustworthy. A value cut short by
+  `length` that happens to be syntactically complete has
+  `structurallyComplete: true` and `parserExecutable: false` at the same
+  time - that combination is exactly the scenario this library exists to
+  catch.
+- `receivedBytes` is the only metric included beyond the fields decide.ts
+  already computes - a received-chunk count was considered and deliberately
+  left out: the parser only tracks cumulative bytes, not `push()` call
+  counts, and adding that tracking solely to populate an evidence field was
+  judged not worth the new cross-layer coupling for this release.
 
 ## Fail-closed guarantees
 
