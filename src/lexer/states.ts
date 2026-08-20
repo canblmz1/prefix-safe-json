@@ -39,12 +39,6 @@ export const enum ScannerState {
   /** Reading 'null' literal. */
   LiteralNull = 12,
 
-  /** Root value complete, consuming trailing whitespace. */
-  TrailingWhitespace = 13,
-
-  /** Non-whitespace after root value. */
-  TrailingData = 14,
-
   /** Irrecoverable error. */
   Invalid = 15,
 

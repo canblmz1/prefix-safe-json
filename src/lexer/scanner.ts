@@ -126,12 +126,6 @@ export class Scanner {
       case ScannerState.LiteralNull:
         this.processLiteral(ch, byteOffset, charByteLength);
         break;
-      case ScannerState.TrailingWhitespace:
-        this.processTrailingWhitespace(ch, byteOffset);
-        break;
-      case ScannerState.TrailingData:
-        // Consume all trailing data silently — diagnostic was already emitted
-        break;
       case ScannerState.Invalid:
       case ScannerState.Finished:
         // No-op — terminal states
@@ -179,7 +173,6 @@ export class Scanner {
     type: "string" | "number" | "literal" | "unicode_escape" | "surrogate" | "none";
     buffer: string;
     byteStart: number;
-    isKey: boolean;
   } {
     switch (this.state) {
       case ScannerState.InString:
@@ -188,21 +181,18 @@ export class Scanner {
           type: this.stringIsKey ? "object_key" as "string" : "string",
           buffer: this.stringBuffer,
           byteStart: this.stringByteStart,
-          isKey: this.stringIsKey,
         };
       case ScannerState.UnicodeEscape:
         return {
           type: "unicode_escape",
           buffer: this.unicodeHexBuffer,
           byteStart: this.stringByteStart,
-          isKey: this.stringIsKey,
         };
       case ScannerState.UnicodeSurrogatePending:
         return {
           type: "surrogate",
           buffer: this.stringBuffer,
           byteStart: this.stringByteStart,
-          isKey: this.stringIsKey,
         };
       case ScannerState.NumberInteger:
       case ScannerState.NumberFraction:
@@ -212,7 +202,6 @@ export class Scanner {
           type: "number",
           buffer: this.numberBuffer,
           byteStart: this.numberByteStart,
-          isKey: false,
         };
       case ScannerState.LiteralTrue:
       case ScannerState.LiteralFalse:
@@ -221,10 +210,9 @@ export class Scanner {
           type: "literal",
           buffer: this.literalTarget.slice(0, this.literalIndex),
           byteStart: this.literalByteStart,
-          isKey: false,
         };
       default:
-        return { type: "none", buffer: "", byteStart: 0, isKey: false };
+        return { type: "none", buffer: "", byteStart: 0 };
     }
   }
 
@@ -289,7 +277,7 @@ export class Scanner {
           this.numberByteStart,
           this.currentByteOffset + 1,
         );
-        this.state = ScannerState.TrailingWhitespace;
+        this.state = ScannerState.Finished;
         return "finalized";
       }
     }
@@ -319,7 +307,7 @@ export class Scanner {
           this.literalByteStart,
           this.currentByteOffset + 1,
         );
-        this.state = ScannerState.TrailingWhitespace;
+        this.state = ScannerState.Finished;
         return true;
       }
     }
@@ -741,20 +729,6 @@ export class Scanner {
       );
       this.state = ScannerState.Invalid;
     }
-  }
-
-  private processTrailingWhitespace(ch: string, byteOffset: number): void {
-    if (isWhitespace(ch)) return;
-
-    // Non-whitespace after root value
-    this.emitDiagnostic(
-      DiagnosticCode.E_TRAILING_DATA,
-      "error",
-      byteOffset,
-      `Unexpected data after root JSON value: ${JSON.stringify(ch)}`,
-      false,
-    );
-    this.state = ScannerState.TrailingData;
   }
 
   // -----------------------------------------------------------------------
