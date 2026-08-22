@@ -17,6 +17,7 @@
   ],
   "license": "MIT OR Apache-2.0",
   "type": "module",
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/canblmz1/prefix-safe-json.git"
