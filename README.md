@@ -100,6 +100,14 @@ Vercel AI SDK. High-level guards currently ship for the AI SDK; every
 provider has a public low-level adapter (see below) that composes with
 `createToolCallExecutionGate()` the same way.
 
+`AiSdkStreamAdapter`/`createAiSdkExecutionGuard()` target the public
+`streamText()`/`generateText()` `fullStream` surface, whose `finishReason`
+is a plain unified string (`"stop"`, `"length"`, ...). They are not
+currently an adapter for the lower-level `@ai-sdk/provider` `doStream()`
+boundary (`LanguageModelV3`/`V4`), where finish reason is
+`{ unified, raw }`-object-shaped — building your own provider against that
+interface directly needs different handling of that field.
+
 Full semantics, the decision table, provider finish-reason mapping, and the
 high-level guard API: [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
@@ -270,6 +278,8 @@ A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATIO
 ```bash
 npm install prefix-safe-json
 ```
+
+ESM only — `import`, not `require`. There is currently no CommonJS build.
 
 ## Low-level API: Quick Start
 
