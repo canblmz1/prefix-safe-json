@@ -94,6 +94,34 @@ provider, or framework hands it the data. See
 `test/guard/ai-sdk-compatibility.test.ts` for the cross-version test
 evidence.
 
+**Execution ownership: what must never also happen**
+
+The guard's decisions only mean something if it's the sole thing deciding
+whether your tool function runs. The pattern above works because it never
+gives the AI SDK's own tool-calling loop a chance to run your tool itself:
+
+- **Safe, supported pattern** — define your tools *without* an `execute`
+  callback (or a no-op one), consume `fullStream` yourself, and dispatch
+  manually — only for `action === "execute"` — after `guard.finish()`,
+  exactly as shown above.
+- **Unprotected / misuse pattern** — attach the real, irreversible operation
+  as the tool's own AI SDK-native `execute` callback, *and* separately run
+  the guard on the same stream. The SDK can invoke `execute` as soon as it
+  resolves that call's input, independent of and often before this guard
+  ever reaches a decision. If that happens, the side effect has already run
+  — `prefix-safe-json` cannot retroactively undo it.
+
+The guard does defend against the second pattern in one specific way: a
+`tool-result` or `tool-error` part on `fullStream` is direct evidence the
+SDK's own loop already invoked that call's `execute` callback. Observing
+either permanently disqualifies that call from ever being reported
+`action: "execute"` by the guard (`reason: "sdk_execution_observed"`), so a
+caller who also runs the documented manual-dispatch loop will not invoke the
+tool function a *second* time. It does not undo whatever the SDK's own
+callback already did. See
+[`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence)
+for the full behavior and test matrix.
+
 **Supported providers**: OpenAI (legacy `function_call` and Responses API),
 Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the
 Vercel AI SDK. High-level guards currently ship for the AI SDK; every

@@ -33,7 +33,8 @@ export interface ToolCallState {
     | "truncated"
     | "salvaged"
     | "invalid"
-    | "cancelled";
+    | "cancelled"
+    | "sdk_execution_observed";
 
   /**
    * Result of validating `parser.stableValue` against the JSON Schema

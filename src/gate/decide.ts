@@ -134,6 +134,21 @@ export function decideExecution(
   // coordinator version adds a new status literal without a matching case
   // here, `noImplicitReturns` fails the build - not a silent runtime gap.
   switch (call.status) {
+    case "sdk_execution_observed":
+      // The coordinator only ever sets this status once, the moment it sees
+      // proof (a `tool-result` or `tool-error` diagnostic) that the AI SDK's
+      // own tool loop already invoked this call's `execute` callback - see
+      // `DefaultToolCallStreamCoordinator.handleProviderDiagnostic`. That
+      // transition is one-way (collecting -> sdk_execution_observed only)
+      // and every other status-setting path already guards on
+      // `status === "collecting"` before running, so nothing downstream -
+      // not a safe finish reason, not a structurally complete value, not a
+      // passing schema - can ever move a call off this status once set.
+      // Re-executing (or retrying) a call the SDK already ran risks a
+      // second/duplicate invocation of the same irreversible side effect,
+      // so this is always `reject`, never `retry`.
+      return reject("sdk_execution_observed");
+
     case "complete": {
       if (call.schemaValid === false) {
         return reject("schema_invalid");

@@ -20,3 +20,31 @@
  * blindly.
  */
 export const CONTENT_FILTERED_DIAGNOSTIC_CODE = "E_CONTENT_FILTERED";
+
+/**
+ * Emitted (as a `provider_diagnostic` carrying the call's own `callRef`) by
+ * the AI SDK adapter when a `tool-result` part is observed: direct proof
+ * that the Vercel AI SDK's own tool-calling loop already invoked this call's
+ * `execute` callback and it returned successfully - independent of, and
+ * almost always before, this library's own decision is ever computed. See
+ * `SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE` for the failed-attempt counterpart;
+ * the coordinator treats both identically (see `coordinator.ts`'s
+ * `handleProviderDiagnostic`), poisoning the call to `status:
+ * "sdk_execution_observed"` so the gate can never later report `execute` for
+ * it - re-running (or, for the error case, retrying) a call the SDK already
+ * attempted would risk a second/duplicate invocation of the same
+ * irreversible side effect.
+ */
+export const SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE = "E_SDK_EXECUTION_OBSERVED";
+
+/**
+ * Emitted (as a `provider_diagnostic` carrying the call's own `callRef`, when
+ * a `callRef` could be determined) by the AI SDK adapter when a `tool-error`
+ * part is observed: proof that the Vercel AI SDK's own tool-calling loop
+ * already invoked this call's `execute` callback and it threw. This does NOT
+ * prove no partial irreversible side effect occurred before the throw, so it
+ * receives the exact same fail-closed treatment as
+ * `SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE` - success and failure are not
+ * distinguished into safe/unsafe here, both must fail closed.
+ */
+export const SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE = "E_PROVIDER_TOOL_ERROR";

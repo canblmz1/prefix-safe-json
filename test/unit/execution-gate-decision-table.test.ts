@@ -206,6 +206,31 @@ describe("decideExecution — structural status mapping", () => {
     expect(decision.reason).toBe("stream_incomplete");
   });
 
+  it('"sdk_execution_observed" status -> reject/sdk_execution_observed, never retry', () => {
+    const decision = decideExecution(call({ status: "sdk_execution_observed" }), ctx());
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+    expect("value" in decision).toBe(false);
+  });
+
+  it('"sdk_execution_observed" status is never upgraded to execute by otherwise-perfect evidence (irreversibility)', () => {
+    // Every field that would normally earn `execute` is present and valid -
+    // a complete, schema-valid, genuinely-executable value with a safe
+    // stream-end reason. Only `status` says the SDK already ran this call.
+    // Nothing about how favorable the rest of the evidence looks may move
+    // this off `reject`.
+    const decision = decideExecution(
+      call({
+        status: "sdk_execution_observed",
+        schemaValid: true,
+        parser: parserSnapshot({ executable: true, rootComplete: true, stableValue: { path: "a.txt" } }),
+      }),
+      ctx({ streamEndReason: "complete" }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
   it("collecting status (mid-stream, never finished) -> retry/stream_incomplete", () => {
     const decision = decideExecution(
       call({ status: "collecting", parser: parserSnapshot({ executable: false, phase: "collecting" }) }),
