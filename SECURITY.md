@@ -28,4 +28,6 @@ This library parses untrusted JSON input from LLM streaming endpoints and can be
 
 ## Supported Versions
 
-This project is in **alpha** stage. Security fixes will be applied to the latest version only.
+This project is pre-1.0 (see [README.md](README.md) for what's currently
+considered stable). Security fixes are applied to the latest published
+version only — there is no back-port policy across older minor versions.
