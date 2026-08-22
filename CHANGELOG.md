@@ -8,6 +8,35 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-22
+
+**Fixes a broken `0.1.0` publish.** `0.1.0`'s package on npm shipped with no
+`dist/` directory at all and could not be imported
+(`ERR_MODULE_NOT_FOUND: .../dist/index.js`). `0.1.0` is deprecated on npm
+pointing here; `latest` now resolves to this version.
+
+Root cause: `.github/workflows/publish.yml`'s `publish` job runs on its own
+fresh runner with its own checkout — nothing built by `test-matrix` (a
+separate job in the same workflow) is shared with it, and `dist/` is
+gitignored. The commit that shipped `0.1.0` had removed `publish`'s own
+`Build` step, reasoning it was redundant with `test-matrix`'s build — true
+for typecheck/lint/test, false for build, since `publish` is the only job
+whose output actually gets packed and published. `npm publish` happily
+packed and published whatever existed in that job's checkout, which was no
+`dist/` at all.
+
+Fix: restored `publish`'s own `Typecheck`/`Lint`/`Test`/`Build`/examples/
+`Pack check` steps (still gated behind `needs: test-matrix` as an
+additional, not a replacement, requirement), and added a new hard gate —
+`Installed-tarball import smoke test` — that runs `npm pack`, installs the
+resulting tarball into a scratch project exactly the way a real consumer
+would, imports the four top-level factory exports, and runs one real parse
+through `createParser()`. Verified locally both ways: passes against a
+correctly-built tree, and fails loudly (`ERR_MODULE_NOT_FOUND`, non-zero
+exit) when `dist/` is removed — reproducing the exact `0.1.0` failure.
+
+No source or public-API changes from `0.1.0`.
+
 ## [0.1.0] - 2026-08-22
 
 First non-alpha release. No API changes from `0.0.1-alpha.4` — this release

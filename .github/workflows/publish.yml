@@ -115,11 +115,99 @@ jobs:
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # test-matrix (needs:, above) already ran typecheck, lint, test,
-      # build, the examples, and pack:check across every supported Node
-      # version and OS. Re-running a single-OS/single-Node subset of the
-      # same checks here would only mask that gate behind a narrower one,
-      # so this job trusts it and does not repeat it.
+      # test-matrix (needs:, above) already verified typecheck/lint/test
+      # pass on every supported Node version and OS - that part really is
+      # redundant to repeat here. Build is NOT: this job runs on its own
+      # fresh runner with its own checkout, and `dist/` is gitignored, so
+      # nothing test-matrix's runners produced ever reaches this one. Skip
+      # this step and `npm publish` packs a `dist/`-less tarball - exactly
+      # what happened the first time this workflow shipped without it.
+      - name: Typecheck
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run typecheck
+
+      - name: Lint
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run lint --max-warnings=0
+
+      - name: Test
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run test
+
+      - name: Build
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run build
+
+      - name: Run end-to-end example (Anthropic)
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run example:anthropic
+
+      - name: Run end-to-end example (AI SDK execution gate)
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run example:ai-sdk
+
+      - name: Run end-to-end example (AI SDK execution guard)
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run example:ai-sdk-guard
+
+      - name: Pack check
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run pack:check
+
+      # The exact bug this step exists to catch: `npm publish` packs
+      # whatever is in THIS job's own working directory, which shares
+      # nothing with test-matrix's runners (needs:, above). A future
+      # regression in this job's own `Build` step - or a build config
+      # change, a cache issue, anything - would still pass every check
+      # above, since none of them install the packed tarball into a
+      # separate project the way a real consumer would. This does exactly
+      # that, against the literal tarball about to be published.
+      - name: Installed-tarball import smoke test
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
+          TARBALL=$(npm pack --silent)
+          echo "Packed: $TARBALL"
+
+          SMOKE_DIR="$(mktemp -d)"
+          cp "$TARBALL" "$SMOKE_DIR/"
+          cd "$SMOKE_DIR"
+          npm init -y >/dev/null
+          npm install "./$TARBALL"
+
+          cat > smoke.mjs <<'EOF'
+          import {
+            createParser,
+            createToolCallStreamCoordinator,
+            createToolCallExecutionGate,
+            createAiSdkExecutionGuard,
+          } from 'prefix-safe-json';
+
+          const exportsToCheck = {
+            createParser,
+            createToolCallStreamCoordinator,
+            createToolCallExecutionGate,
+            createAiSdkExecutionGuard,
+          };
+          for (const [name, value] of Object.entries(exportsToCheck)) {
+            if (typeof value !== 'function') {
+              throw new Error(`installed package is missing export: ${name}`);
+            }
+          }
+
+          const parser = createParser();
+          parser.push('{"path":"a.md","content":"hi"}');
+          const result = parser.finish();
+          if (result.outcome !== 'valid') {
+            throw new Error(
+              `expected a valid parse from the installed package, got outcome=${result.outcome}`,
+            );
+          }
+
+          console.log('OK: installed tarball imports and a real parse round-trips');
+          EOF
+
+          node smoke.mjs
 
       # A prerelease version (anything with a `-` per semver, e.g.
       # "0.0.1-alpha.3") must never claim the "latest" dist-tag - that tag is
