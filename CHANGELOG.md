@@ -3,10 +3,51 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-This project is pre-1.0 (`0.0.1-alpha.4`); see [RELEASE.md](RELEASE.md) for
-the quantitative bar (mutation score, coverage) a version bump requires.
+See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
+coverage) a version bump requires.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-08-22
+
+First non-alpha release. No API changes from `0.0.1-alpha.4` — this release
+drops the `alpha` prerelease tag after the package had already been
+integrated against three independent real-world codebases (Dyad, CodePilot,
+Apache Maka) across separate PRs without needing a single signature change
+to the public API. Still pre-1.0: a future breaking change remains possible
+and will be called out here, but the "under active development, do not use
+in production" caveat no longer reflects the package's actual state.
+
+### Changed
+
+- **package**: version `0.0.1-alpha.4` → `0.1.0`. Drops the `alpha`
+  prerelease tag; the published `README.md` no longer carries the "do not
+  use in production" warning.
+- **guard**: `createAiSdkExecutionGuard()` promoted from `@public
+  (Experimental)` to `@public (Stable)` in both `src/index.ts` and
+  `src/guard/ai-sdk.ts`'s own doc comment. The raw provider adapters
+  (`OpenAIStreamAdapter` and siblings) remain `@public (Experimental)` —
+  this release does not claim stability for surface this library's own real
+  integrations have not directly exercised.
+- **package**: added a root `LICENSE` file — a short pointer to
+  `LICENSE-MIT`/`LICENSE-APACHE` (the actual, unmodified license texts,
+  present since the initial commit and unchanged by this release), not a
+  new or different license grant. GitHub's own license detection reported
+  `NOASSERTION`/"Other" for this repository without a root `LICENSE` file
+  present; this corrects that without touching either full license text.
+  Added to the npm `files` allowlist alongside the two it points to.
+
+### Verified (see [RELEASE.md](RELEASE.md))
+
+- `npm test`, `npm run typecheck`, `npm run lint` — all pass; also green on
+  the CI matrix (Node 18/20/22 × ubuntu/windows/macos) for this exact commit.
+- `npm run test:coverage` — 99.02% statements/lines, 95.6% branch, 98.81%
+  functions (802/802 tests passing).
+- `npm run test:mutate` — 87.70% mutation score (2165 killed + 39 timeout of
+  2513 total mutants), above the 85% release bar.
+- `npm run test:fuzz` run continuously for 10 minutes (105 full iterations,
+  each reseeding fast-check's randomness): 0 failures.
+- `npm run bench` — no anomalies against the existing throughput profile.
 
 ## [0.0.1-alpha.4] - 2026-08-20
 

@@ -1,6 +1,6 @@
 # prefix-safe-json
 
-> ⚠️ **Alpha** — This project is under active development. APIs may change without notice. Do not use in production.
+> **v0.1** — No longer alpha. Core API (`createParser`, `createToolCallStreamCoordinator`, `createToolCallExecutionGate`, `createAiSdkExecutionGuard`) is considered stable; any breaking change will be called out in [CHANGELOG.md](CHANGELOG.md). Raw provider adapters (`OpenAIStreamAdapter` and friends) remain experimental — see [Current Status](#current-status) for what's covered.
 
 **Don't execute incomplete AI tool calls.**
 
@@ -212,7 +212,7 @@ It does **not**:
 See [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#limitations---what-this-does-not-protect-against)
 for the full list, including known internal limitations.
 
-## Current Status (Alpha)
+## Current Status
 
 ### Implemented
 

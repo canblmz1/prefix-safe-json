@@ -79,7 +79,7 @@ export type {
 
 // High-level execution guards
 /**
- * @public (Experimental)
+ * @public (Stable)
  * Drop-in fail-closed execution guard for the Vercel AI SDK's `fullStream`.
  * Composes `AiSdkStreamAdapter` and `createToolCallExecutionGate()` - see
  * `docs/EXECUTION_GATE.md#high-level-guards`.

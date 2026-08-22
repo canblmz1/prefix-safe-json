@@ -10,7 +10,66 @@ permissions:
   contents: write
 
 jobs:
+  # Duplicated from ci.yml rather than referenced across workflow files on
+  # purpose: `needs:` only works between jobs in the SAME workflow file, and
+  # the alternative (a `workflow_run` trigger watching ci.yml) resolves the
+  # workflow file from the default branch rather than the pushed commit and
+  # has no guaranteed ordering against this push's own ci.yml run - both are
+  # real gotchas for what is meant to be an unambiguous npm-publish gate.
+  # This job is that gate: every OS/Node combination must pass before
+  # `publish` (needs: test-matrix, below) is even considered.
+  test-matrix:
+    name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ["18", "20", "22"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint --max-warnings=0
+
+      - name: Run Tests
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run end-to-end example (Anthropic)
+        run: pnpm run example:anthropic
+
+      - name: Run end-to-end example (AI SDK execution gate)
+        run: pnpm run example:ai-sdk
+
+      - name: Run end-to-end example (AI SDK execution guard)
+        run: pnpm run example:ai-sdk-guard
+
+      - name: Pack Check
+        run: pnpm run pack:check
+
   publish:
+    needs: test-matrix
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,37 +115,11 @@ jobs:
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Typecheck
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run typecheck
-
-      - name: Lint
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run lint --max-warnings=0
-
-      - name: Test
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run test
-
-      - name: Build
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run build
-
-      - name: Run end-to-end example (Anthropic)
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run example:anthropic
-
-      - name: Run end-to-end example (AI SDK execution gate)
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run example:ai-sdk
-
-      - name: Run end-to-end example (AI SDK execution guard)
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run example:ai-sdk-guard
-
-      - name: Pack check
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: pnpm run pack:check
+      # test-matrix (needs:, above) already ran typecheck, lint, test,
+      # build, the examples, and pack:check across every supported Node
+      # version and OS. Re-running a single-OS/single-Node subset of the
+      # same checks here would only mask that gate behind a narrower one,
+      # so this job trusts it and does not repeat it.
 
       # A prerelease version (anything with a `-` per semver, e.g.
       # "0.0.1-alpha.3") must never claim the "latest" dist-tag - that tag is
@@ -122,8 +155,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v${{ steps.version-check.outputs.version }}" \
+          VERSION="${{ steps.version-check.outputs.version }}"
+          PRERELEASE_FLAG=()
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE_FLAG=(--prerelease)
+          fi
+          gh release create "v$VERSION" \
             --repo "${{ github.repository }}" \
-            --title "v${{ steps.version-check.outputs.version }}" \
-            --prerelease \
+            --title "v$VERSION" \
+            "${PRERELEASE_FLAG[@]}" \
             --generate-notes

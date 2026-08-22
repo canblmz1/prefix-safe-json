@@ -3,7 +3,7 @@ import { createProviderExecutionGuard } from "./provider-guard.js";
 import { AiSdkExecutionGuard, ExecutionGuardOptions } from "./types.js";
 
 /**
- * @public (Experimental)
+ * @public (Stable)
  * Drop-in fail-closed execution guard for the Vercel AI SDK's `fullStream`.
  * Composes `AiSdkStreamAdapter` with `createToolCallExecutionGate()` - same
  * decision logic, same fail-closed guarantees, no new parser or coordinator.
