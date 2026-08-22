@@ -71,6 +71,16 @@ jobs:
   publish:
     needs: test-matrix
     runs-on: ubuntu-latest
+    # id-token: write is scoped to this job only (not the top-level block,
+    # which test-matrix also inherits) - it's the OIDC permission npm's
+    # `--provenance` flag needs to obtain a Sigstore-signed attestation at
+    # publish time, and only the publish step ever runs. contents: write is
+    # repeated here because a job-level `permissions:` block replaces the
+    # top-level one for that job rather than adding to it, and this job's
+    # own "Tag the release" step still needs it to push a tag.
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -228,7 +238,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
-        run: npm publish --access public --tag ${{ steps.dist-tag.outputs.tag }}
+        run: npm publish --access public --provenance --tag ${{ steps.dist-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
