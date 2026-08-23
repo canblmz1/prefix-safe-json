@@ -105,6 +105,14 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   count, concurrent call count, tool name length) never reach `execute` —
   a limit breach is `reject`/`resource_limit`, checked before every other
   status-based outcome.
+- On the Vercel AI SDK `ai@6`+ specifically: a tool wrapped with
+  `createAiSdkExecutionLock()` cannot have its real handler invoked by the
+  SDK's own tool loop at all — not detected afterward, structurally
+  excluded before `execute` is ever reached (verified directly against
+  `ai@6`/`ai@7`'s own real source, not their published types). This is the
+  one guarantee in this list that constrains something *upstream* of this
+  library's own trust boundary — see "Non-guarantees" below for exactly how
+  far it reaches and where it stops.
 
 ## Non-guarantees
 
@@ -151,13 +159,30 @@ general AI security platform. It is explicitly **not**:
   or scopes a given tool implementation runs with is entirely outside this
   library's model.
 
-**Most importantly:** if an SDK or caller already executed an irreversible
-action before this library's decision was consulted — most concretely, a
-native AI SDK `execute` callback wired directly onto the same tool
-definition this library is meant to gate — **this library cannot undo that
-first execution.** What it can and does do, once it observes direct
-evidence that this happened (see the `sdk_execution_observed` guarantee
-above), is refuse to *also* authorize a second, caller-driven execution of
-the same call. The precondition for this library's guarantees to mean
-anything at all is that it is consulted *before* the irreversible operation
-runs — see "Safe, supported integration" in `docs/EXECUTION_GATE.md`.
+**Most importantly:** everything above this point in the document describes
+*decision integrity* — whether the `execute`/`retry`/`reject` verdict this
+library produces is trustworthy. It says nothing, by itself, about
+*execution ownership* — whether this library's decision is actually the
+thing controlling whether the real operation runs at all. Those are
+different problems with different guarantees:
+
+- If an SDK or caller already executed an irreversible action before this
+  library's decision was consulted — most concretely, a native AI SDK
+  `execute` callback wired directly onto the same tool definition this
+  library is meant to gate, on `ai@5`, or on any major bypassing
+  `createAiSdkExecutionLock()` — **this library cannot undo that first
+  execution.** What it can and does do, once it observes direct evidence
+  that this happened (the `sdk_execution_observed` guarantee above), is
+  refuse to *also* authorize a second, caller-driven execution of the same
+  call.
+- On `ai@6`+, using `createAiSdkExecutionLock()`, this library's decision
+  *is* the thing controlling execution: the SDK's own tool loop is
+  structurally incapable of running the real handler regardless of what
+  this library decides, because there is no `execute` callback anywhere
+  for it to call. This is the one case in this document where decision
+  integrity and execution ownership coincide.
+
+The precondition for every *other* guarantee in this document to mean
+anything at all is that this library is consulted *before* the irreversible
+operation runs — see "Execution ownership" in `docs/EXECUTION_GATE.md` for
+the full breakdown of which pattern gets which guarantee.
