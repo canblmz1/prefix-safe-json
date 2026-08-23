@@ -321,8 +321,10 @@ npm install prefix-safe-json
 ```
 
 ESM only — `import`, not `require`. There is currently no CommonJS build.
-Node `>=18.0.0`. See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for
-the full ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
+Node `>=22.0.0` (Active LTS lines only — Node 18/20 are end-of-life and no
+longer receive security patches). See
+[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the full
+ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
 compatibility matrix.
 
 ## Low-level API: Quick Start

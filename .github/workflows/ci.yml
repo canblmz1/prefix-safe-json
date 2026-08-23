@@ -20,7 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: ["18", "20", "22"]
+        # Active LTS lines only (verified against nodejs.org's release
+        # schedule on 2026-08-23): 18 went EOL 2025-03-27, 20 went EOL
+        # 2026-03-24. Testing against either would mean testing against a
+        # Node line that no longer receives security patches at all, which
+        # this project - itself a security-integrity library - does not
+        # treat as a defensible baseline. See docs/COMPATIBILITY.md.
+        node-version: ["22", "24"]
 
     steps:
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

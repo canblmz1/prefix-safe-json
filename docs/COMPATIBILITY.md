@@ -88,8 +88,17 @@ than treating `0.x` as a formality:
   condition and no CommonJS build. `import { createParser } from
   "prefix-safe-json"` (or dynamic `import()` from CommonJS) is the only
   supported consumption path.
-- **Node `>=18.0.0`** (`package.json` `engines.node`). Not tested against
-  earlier Node major versions.
+- **Node `>=22.0.0`** (`package.json` `engines.node`) — Active LTS lines
+  only. Previously `>=18.0.0`; raised because Node 18 and Node 20 both
+  reached end-of-life (2025-03-27 and 2026-03-24 respectively — verified
+  against nodejs.org's release schedule, not assumed) and no longer receive
+  security patches at all. A security-integrity library treating an
+  unpatched runtime as a supported baseline was judged indefensible, not a
+  cosmetic preference for newer tooling. This is a real compatibility
+  narrowing for any consumer still on Node 18/20 — SemVer-relevant even
+  though no public API changed (see the versioning policy above: pre-1.0,
+  shipped as a normal minor). CI matches this exactly (Node 22, 24 ×
+  Linux/Windows/macOS). Not tested against earlier Node major versions.
 - No browser-specific build or bundler-target guarantee is made; the
   package is plain ESM TypeScript output (`dist/*.js` + `.d.ts`) with no
   Node-specific built-ins used in the parser/coordinator/gate/guard core
