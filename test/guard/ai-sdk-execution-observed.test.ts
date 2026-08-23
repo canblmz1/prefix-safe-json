@@ -10,10 +10,16 @@
 //
 // `tool-result` (the SDK's execute() succeeded) and `tool-error` (it threw)
 // are both direct, observable proof that execution authority already left
-// the caller's hands. Every test below proves the guard treats that as a
-// permanent, call-scoped, un-overridable disqualification from `execute` -
-// simulating the real documented dispatch loop with a counted fake side
-// effect, not just inspecting `decision.action`.
+// the caller's hands. The first describe block below proves the guard
+// treats *attributed* evidence (a real toolCallId) as a permanent,
+// call-scoped, un-overridable disqualification from `execute`, with
+// absolute priority over every other rejection reason. The second describe
+// block proves *unattributable* evidence (no usable toolCallId) - where the
+// guard cannot know which in-flight call the SDK actually ran - fails
+// closed for the entire stream instead of guessing, including calls that
+// start after the evidence arrives. Both simulate the real documented
+// dispatch loop with a counted fake side effect, not just
+// `decision.action`.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi } from "vitest";
@@ -185,18 +191,135 @@ describe("createAiSdkExecutionGuard — SDK execution-observed (tool-result/tool
     expect(write_file).toHaveBeenCalledWith({ path: "a.txt", content: "hi" });
   });
 
-  it("J: an unattributable tool-result (no toolCallId) does not authorize or poison any specific call, but is visible in diagnostics", () => {
+  it("J: an unattributable tool-result (no toolCallId) fails the whole stream closed, not just one guessed call, but is visible in diagnostics", async () => {
     const guard = createAiSdkExecutionGuard();
+    const write_file = vi.fn();
     for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) guard.push(part);
-    // No toolCallId on this part at all - cannot be attributed to call c1 or anything else.
+    // No toolCallId on this part at all - cannot be attributed to call c1 or
+    // anything else. c1's own evidence is otherwise genuinely safe, but with
+    // no way to know whether c1 (or some other call) is the one the SDK
+    // already ran, it must fail closed too rather than be evaluated as if
+    // nothing happened.
     guard.push({ type: "tool-result", toolName: "write_file" });
     guard.push({ type: "finish", finishReason: "tool-calls" });
 
     const { decisions, diagnostics } = guard.finish();
-    // c1's own evidence is genuinely safe and is evaluated on its own merits,
-    // unaffected by an unattributable diagnostic that names no call.
     const decision = expectDefined(decisions[0]);
-    expect(decision.action).toBe("execute");
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
     expect(diagnostics.some((d) => d.code === "E_SDK_EXECUTION_OBSERVED" && d.internalId === undefined)).toBe(true);
+
+    await dispatch(decisions, { write_file });
+    expect(write_file).not.toHaveBeenCalled();
+  });
+
+  it("K: tool-result attributed to c1, AND finishReason 'error' (provider_error) - sdk_execution_observed wins over provider_error too", () => {
+    const guard = createAiSdkExecutionGuard();
+    for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) guard.push(part);
+    guard.push({ type: "tool-result", toolCallId: "c1", toolName: "write_file" });
+    guard.push({ type: "finish", finishReason: "error" });
+
+    const decision = expectDefined(guard.finish().decisions[0]);
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+});
+
+describe("createAiSdkExecutionGuard — unattributable (stream-wide) SDK execution-observed evidence", () => {
+  it("single valid call + unattributable tool-result + safe finish => reject, zero manual side effects", async () => {
+    const guard = createAiSdkExecutionGuard();
+    const write_file = vi.fn();
+    for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) guard.push(part);
+    guard.push({ type: "tool-result", toolName: "write_file" }); // no toolCallId
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const { decisions } = guard.finish();
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0]?.action).toBe("reject");
+    expect(decisions[0]?.reason).toBe("sdk_execution_observed");
+
+    await dispatch(decisions, { write_file });
+    expect(write_file).not.toHaveBeenCalled();
+  });
+
+  it("two valid calls + unattributable tool-result + safe finish => BOTH reject, zero manual side effects for both", async () => {
+    const guard = createAiSdkExecutionGuard();
+    const read_file = vi.fn();
+    const write_file = vi.fn();
+    for (const part of toolInputParts("call_a", "read_file", ['{"path":"a.txt"}'])) guard.push(part);
+    for (const part of toolInputParts("call_b", "write_file", ['{"path":"b.txt","content":"hi"}'])) guard.push(part);
+    // Some tool's execute() already ran via the SDK - we don't know which.
+    guard.push({ type: "tool-result" });
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const { decisions } = guard.finish();
+    expect(decisions).toHaveLength(2);
+    for (const decision of decisions) {
+      expect(decision.action).toBe("reject");
+      expect(decision.reason).toBe("sdk_execution_observed");
+    }
+
+    await dispatch(decisions, { read_file, write_file });
+    expect(read_file).not.toHaveBeenCalled();
+    expect(write_file).not.toHaveBeenCalled();
+  });
+
+  it("two valid calls + unattributable tool-error => BOTH reject", () => {
+    const guard = createAiSdkExecutionGuard();
+    for (const part of toolInputParts("call_a", "read_file", ['{"path":"a.txt"}'])) guard.push(part);
+    for (const part of toolInputParts("call_b", "write_file", ['{"path":"b.txt","content":"hi"}'])) guard.push(part);
+    guard.push({ type: "tool-error", error: "boom" }); // no toolCallId
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const { decisions } = guard.finish();
+    expect(decisions).toHaveLength(2);
+    for (const decision of decisions) {
+      expect(decision.action).toBe("reject");
+      expect(decision.reason).toBe("sdk_execution_observed");
+    }
+  });
+
+  it("global evidence arriving before a LATER call even starts still disqualifies that later call - a safe finish never upgrades it", () => {
+    const guard = createAiSdkExecutionGuard();
+    for (const part of toolInputParts("call_a", "read_file", ['{"path":"a.txt"}'])) guard.push(part);
+    // Unattributable evidence arrives before call_b has even started.
+    guard.push({ type: "tool-result" });
+    // call_b starts and completes cleanly AFTER the global evidence.
+    for (const part of toolInputParts("call_b", "write_file", ['{"path":"b.txt","content":"hi"}'])) guard.push(part);
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const { decisions } = guard.finish();
+    expect(decisions).toHaveLength(2);
+    for (const decision of decisions) {
+      expect(decision.action).toBe("reject");
+      expect(decision.reason).toBe("sdk_execution_observed");
+    }
+  });
+
+  it("global evidence in one guard instance leaves a second, independent guard instance completely unaffected", () => {
+    const poisonedGuard = createAiSdkExecutionGuard();
+    for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) poisonedGuard.push(part);
+    poisonedGuard.push({ type: "tool-result" }); // unattributable
+    poisonedGuard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const cleanGuard = createAiSdkExecutionGuard();
+    for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) cleanGuard.push(part);
+    cleanGuard.push({ type: "finish", finishReason: "tool-calls" });
+
+    expect(expectDefined(poisonedGuard.finish().decisions[0]).action).toBe("reject");
+    expect(expectDefined(cleanGuard.finish().decisions[0]).action).toBe("execute");
+  });
+
+  it("a normal request with no SDK execution evidence at all is completely unaffected by this mechanism", async () => {
+    const guard = createAiSdkExecutionGuard();
+    const write_file = vi.fn();
+    for (const part of toolInputParts("c1", "write_file", ['{"path":"a.txt","content":"hi"}'])) guard.push(part);
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+
+    const { decisions } = guard.finish();
+    expect(decisions[0]?.action).toBe("execute");
+
+    await dispatch(decisions, { write_file });
+    expect(write_file).toHaveBeenCalledTimes(1);
   });
 });

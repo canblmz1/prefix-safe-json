@@ -100,25 +100,33 @@ The guard's decisions only mean something if it's the sole thing deciding
 whether your tool function runs. The pattern above works because it never
 gives the AI SDK's own tool-calling loop a chance to run your tool itself:
 
-- **Safe, supported pattern** — define your tools *without* an `execute`
-  callback (or a no-op one), consume `fullStream` yourself, and dispatch
+- **Safe, supported pattern** — define your tools *without* an AI SDK-native
+  `execute` callback at all. Not even a no-op one: the guard treats any
+  `tool-result`/`tool-error` it observes as proof the SDK's tool loop
+  already invoked that call, and a no-op callback still produces one —
+  omitting `execute` entirely is what keeps the SDK from running the tool
+  itself in the first place. Consume `fullStream` yourself, and dispatch
   manually — only for `action === "execute"` — after `guard.finish()`,
   exactly as shown above.
 - **Unprotected / misuse pattern** — attach the real, irreversible operation
-  as the tool's own AI SDK-native `execute` callback, *and* separately run
-  the guard on the same stream. The SDK can invoke `execute` as soon as it
-  resolves that call's input, independent of and often before this guard
-  ever reaches a decision. If that happens, the side effect has already run
-  — `prefix-safe-json` cannot retroactively undo it.
+  (or any `execute` implementation at all, no-op included) as the tool's own
+  AI SDK-native callback, *and* separately run the guard on the same
+  stream. The SDK can invoke `execute` as soon as it resolves that call's
+  input, independent of and often before this guard ever reaches a
+  decision. If that happens, the side effect has already run —
+  `prefix-safe-json` cannot retroactively undo it.
 
 The guard does defend against the second pattern in one specific way: a
 `tool-result` or `tool-error` part on `fullStream` is direct evidence the
-SDK's own loop already invoked that call's `execute` callback. Observing
-either permanently disqualifies that call from ever being reported
-`action: "execute"` by the guard (`reason: "sdk_execution_observed"`), so a
-caller who also runs the documented manual-dispatch loop will not invoke the
-tool function a *second* time. It does not undo whatever the SDK's own
-callback already did. See
+SDK's own loop already invoked *some* call. When it names a specific call
+(a real `toolCallId`), only that call is disqualified; when it doesn't, the
+guard cannot tell which in-flight call was affected and fails closed for
+**every** call in that stream rather than guess. Either way the guard never
+again reports `action: "execute"` for the affected call(s)
+(`reason: "sdk_execution_observed"`, which takes priority over every other
+rejection reason), so a caller who also runs the documented manual-dispatch
+loop will not invoke the tool function a *second* time. It does not undo
+whatever the SDK's own callback already did. See
 [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence)
 for the full behavior and test matrix.
 

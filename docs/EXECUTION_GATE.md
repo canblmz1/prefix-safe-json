@@ -76,15 +76,24 @@ later conditions could otherwise slip past:
 
 | # | Condition | action | reason |
 |---|---|---|---|
-| 1 | A resource-limit diagnostic was recorded (`E_LIMIT_*` on the parser, or `E_COORDINATOR_LIMIT_*` / `E_TOOL_NAME_LIMIT` on the coordinator) | reject | `resource_limit` |
-| 2 | The stream-level end reason was `"provider_error"` | reject | `provider_error` |
-| 3 | A content-policy termination was recorded (`E_CONTENT_FILTERED`) | reject | `content_filtered` |
-| 4 | `status === "sdk_execution_observed"` (a `tool-result`/`tool-error` proved a provider SDK's own tool loop already invoked this call - see [Execution ownership](#execution-ownership-tool-resulttool-error-as-evidence) below) | reject | `sdk_execution_observed` |
+| 1 | SDK execution ownership evidence exists - `status === "sdk_execution_observed"` for this call, **or** an unattributable `tool-result`/`tool-error` was recorded anywhere in this stream (see [Execution ownership](#execution-ownership-tool-resulttool-error-as-evidence) below) | reject | `sdk_execution_observed` |
+| 2 | A resource-limit diagnostic was recorded (`E_LIMIT_*` on the parser, or `E_COORDINATOR_LIMIT_*` / `E_TOOL_NAME_LIMIT` on the coordinator) | reject | `resource_limit` |
+| 3 | The stream-level end reason was `"provider_error"` | reject | `provider_error` |
+| 4 | A content-policy termination was recorded (`E_CONTENT_FILTERED`) | reject | `content_filtered` |
 | 5 | `status === "complete"` and the registered schema failed | reject | `schema_invalid` |
 | 6 | `status === "invalid"` (duplicate key, bad token, broken tool identity) | reject | `malformed` |
 | 7 | `status === "truncated"` (a real, raw mid-value/mid-container cut) | retry | `truncated` |
 | 8 | `status === "complete"` **and** `parser.executable` **and** schema passes (or no schema registered) | **execute** | `complete` |
 | 9 | Everything else non-executable - `"salvaged"` (repaired-closed, unconfirmed), `"complete"`-but-not-`executable` (stream-reason mismatch or trailing data), `"cancelled"`, `"collecting"` | retry | `stream_incomplete` |
+
+Row 1 is checked before every other row, including the resource/provider/
+content-policy checks in rows 2-4: it is a statement that execution
+authority already left this library's hands, not a statement about the
+arguments or stream being unusable, and a caller's higher-level logic might
+need to act on that completely differently (e.g. safe to regenerate the
+whole tool call on a resource limit; never safe to once SDK execution was
+observed, since a fresh generation could trigger the SDK's own `execute()`
+again for whatever already ran).
 
 Row 8 is the important one for container-level truncation: a value like
 `["npm install","npm test"` has no unterminated string - the parser *can*
@@ -292,63 +301,91 @@ ever invoke the real tool function for calls this library evaluates. That's
 true for the documented pattern (consume `fullStream` yourself, dispatch
 manually after `finish()`) - but nothing stops a caller from *also*
 attaching the real, irreversible operation as the AI SDK-native `execute`
-callback on the same tool definition. In that configuration the SDK's own
-tool loop can invoke `execute` as soon as it resolves a call's input -
-independent of, and typically before, this guard ever reaches a decision
-for that call. If that happens, the side effect has already run before
-`prefix-safe-json` was ever consulted; no library operating purely on
-`fullStream` evidence can undo that retroactively.
+callback on the same tool definition - not even a no-op implementation of
+one. In that configuration the SDK's own tool loop can invoke `execute` as
+soon as it resolves a call's input - independent of, and typically before,
+this guard ever reaches a decision for that call. If that happens, the side
+effect has already run before `prefix-safe-json` was ever consulted; no
+library operating purely on `fullStream` evidence can undo that
+retroactively.
 
 What this library *can* do, and does: a `tool-result` part (the SDK's
-`execute` callback returned) or a `tool-error` part (it threw) on
-`fullStream` is direct, observable proof that a provider SDK's own tool
-loop already invoked that specific call - regardless of what its arguments
-look like or how the stream eventually finishes. `AiSdkStreamAdapter`
-normalizes either into a `provider_diagnostic` carrying the call's own
-`callRef`; the coordinator treats both identically (success and failure
-both fail closed - an error does not prove the absence of a partial side
-effect before the throw) and immediately marks that specific call `status:
-"sdk_execution_observed"`. That transition happens the moment the evidence
-arrives, mid-stream, and is one-way: no later event for that call - a safe
-finish reason, a structurally complete value, a passing schema, a duplicate
-of the same diagnostic - can move it off that status. The gate reports
-`reject` / `sdk_execution_observed` for it, permanently, so a caller running
+`execute` callback returned - including a no-op one) or a `tool-error` part
+(it threw) on `fullStream` is direct, observable proof that a provider
+SDK's own tool loop already invoked *some* call - regardless of what its
+arguments look like or how the stream eventually finishes.
+`AiSdkStreamAdapter` normalizes either into a `provider_diagnostic`; the
+coordinator treats success and failure identically (an error does not
+prove the absence of a partial side effect before the throw). Two evidence
+shapes exist, and the gate's response scales to how much the evidence
+actually tells it:
+
+- **Attributed** - the part carries a `toolCallId` the coordinator can
+  resolve to a specific in-flight call. That exact call's `status` becomes
+  `"sdk_execution_observed"` immediately, mid-stream, the moment the
+  evidence arrives - mirroring the same mid-stream mutation
+  `handleIdentity()` already performs for identity conflicts. The
+  transition is one-way and call-scoped: nothing that arrives afterward for
+  that call - a safe finish reason, a structurally complete value, a
+  passing schema, a duplicate of the same diagnostic - can move it back,
+  and an unrelated concurrent call is unaffected.
+- **Unattributable** - the part carries no usable `toolCallId` at all. The
+  coordinator cannot know which in-flight call (if any specific one) it
+  refers to, and does not guess: it records a stream-wide diagnostic
+  (`internalId: undefined`) instead of assigning it to one call arbitrarily.
+  With no way to rule any call out - including one whose `tool_call_start`
+  arrives *after* this point - as the one the SDK already executed,
+  **every call the gate ever decides for this stream fails closed**, not
+  just the one that happens to look safest. This is deliberately the more
+  conservative of the two responses: attributing wrongly risks leaving the
+  actually-executed call free to run again while a different, genuinely
+  safe call is punished for no reason; refusing the whole stream never has
+  that failure mode.
+
+Either way the gate reports `reject` / `sdk_execution_observed`, permanently
+- and that reason takes priority over every other rejection reason
+(`resource_limit`, `provider_error`, `content_filtered`, structural
+truncation/malformedness; see the decision table above), because it is
+categorically different information from all of them. So a caller running
 the documented manual-dispatch loop never invokes the tool function a
-*second* time for a call the SDK already ran.
+*second* time for a call (or, in the unattributable case, any call) the SDK
+already ran.
 
-This is call-scoped: an unrelated concurrent call with no such evidence is
-evaluated entirely on its own merits, and evidence recorded in one guard/gate
-instance never affects another. It is also honestly limited: an
-unattributable `tool-result`/`tool-error` (no `toolCallId` at all) still
-produces a stream-wide diagnostic but disqualifies no specific call, since
-there is no call to hold ineligible and guessing one would be worse than
-evaluating it normally.
+**Safe, supported integration** - never attach an AI SDK-native `execute`
+callback - not even a no-op one - to a tool definition whose actual
+execution will be manually dispatched from this library's decisions.
+Consume `fullStream`, feed every part to the guard/adapter, and dispatch
+manually only for `action === "execute"` after `finish()` (see "From stream
+to safe execution" in the root README). Under this pattern
+`tool-result`/`tool-error` never arrive, because the SDK never runs
+`execute` itself.
 
-**Safe, supported integration** - never attach `execute` to an AI SDK tool
-definition whose real operation this library is meant to gate. Consume
-`fullStream`, feed every part to the guard/adapter, and dispatch manually
-only for `action === "execute"` after `finish()` (see "From stream to safe
-execution" in the root README). Under this pattern `tool-result`/`tool-error`
-never arrive, because the SDK never runs `execute` itself.
+**Unprotected / misuse pattern** - defining `execute` (a no-op
+implementation included) *and* running the guard on the same stream. This
+library will refuse to *also* authorize execution once it observes the
+evidence - of every call in the stream, if the evidence can't be
+attributed to one - but it never had the chance to stop the first one.
 
-**Unprotected / misuse pattern** - defining `execute` *and* running the
-guard on the same stream. This library will refuse to *also* authorize a
-second execution once it observes the evidence, but it never had the chance
-to stop the first one.
-
-See `test/guard/ai-sdk-execution-observed.test.ts` and
-`test/unit/coordinator-sdk-execution-observed.test.ts` for the full evidence
-and test matrix (concurrent-call isolation, duplicate/reordered evidence,
-cross-guard-instance isolation, unattributable evidence).
+See `test/guard/ai-sdk-execution-observed.test.ts`,
+`test/unit/coordinator-sdk-execution-observed.test.ts`, and
+`test/unit/execution-gate-decision-table.test.ts` for the full evidence and
+test matrix: concurrent-call isolation, duplicate/reordered evidence,
+cross-guard-instance isolation, unattributable evidence disqualifying an
+entire stream (including a call that starts after the evidence arrives),
+and rejection-reason priority against every other disqualifier.
 
 ## Fail-closed guarantees
 
 - `execute` is reached from exactly one branch in the decision table, and
   only after every disqualifying check has already run.
-- Once a call's `status` becomes `"sdk_execution_observed"` (see
-  [Execution ownership](#execution-ownership-tool-resulttool-error-as-evidence)
-  above), that transition is one-way for the lifetime of the call - nothing
-  that arrives afterward can route it back through the `execute` branch.
+- Once a call's `status` becomes `"sdk_execution_observed"`, or an
+  unattributable `tool-result`/`tool-error` is recorded anywhere in the
+  stream (see [Execution ownership](#execution-ownership-tool-resulttool-error-as-evidence)
+  above), that fact is permanent - for the call, or for every call in the
+  stream in the unattributable case - and is checked before every other
+  disqualifier. Nothing that arrives afterward, and no other rejection
+  reason that also happens to be true at the same time, can route a call
+  back through the `execute` branch or hide that this evidence exists.
 - The status→decision mapping is an exhaustive `switch` with no `default`
   case; the TypeScript compiler (`noImplicitReturns`) fails the build if a
   future coordinator version adds a status this function doesn't handle,

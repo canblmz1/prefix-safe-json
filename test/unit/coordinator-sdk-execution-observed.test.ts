@@ -153,4 +153,24 @@ describe("Coordinator — SDK execution-observed poisoning", () => {
     expect(callA.status).toBe("sdk_execution_observed");
     expect(callB.status).toBe("collecting");
   });
+
+  it("an unattributable diagnostic also leaves a call that starts AFTER it at status collecting - the coordinator never guesses, at any point in time", () => {
+    // This is the coordinator half of the story only: it deliberately never
+    // assigns unattributable evidence to any call, no matter when that call
+    // starts. The corresponding cross-call fail-closed response lives
+    // entirely in decideExecution()'s global-diagnostics check (see
+    // test/unit/execution-gate-decision-table.test.ts and
+    // test/guard/ai-sdk-execution-observed.test.ts) - not here.
+    const coord = createToolCallStreamCoordinator();
+    coord.push({
+      type: "provider_diagnostic",
+      provider: "ai-sdk",
+      code: SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+      severity: "error",
+      message: "already executed, unknown call",
+    } as unknown as NormalizedToolStreamEvent);
+    startCall(coord, "later", "write_file");
+
+    expect(expectDefined(coord.snapshot().calls[0]).status).toBe("collecting");
+  });
 });

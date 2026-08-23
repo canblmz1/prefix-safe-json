@@ -161,6 +161,68 @@ describe("decideExecution — priority ordering (fail-closed checks run before e
     );
     expect(decision.reason).toBe("resource_limit");
   });
+
+  it("sdk_execution_observed (attributed via status) wins over resource_limit, even when a limit diagnostic is also present", () => {
+    const decision = decideExecution(
+      call({
+        status: "sdk_execution_observed",
+        parser: parserSnapshot({ diagnostics: [diagnostic({ code: "E_LIMIT_DEPTH" })] }),
+      }),
+      ctx(),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
+  it("sdk_execution_observed (attributed via status) wins over provider_error", () => {
+    const decision = decideExecution(
+      call({ status: "sdk_execution_observed" }),
+      ctx({ streamEndReason: "provider_error" }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
+  it("sdk_execution_observed (attributed via status) wins over content_filtered", () => {
+    const decision = decideExecution(
+      call({ status: "sdk_execution_observed" }),
+      ctx({ diagnostics: [coordDiag({ code: "E_CONTENT_FILTERED" })] }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
+  it("sdk_execution_observed (attributed via status) wins over a structural truncation (the real-world 'length' case)", () => {
+    const decision = decideExecution(
+      call({ status: "sdk_execution_observed", parser: parserSnapshot({ executable: false, rootComplete: false }) }),
+      ctx({ streamEndReason: "length" }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
+  it("sdk_execution_observed (unattributable/global evidence) ALSO wins over resource_limit - both evidence shapes share the same priority", () => {
+    const decision = decideExecution(
+      call({
+        // status is ordinary "complete" here - the call itself was never
+        // individually attributed. Only the stream-wide diagnostic says a
+        // tool-result/tool-error was observed somewhere in this stream.
+        parser: parserSnapshot({ diagnostics: [diagnostic({ code: "E_LIMIT_DEPTH" })] }),
+      }),
+      ctx({ diagnostics: [coordDiag({ code: "E_SDK_EXECUTION_OBSERVED" })] }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
+
+  it("sdk_execution_observed (unattributable/global evidence via the tool-error code) also wins over an otherwise-perfect call", () => {
+    const decision = decideExecution(
+      call({ schemaValid: true }),
+      ctx({ diagnostics: [coordDiag({ code: "E_PROVIDER_TOOL_ERROR" })] }),
+    );
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("sdk_execution_observed");
+  });
 });
 
 describe("decideExecution — structural status mapping", () => {
