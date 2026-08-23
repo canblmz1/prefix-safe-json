@@ -1,3 +1,7 @@
+import type { StreamEndReason } from "../types.js";
+
+export type { StreamEndReason };
+
 export type ProviderName =
   | "openai"
   | "anthropic"
@@ -54,14 +58,6 @@ export interface ToolCallArgumentsDeltaEvent extends NormalizedEventBase {
   readonly callRef: ProviderCallRef;
   readonly delta: string | Uint8Array;
 }
-
-export type StreamEndReason =
-  | "complete"
-  | "length"
-  | "cancelled"
-  | "provider_error"
-  | "network_error"
-  | "unknown";
 
 export interface ToolCallEndEvent extends NormalizedEventBase {
   readonly type: "tool_call_end";

@@ -6,20 +6,35 @@
 // ToolCallState fixtures, without spinning up a full push()/finish()
 // pipeline for every row of the table.
 //
-// Priority order matters and is intentional: every fail-closed disqualifier
+// Priority order matters and is intentional. SDK-execution-ownership
+// evidence (attributed to this call, or stream-wide/unattributable) is
+// checked FIRST, before every other disqualifier - it is a statement that
+// execution authority already left this library's hands, categorically
+// different from every other check below, which are all statements about
+// the ARGUMENTS/STREAM being unusable. A caller's higher-level logic might
+// reasonably retry a whole request on resource_limit/provider_error/
+// content_filtered; retrying is never safe once SDK execution was observed,
+// since a fresh generation could trigger the SDK's own execute() again for
+// whatever already (partially) ran. That distinction would be lost if a
+// data-quality reason could mask it, so it always wins regardless of what
+// else is also true about the call. Every other fail-closed disqualifier
 // (resource limits, provider errors, content-policy terminations, schema
-// mismatches, malformed content, positively-observed truncation) is checked
-// before the single positive "execute" branch. "execute" is reached only
-// once nothing above has disqualified the call - it is the last positive
-// case, never the first check made, so a future status value that happens
-// to superficially resemble "complete" still can't skip the checks ahead of
-// it.
+// mismatches, malformed content, positively-observed truncation) is then
+// checked before the single positive "execute" branch. "execute" is reached
+// only once nothing above has disqualified the call - it is the last
+// positive case, never the first check made, so a future status value that
+// happens to superficially resemble "complete" still can't skip the checks
+// ahead of it.
 // ---------------------------------------------------------------------------
 
 import { DiagnosticCode } from "../diagnostics/codes.js";
 import { CoordinatorDiagnostic, ToolCallState } from "../coordinator/types.js";
 import { StreamEndReason } from "../coordinator/protocol.js";
-import { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
+import {
+  CONTENT_FILTERED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+} from "../coordinator/diagnostic-codes.js";
 import { DecisionEvidence, ExecuteDecision, ExecutionReason, NonExecutableDecision } from "./types.js";
 
 export interface DecisionContext {
@@ -58,6 +73,11 @@ const COORDINATOR_RESOURCE_LIMIT_CODES: ReadonlySet<string> = new Set([
   "E_COORDINATOR_LIMIT_CALLS",
   "E_COORDINATOR_LIMIT_EVENTS",
   "E_TOOL_NAME_LIMIT",
+]);
+
+const SDK_EXECUTION_OBSERVED_CODES: ReadonlySet<string> = new Set([
+  SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 ]);
 
 export function decideExecution(
@@ -105,6 +125,30 @@ export function decideExecution(
     return { ...common, action: "retry", executable: false, reason };
   }
 
+  // --- SDK execution ownership (highest priority - see file header) -------
+  // Two evidence shapes, identical outcome:
+  //  - attributed: `call.status` was poisoned the moment the coordinator
+  //    resolved a tool-result/tool-error to this exact call - see
+  //    DefaultToolCallStreamCoordinator.handleProviderDiagnostic. One-way,
+  //    call-scoped.
+  //  - unattributable: a tool-result/tool-error arrived with no resolvable
+  //    call identity at all, recorded as a stream-wide diagnostic
+  //    (`internalId: undefined`) instead of guessing which call it meant.
+  //    With no way to rule any call in this stream out - including one
+  //    whose `tool_call_start` arrives after this point - as the one the
+  //    SDK already executed, EVERY call decided against this same
+  //    `ctx.diagnostics` list must fail closed, not just the one that
+  //    happens to look safest. `globalCoordinatorDiagnostics` is re-derived
+  //    fresh from the full, append-only diagnostics list on every call to
+  //    this function, so this is automatic for calls that exist now and
+  //    calls the coordinator hasn't created yet.
+  if (
+    call.status === "sdk_execution_observed" ||
+    globalCoordinatorDiagnostics.some((d) => SDK_EXECUTION_OBSERVED_CODES.has(d.code))
+  ) {
+    return reject("sdk_execution_observed");
+  }
+
   // --- Universal fail-closed checks ---------------------------------------
   // Evaluated first and unconditionally, regardless of call.status, so a
   // resource limit, a provider-side failure, or a content-policy
@@ -133,6 +177,11 @@ export function decideExecution(
   // Exhaustive over ToolCallState["status"] with no `default`: if a future
   // coordinator version adds a new status literal without a matching case
   // here, `noImplicitReturns` fails the build - not a silent runtime gap.
+  // "sdk_execution_observed" has no case here at all: the check above
+  // already returned for it, and TypeScript's own control-flow narrowing
+  // has removed that literal from `call.status`'s type by this point - the
+  // compiler itself now rejects a case for it as unreachable, a stronger
+  // guarantee than a runtime-only "this shouldn't happen" comment could give.
   switch (call.status) {
     case "complete": {
       if (call.schemaValid === false) {

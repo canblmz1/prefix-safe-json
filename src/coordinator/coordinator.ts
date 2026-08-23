@@ -14,6 +14,21 @@ import {
   CoordinatorDiagnostic,
   JsonSchemaLike
 } from "./types.js";
+import {
+  SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+} from "./diagnostic-codes.js";
+
+// A `provider_diagnostic` carrying either code is proof that a provider SDK's
+// own tool loop already invoked this call's `execute` callback (see the two
+// constants' own docs in diagnostic-codes.ts) - success and failure get
+// identical treatment here, since neither proves the absence of a partial
+// irreversible side effect, and this library only needs to know that
+// execution authority already left its hands.
+const SDK_EXECUTION_OBSERVED_CODES: ReadonlySet<string> = new Set([
+  SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+]);
 
 class CoordinatorCallState {
   readonly internalId: string;
@@ -408,6 +423,25 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
       message: event.message,
       internalId,
     });
+
+    // Mirrors handleIdentity()'s existing "mutate call.status mid-stream, not
+    // only at finishCall() time" pattern for identity conflicts - this is
+    // the same kind of call-scoped fact that can be known before the stream
+    // ends and must not wait for it. Gated on "collecting" (first write
+    // wins, matching finishCall()'s own `if (call.status !== "collecting")
+    // return` guard) so this is a one-way transition: once set, no later
+    // event of any kind - including a duplicate of this same diagnostic -
+    // can move the call off "sdk_execution_observed". An unattributable
+    // diagnostic (no callRef, e.g. a malformed provider event with no
+    // correlatable ID) intentionally poisons nothing - there is no specific
+    // call to hold ineligible, and guessing one would be worse than leaving
+    // it to decide normally.
+    if (internalId !== undefined && SDK_EXECUTION_OBSERVED_CODES.has(event.code)) {
+      const call = this.calls.get(internalId);
+      if (call && call.status === "collecting") {
+        call.status = "sdk_execution_observed";
+      }
+    }
   }
 
   private handleStreamEnd(event: NormalizedToolStreamEvent & { type: "provider_stream_end" }) {

@@ -6,10 +6,16 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Default to read-only; individual jobs opt into anything more.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -17,15 +23,15 @@ jobs:
         node-version: ["18", "20", "22"]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
     - name: Install pnpm
-      uses: pnpm/action-setup@v3
+      uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
       with:
         version: 10
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'pnpm'
@@ -56,3 +62,58 @@ jobs:
 
     - name: Pack Check
       run: pnpm run pack:check
+
+  # Split out from build-and-test's 9-leg matrix rather than run there:
+  # v8 coverage instrumentation on 9 legs bought no meaningful extra signal
+  # over one representative run - the source under test has no
+  # platform-conditional branches that would make per-OS coverage numbers
+  # differ - and multiplied the instrumented-run cost ninefold for nothing.
+  # Coverage stays a required PR/push gate; it just runs once.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Tests (with coverage)
+        run: pnpm run test:coverage
+
+  dependency-review:
+    name: Dependency Review
+    # PRs only - there is no "diff" to review on a direct push.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Catch newly-introduced risk in this PR's dependency diff, not
+          # pre-existing devDependency advisories already present on main -
+          # those are tracked separately (see the scheduled dependency audit
+          # workflow) and would otherwise make every unrelated PR fail.
+          fail-on-severity: high
+          # Left at "never" (rather than the action's own "on-failure"
+          # default) deliberately: posting a PR comment needs
+          # `pull-requests: write`, and this job only holds `contents: read`.
+          # The failed check itself is already the visible signal.
+          comment-summary-in-pr: never

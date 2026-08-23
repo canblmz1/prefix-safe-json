@@ -1,6 +1,10 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
-import { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
+import {
+  CONTENT_FILTERED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+  SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+} from "../coordinator/diagnostic-codes.js";
 
 // ---------------------------------------------------------------------------
 // Vercel AI SDK (`ai` package) fullStream part shapes.
@@ -44,6 +48,15 @@ interface AiSdkToolCallPart {
   // push() for why this adapter never reads it.
 }
 
+interface AiSdkToolResultPart {
+  type: "tool-result";
+  toolCallId?: string;
+  toolName?: string;
+  // `output`/`result` deliberately not modeled - see the "tool-result" case
+  // in push() below. This adapter only cares THAT the SDK's own tool loop
+  // already executed the call, never what it returned.
+}
+
 interface AiSdkToolErrorPart {
   type: "tool-error";
   toolCallId?: string;
@@ -71,6 +84,7 @@ export type AiSdkStreamPart =
   | AiSdkToolInputDeltaPart
   | AiSdkToolInputEndPart
   | AiSdkToolCallPart
+  | AiSdkToolResultPart
   | AiSdkToolErrorPart
   | AiSdkFinishPart
   | AiSdkErrorPart
@@ -190,13 +204,41 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         // verbatim from "tool-input-delta" parts above, byte for byte.
         break;
       }
-      case "tool-error": {
+      case "tool-result": {
+        // Direct proof the SDK's own tool loop already invoked and completed
+        // this call's `execute` callback - see
+        // SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE's own docs. This adapter
+        // never reads `output`/`result`: the point isn't what the SDK's
+        // execution produced, only that execution already happened, which
+        // must permanently disqualify this call from an `execute` decision
+        // here (DefaultToolCallStreamCoordinator.handleProviderDiagnostic
+        // acts on this code). An unattributable result (no id at all) still
+        // gets reported - just without a callRef, matching "tool-error"
+        // below - rather than silently dropped.
         const id = toolPartId(part);
         events.push({
           type: "provider_diagnostic",
           sequence: ++this.sequence,
           provider: this.provider,
-          code: "E_PROVIDER_TOOL_ERROR",
+          code: SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
+          severity: "error",
+          message: `Tool "${part.toolName ?? "unknown"}" was already executed by the AI SDK's own tool loop before this guard reached a decision`,
+          ...(id !== undefined ? { callRef: { sourceKey: `tool-input:${id}` } } : {}),
+        });
+        break;
+      }
+      case "tool-error": {
+        // Also proof the SDK's own tool loop already invoked this call's
+        // `execute` callback - it threw, but that does not prove no partial
+        // irreversible side effect occurred first. Deliberately the same
+        // fail-closed treatment as "tool-result" above: see
+        // SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE's own docs.
+        const id = toolPartId(part);
+        events.push({
+          type: "provider_diagnostic",
+          sequence: ++this.sequence,
+          provider: this.provider,
+          code: SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
           severity: "error",
           message: `Tool "${part.toolName ?? "unknown"}" reported an error: ${stringifyError(part.error)}`,
           ...(id !== undefined ? { callRef: { sourceKey: `tool-input:${id}` } } : {}),
@@ -274,8 +316,8 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         this.finished = true;
         break;
       }
-      // Unrelated part types (text-delta, reasoning-delta, tool-result,
-      // start, start-step, finish-step, etc.) carry no tool-argument or
+      // Unrelated part types (text-delta, reasoning-delta, start,
+      // start-step, finish-step, etc.) carry no tool-argument or
       // stream-termination information for our purposes and must not crash
       // the adapter.
       default:

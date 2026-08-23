@@ -33,6 +33,7 @@ export type ExecutionReason =
   | "resource_limit"
   | "provider_error"
   | "content_filtered"
+  | "sdk_execution_observed"
   | "unknown";
 
 /**

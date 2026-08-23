@@ -91,6 +91,35 @@ describe("AiSdkStreamAdapter — normalization", () => {
     expect(diagEvent.callRef).toBeUndefined();
   });
 
+  it("'tool-result' emits a provider_diagnostic (with the call's own callRef) without ending the stream", () => {
+    const adapter = new AiSdkStreamAdapter();
+    const events = adapter.push({ type: "tool-result", toolCallId: "call_1", toolName: "write_file" });
+    expect(events).toHaveLength(1);
+    const diagEvent = expectDefined(events[0]) as NormalizedToolStreamEvent & { type: "provider_diagnostic" };
+    expect(diagEvent.type).toBe("provider_diagnostic");
+    expect(diagEvent.code).toBe("E_SDK_EXECUTION_OBSERVED");
+    expect(diagEvent.severity).toBe("error");
+    expect(diagEvent.callRef?.sourceKey).toBe("tool-input:call_1");
+    // Adapter must still be alive after this - a tool-result is not a
+    // stream-terminal event.
+    expect(adapter.push({ type: "tool-input-start", id: "call_2", toolName: "f" })).toHaveLength(1);
+  });
+
+  it("'tool-result' with no toolCallId omits callRef instead of fabricating one", () => {
+    const adapter = new AiSdkStreamAdapter();
+    const events = adapter.push({ type: "tool-result", toolName: "write_file" });
+    const diagEvent = expectDefined(events[0]) as NormalizedToolStreamEvent & { type: "provider_diagnostic" };
+    expect(diagEvent.callRef).toBeUndefined();
+    expect(diagEvent.code).toBe("E_SDK_EXECUTION_OBSERVED");
+  });
+
+  it("'tool-result' with no toolName falls back to \"unknown\" in the message instead of \"undefined\"", () => {
+    const adapter = new AiSdkStreamAdapter();
+    const events = adapter.push({ type: "tool-result", toolCallId: "call_1" });
+    const diagEvent = expectDefined(events[0]) as NormalizedToolStreamEvent & { type: "provider_diagnostic" };
+    expect(diagEvent.message).toContain('Tool "unknown"');
+  });
+
   it("rejects a non-object raw event with a fully-populated diagnostic instead of throwing", () => {
     const adapter = new AiSdkStreamAdapter();
     const events = adapter.push(null);
@@ -121,9 +150,9 @@ describe("AiSdkStreamAdapter — normalization", () => {
     expect(adapter.push({ type: "tool-input-delta", id: "call_1" })).toEqual([]);
   });
 
-  it("ignores unrelated part types without crashing (text-delta, start-step, finish-step, tool-result)", () => {
+  it("ignores unrelated part types without crashing (text-delta, start-step, finish-step, reasoning-delta)", () => {
     const adapter = new AiSdkStreamAdapter();
-    for (const type of ["text-delta", "start-step", "finish-step", "tool-result", "reasoning-delta"]) {
+    for (const type of ["text-delta", "start-step", "finish-step", "reasoning-delta"]) {
       expect(() => adapter.push({ type })).not.toThrow();
     }
   });

@@ -4,8 +4,8 @@
 
 **Don't execute incomplete AI tool calls.**
 
-`prefix-safe-json` is a fail-closed integrity layer for streamed LLM tool
-calls. It distinguishes complete, unfabricated arguments from truncated
+`prefix-safe-json` is a fail-closed execution-integrity layer for streamed
+LLM tool calls. It distinguishes complete, unfabricated arguments from truncated
 ones — including ones a syntax-level JSON repairer can make *look* complete
 — before they reach a tool with real side effects (writing a file, running a
 command, sending a request).
@@ -94,11 +94,55 @@ provider, or framework hands it the data. See
 `test/guard/ai-sdk-compatibility.test.ts` for the cross-version test
 evidence.
 
+**Execution ownership: what must never also happen**
+
+The guard's decisions only mean something if it's the sole thing deciding
+whether your tool function runs. The pattern above works because it never
+gives the AI SDK's own tool-calling loop a chance to run your tool itself:
+
+- **Safe, supported pattern** — define your tools *without* an AI SDK-native
+  `execute` callback at all. Not even a no-op one: the guard treats any
+  `tool-result`/`tool-error` it observes as proof the SDK's tool loop
+  already invoked that call, and a no-op callback still produces one —
+  omitting `execute` entirely is what keeps the SDK from running the tool
+  itself in the first place. Consume `fullStream` yourself, and dispatch
+  manually — only for `action === "execute"` — after `guard.finish()`,
+  exactly as shown above.
+- **Unprotected / misuse pattern** — attach the real, irreversible operation
+  (or any `execute` implementation at all, no-op included) as the tool's own
+  AI SDK-native callback, *and* separately run the guard on the same
+  stream. The SDK can invoke `execute` as soon as it resolves that call's
+  input, independent of and often before this guard ever reaches a
+  decision. If that happens, the side effect has already run —
+  `prefix-safe-json` cannot retroactively undo it.
+
+The guard does defend against the second pattern in one specific way: a
+`tool-result` or `tool-error` part on `fullStream` is direct evidence the
+SDK's own loop already invoked *some* call. When it names a specific call
+(a real `toolCallId`), only that call is disqualified; when it doesn't, the
+guard cannot tell which in-flight call was affected and fails closed for
+**every** call in that stream rather than guess. Either way the guard never
+again reports `action: "execute"` for the affected call(s)
+(`reason: "sdk_execution_observed"`, which takes priority over every other
+rejection reason), so a caller who also runs the documented manual-dispatch
+loop will not invoke the tool function a *second* time. It does not undo
+whatever the SDK's own callback already did. See
+[`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence)
+for the full behavior and test matrix.
+
 **Supported providers**: OpenAI (legacy `function_call` and Responses API),
 Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the
 Vercel AI SDK. High-level guards currently ship for the AI SDK; every
 provider has a public low-level adapter (see below) that composes with
 `createToolCallExecutionGate()` the same way.
+
+`AiSdkStreamAdapter`/`createAiSdkExecutionGuard()` target the public
+`streamText()`/`generateText()` `fullStream` surface, whose `finishReason`
+is a plain unified string (`"stop"`, `"length"`, ...). They are not
+currently an adapter for the lower-level `@ai-sdk/provider` `doStream()`
+boundary (`LanguageModelV3`/`V4`), where finish reason is
+`{ unified, raw }`-object-shaped — building your own provider against that
+interface directly needs different handling of that field.
 
 Full semantics, the decision table, provider finish-reason mapping, and the
 high-level guard API: [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
@@ -119,6 +163,8 @@ This library parses each chunk incrementally and provides:
 ## Core Principle
 
 > The parser never fabricates missing data. It clearly distinguishes what is definite, what is pending, what was deterministically repaired, and what is lost.
+
+> **Valid JSON is not safe generation completion. Safe generation completion is not permission to execute a side effect.** Structural validity, confirmed completeness, and execution authority are three separate questions — the gate layer (below) answers all three before ever returning `execute`, not just the first. See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the full guarantee/non-guarantee list.
 
 ## Why not a general "partial JSON" parser?
 
@@ -210,7 +256,9 @@ It does **not**:
   with complete, schema-valid arguments is still reported `execute`)
 
 See [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#limitations---what-this-does-not-protect-against)
-for the full list, including known internal limitations.
+for the full list, including known internal limitations, and
+[`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the complete security
+objective, trust boundaries, and guarantee/non-guarantee list.
 
 ## Current Status
 
@@ -229,6 +277,7 @@ for the full list, including known internal limitations.
 - Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
 - `createToolCallExecutionGate()` — a fail-closed `execute` / `retry` / `reject` decision per tool call, built on top of the coordinator (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md))
 - `createAiSdkExecutionGuard()` — a drop-in high-level guard for the Vercel AI SDK's `fullStream`, composing a provider adapter with the execution gate; every `ExecutionDecision` also carries an `evidence` object explaining why (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#high-level-guards))
+- SDK execution-ownership detection — direct evidence that the AI SDK's own tool loop already invoked a call (attributed or, when it can't be, stream-wide) permanently blocks this library from also authorizing it, with the highest rejection-reason priority of any disqualifier (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence))
 
 ### Not Yet Implemented
 
@@ -270,6 +319,11 @@ A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATIO
 ```bash
 npm install prefix-safe-json
 ```
+
+ESM only — `import`, not `require`. There is currently no CommonJS build.
+Node `>=18.0.0`. See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for
+the full ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
+compatibility matrix.
 
 ## Low-level API: Quick Start
 
