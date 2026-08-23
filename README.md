@@ -98,23 +98,38 @@ evidence.
 
 The guard's decisions only mean something if it's the sole thing deciding
 whether your tool function runs. The pattern above works because it never
-gives the AI SDK's own tool-calling loop a chance to run your tool itself:
+gives the AI SDK's own tool-calling loop a chance to run your tool itself —
+in order from strongest guarantee to weakest:
 
-- **Safe, supported pattern** — define your tools *without* an AI SDK-native
-  `execute` callback at all. Not even a no-op one: the guard treats any
-  `tool-result`/`tool-error` it observes as proof the SDK's tool loop
-  already invoked that call, and a no-op callback still produces one —
-  omitting `execute` entirely is what keeps the SDK from running the tool
-  itself in the first place. Consume `fullStream` yourself, and dispatch
-  manually — only for `action === "execute"` — after `guard.finish()`,
-  exactly as shown above.
+- **Strongest — `createAiSdkExecutionLock()` (`ai@6`+)** — wrap your tool
+  definitions with it before passing them to `streamText()`/`generateText()`.
+  It drops any `execute` you attach and forces the SDK's own `needsApproval`
+  mechanism on, so the SDK's tool loop is *structurally* incapable of
+  calling your real handler — verified directly against `ai@6`/`ai@7`'s own
+  source, not inferred. Still dispatch manually from
+  `guard.finish().decisions`, exactly as shown above; this only closes the
+  door on the SDK ever doing it *for* you. See
+  [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence).
+- **Safe, supported pattern (all majors, including `ai@5`)** — define your
+  tools *without* an AI SDK-native `execute` callback at all. Not even a
+  no-op one: the guard treats any `tool-result`/`tool-error` it observes as
+  proof the SDK's tool loop already invoked that call, and a no-op callback
+  still produces one — omitting `execute` entirely is what keeps the SDK
+  from running the tool itself in the first place. Consume `fullStream`
+  yourself, and dispatch manually — only for `action === "execute"` — after
+  `guard.finish()`, exactly as shown above. `createAiSdkExecutionLock()`
+  above gets you this same shape automatically (it drops `execute` too) plus
+  the SDK-enforced backstop where that backstop exists.
 - **Unprotected / misuse pattern** — attach the real, irreversible operation
-  (or any `execute` implementation at all, no-op included) as the tool's own
-  AI SDK-native callback, *and* separately run the guard on the same
-  stream. The SDK can invoke `execute` as soon as it resolves that call's
-  input, independent of and often before this guard ever reaches a
-  decision. If that happens, the side effect has already run —
-  `prefix-safe-json` cannot retroactively undo it.
+  (or any `execute` implementation at all, no-op included) directly as the
+  tool's own AI SDK-native callback, bypassing both options above, *and*
+  separately run the guard on the same stream. The SDK can invoke `execute`
+  as soon as it resolves that call's input, independent of and often before
+  this guard ever reaches a decision. If that happens, the side effect has
+  already run — `prefix-safe-json` cannot retroactively undo it, and on
+  `ai@5` specifically nothing in this library can prevent that first call at
+  all (verified directly, not assumed — see
+  `test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts`).
 
 The guard does defend against the second pattern in one specific way: a
 `tool-result` or `tool-error` part on `fullStream` is direct evidence the

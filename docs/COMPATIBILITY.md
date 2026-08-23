@@ -37,7 +37,7 @@ specific version of any of them into their dependency graph.
 
 ## Versioning & stability policy
 
-**Package status: pre-1.0** (`0.1.1` at the time of writing). Per
+**Package status: pre-1.0** (`0.2.0` at the time of writing). Per
 [Semantic Versioning](https://semver.org/), a pre-1.0 project's public API
 is not yet guaranteed stable, and this project takes that seriously rather
 than treating `0.x` as a formality:

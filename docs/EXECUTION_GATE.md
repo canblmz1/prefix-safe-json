@@ -366,13 +366,57 @@ library will refuse to *also* authorize execution once it observes the
 evidence - of every call in the stream, if the evidence can't be
 attributed to one - but it never had the chance to stop the first one.
 
+### Closing the first-execution gap on `ai@6`+: `createAiSdkExecutionLock()`
+
+Everything above is *detection* - it stops a second, library-authorized
+execution, but by definition can only observe the SDK's own first one after
+it already happened. `createAiSdkExecutionLock()`
+(`src/guard/ai-sdk-execution-lock.ts`, `@public (Experimental)`) closes that
+specific gap wherever the AI SDK itself makes it closable.
+
+Wrapping a tool definition with it does two things: drops whatever
+`execute` the caller supplied, and forces `needsApproval: true`. On `ai@6`+,
+where the SDK's own tool-approval mechanism exists
+(`needsApproval`/`tool-approval-request`/`experimental_toolApprovalSecret` -
+shipped in `ai@6`, December 2025), this is not a convention this library
+merely documents and hopes is followed: verified directly against `ai@6`
+and `ai@7`'s own real source (not their published types, the actual
+`executeToolsFromStream`/`isApprovalNeeded` implementation each major ships)
+that a tool call pending approval is never added to the set of calls the
+SDK actually executes. `execute` is not merely undefined for that call -
+there is provably no code path left that reaches it. Real execution stays
+exactly where it already was in the safe pattern above: driven manually
+from `guard.finish().decisions`, using the value the gate itself authorized
+from raw evidence.
+
+`ai@5` has no `needsApproval` at all (verified directly against its
+published types: the only match for the string "approval" anywhere in
+`ai@5`'s entire type declaration file is an unrelated JSDoc comment).
+`createAiSdkExecutionLock()` still helps there - it still drops `execute`,
+so a *wrapped* tool has nothing for the SDK to call regardless of major -
+but it cannot protect a tool definition that bypasses the wrapper entirely
+and attaches `execute` directly. That bypass case is exactly the
+"Unprotected / misuse pattern" above, on every major, and the
+`sdk_execution_observed` detection this whole section describes remains its
+only backstop.
+
 See `test/guard/ai-sdk-execution-observed.test.ts`,
-`test/unit/coordinator-sdk-execution-observed.test.ts`, and
-`test/unit/execution-gate-decision-table.test.ts` for the full evidence and
-test matrix: concurrent-call isolation, duplicate/reordered evidence,
+`test/unit/coordinator-sdk-execution-observed.test.ts`,
+`test/unit/execution-gate-decision-table.test.ts`,
+`test/guard/ai-sdk-execution-lock.test.ts`, and
+`test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts` /
+`ai-v6.real.test.ts` / `ai-v7.real.test.ts` for the full evidence and test
+matrix: concurrent-call isolation, duplicate/reordered evidence,
 cross-guard-instance isolation, unattributable evidence disqualifying an
 entire stream (including a call that starts after the evidence arrives),
-and rejection-reason priority against every other disqualifier.
+rejection-reason priority against every other disqualifier, and - the
+`ai-v*.real.test.ts` files specifically - real `streamText()` calls against
+each major's own official (`ai@6`/`ai@7`) or hand-built-to-spec (`ai@5`,
+avoiding an unrelated `msw` dependency the official test double
+transitively requires) provider test double, not hand-constructed
+`fullStream` event objects, proving both the lock's real guarantee on
+`ai@6`/`ai@7` and its real limit on `ai@5` with actual SDK behavior rather
+than an assumption about it.
 
 ## Fail-closed guarantees
 
@@ -398,6 +442,16 @@ and rejection-reason priority against every other disqualifier.
   once every check above has passed, and only if that value is genuinely
   present (a defensive `!== undefined` check - an `executable: true` call
   with no actual value still fails closed instead of executing `undefined`).
+- A second `provider_stream_end` arriving after the stream already finished
+  can never change any call's already-decided outcome - the coordinator's
+  `isFinished` gate rejects it before it reaches any call at all. When that
+  second event's reason genuinely *contradicts* the first (e.g. `"complete"`
+  then `"abort"` - a real provider-protocol anomaly, not just a harmless
+  late duplicate of the same reason), it gets its own diagnostic code,
+  `E_TERMINAL_REASON_CONFLICT` (`severity: "fatal"`), distinct from the
+  generic `E_EVENT_AFTER_STREAM_END` every other post-finish event gets -
+  forensic signal that something worth investigating happened, not a second
+  chance to change the decision.
 
 ## Limitations - what this does NOT protect against
 
