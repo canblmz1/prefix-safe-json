@@ -106,7 +106,32 @@ export type {
 export { createAiSdkExecutionGuard } from "./guard/ai-sdk.js";
 export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from "./guard/types.js";
 
+/**
+ * @public (Experimental)
+ * Structural execution lock for the Vercel AI SDK. Wrapping a tool
+ * definition with this drops whatever `execute` the caller supplied and (on
+ * `ai@6`+, where the SDK's own `needsApproval` mechanism exists) forces the
+ * SDK to treat the call as permanently pending approval - either way, the
+ * SDK's own tool loop cannot call the real handler before this library's
+ * gate has decided anything. On `ai@5` (no `needsApproval` at all) this
+ * still stops the SDK from calling anything, just because there is no
+ * `execute` left to call, not because approval was withheld - see the
+ * function's own doc comment for the exact distinction and its real limit:
+ * a tool that bypasses this function entirely and attaches `execute`
+ * directly is not protected on any major. Real execution stays exactly
+ * where it already was: driven manually from `guard.finish().decisions`.
+ * See `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`.
+ */
+export { createAiSdkExecutionLock } from "./guard/ai-sdk-execution-lock.js";
+
 // Provider API
+/**
+ * @public (Experimental)
+ * The contract every provider adapter above implements. Classified
+ * Experimental alongside them, not Stable: writing a custom adapter against
+ * this interface is exactly as exposed to upstream wire-shape churn as the
+ * adapters that already implement it.
+ */
 export type { ProviderStreamAdapter } from "./providers/adapter.js";
 
 // Provider adapters for various LLM network shapes. Each is independently
