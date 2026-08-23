@@ -141,10 +141,14 @@ in production" caveat no longer reflects the package's actual state.
 
 > **Correction (2026-08-23):** The paragraph above overstates what had
 > actually happened. All three were, and as of this correction still are,
-> **open, unmerged pull requests** proposing integration — not merged,
-> shipped, or production dependencies, and "integrated" above should not
-> have been past tense. Verified directly against the live PRs rather than
-> assumed:
+> **open, unmerged pull requests** — not merged, shipped, or production
+> dependencies, and "integrated" above should not have been past tense.
+> Only two of the three actually propose using `prefix-safe-json` as a
+> dependency: **Dyad** and **CodePilot**. **Apache Maka**'s PR validates
+> the same execution-integrity problem class but uses a Maka-owned native
+> implementation and does **not** depend on `prefix-safe-json` at all — it
+> should not have been grouped with the other two as if it were. Verified
+> directly against the live PRs rather than assumed:
 >
 > - **Dyad** — [dyad-sh/dyad#4341](https://github.com/dyad-sh/dyad/pull/4341)
 >   (open, not merged): a real, substantive PR pinning

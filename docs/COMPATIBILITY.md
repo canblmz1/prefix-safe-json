@@ -42,11 +42,16 @@ specific version of any of them into their dependency graph.
 is not yet guaranteed stable, and this project takes that seriously rather
 than treating `0.x` as a formality:
 
-- **`@public (Stable)`** — exports classified Stable have been directly
-  exercised by this project's own real integrations (currently:
-  `createParser`, `createToolCallStreamCoordinator`,
+- **`@public (Stable)`** — exports classified Stable are the ones this
+  project's own automated test suite and CI-run examples exercise as the
+  primary supported surface (`test/guard/`,
+  `test/unit/execution-gate*.test.ts`, `examples/*.mjs`) — a statement
+  about this repository's own maturity/compatibility intent, not a claim
+  of external production adoption (see `CHANGELOG.md`'s `2026-08-23`
+  correction under `0.1.0` for actual current external-integration
+  status). Currently: `createParser`, `createToolCallStreamCoordinator`,
   `createToolCallExecutionGate`, `createAiSdkExecutionGuard`, and their
-  associated types). Breaking changes to these are avoided pre-1.0 and
+  associated types. Breaking changes to these are avoided pre-1.0 and
   would be called out prominently in `CHANGELOG.md` if one became
   necessary.
 - **`@public (Experimental)`** — exported, usable, and tested, but may
