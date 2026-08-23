@@ -8,6 +8,9 @@
     "html"
   ],
   "coverageAnalysis": "perTest",
+  "thresholds": {
+    "break": 85.01
+  },
   "mutate": [
     "src/parser.ts",
     "src/grammar/stack.ts",
