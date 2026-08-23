@@ -21,8 +21,8 @@ jobs:
   # has no guaranteed ordering against this push's own ci.yml run - both are
   # real gotchas for what is meant to be an unambiguous npm-publish gate.
   # This job is that gate: every OS/Node combination must pass before
-  # `publish` (needs: [test-matrix, mutation-test], below) is even
-  # considered.
+  # `publish` (needs: [test-matrix, coverage, mutation-test, release-fuzz],
+  # below) is even considered.
   test-matrix:
     name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -57,8 +57,8 @@ jobs:
       - name: Lint
         run: pnpm run lint --max-warnings=0
 
-      - name: Run Tests (with coverage)
-        run: pnpm run test:coverage
+      - name: Run Tests
+        run: pnpm run test
 
       - name: Build
         run: pnpm run build
@@ -74,6 +74,36 @@ jobs:
 
       - name: Pack Check
         run: pnpm run pack:check
+
+  # Split out from test-matrix's 9-leg matrix for the same reason as
+  # ci.yml's coverage job: v8 instrumentation on 9 legs bought no
+  # meaningful extra signal here (nothing under test is platform-
+  # conditional) and multiplied the run cost ninefold for nothing. One
+  # dedicated run, still required before publish.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Tests (with coverage)
+        run: pnpm run test:coverage
 
   # Runs in parallel with test-matrix (not chained after it) so this gate
   # adds ~its own runtime to the release, not test-matrix's runtime plus
@@ -116,8 +146,60 @@ jobs:
         # numeric floor should be adopted going forward.
         run: pnpm run test:mutate
 
+  # RELEASE.md's own checklist: "Run `npm run test:fuzz` for 10+ minutes."
+  # That is a wall-clock instruction, not a fixed iteration count - each
+  # `test:fuzz` invocation draws a fresh random seed (no seed is pinned in
+  # test/fuzz/fast-check.test.ts), so this loops the real command for as
+  # long as it takes to clear 600s of actual elapsed time, however many
+  # iterations that turns out to be on the runner of the day, rather than
+  # guessing a fixed count that might fall short on a slower shared runner.
+  # Single Linux/Node runner, in parallel with test-matrix/mutation-test -
+  # mutation testing already dominates release latency (~27 min measured),
+  # so a ~10-15 min fuzz job alongside it should not extend the critical
+  # path.
+  release-fuzz:
+    name: Release fuzz gate (10+ minutes)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run test:fuzz for 10+ minutes
+        run: |
+          set -e
+          START=$(date +%s)
+          TARGET=600
+          i=0
+          while :; do
+            i=$((i + 1))
+            ELAPSED=$(( $(date +%s) - START ))
+            echo "=== release-fuzz iteration $i (elapsed ${ELAPSED}s / target ${TARGET}s) ==="
+            pnpm run test:fuzz
+            ELAPSED=$(( $(date +%s) - START ))
+            if [ "$ELAPSED" -ge "$TARGET" ]; then
+              echo "=== reached ${ELAPSED}s (>= ${TARGET}s target) after $i iterations ==="
+              break
+            fi
+          done
+
   publish:
-    needs: [test-matrix, mutation-test]
+    needs: [test-matrix, coverage, mutation-test, release-fuzz]
     runs-on: ubuntu-latest
     # id-token: write is scoped to this job only (not the top-level block,
     # which the other jobs also would have inherited) - it's the OIDC
@@ -297,14 +379,23 @@ jobs:
       # workstream's NPM_ACCOUNT_ACTION_REQUIRED note for the npm-website
       # step a human still has to do before this has any effect): npm's
       # OIDC-based Trusted Publishing needs npm CLI >=11.5.1. The Node 22
-      # install above may bundle an older npm. This is harmless either way
-      # right now - NODE_AUTH_TOKEN below still authenticates publish
-      # exactly as before - it just means the CLI is already
-      # Trusted-Publishing-capable the moment the npm-side registration
-      # exists, with no further workflow change required here.
-      - name: Ensure npm CLI supports Trusted Publishing (>=11.5.1)
+      # install above may bundle an older npm. Pinned to the exact,
+      # verified-published version 11.5.1 (not a `^11.5.1` range) - this is
+      # a security-sensitive release job, and an unbounded future 11.x
+      # resolution here would mean the exact CLI build doing the publish
+      # step can silently change between releases without this file
+      # changing. 11.5.1 is npm's own documented minimum for Trusted
+      # Publishing support, confirmed to exist on the npm registry
+      # (`npm view npm versions`) before being written here. This is
+      # harmless either way right now - NODE_AUTH_TOKEN below still
+      # authenticates publish exactly as before - it just means the CLI is
+      # already Trusted-Publishing-capable the moment the npm-side
+      # registration exists, with no further workflow change required here.
+      # Bump this pin deliberately (not silently) if a later npm release is
+      # ever wanted.
+      - name: Ensure npm CLI supports Trusted Publishing (11.5.1)
         if: steps.version-check.outputs.should_publish == 'true'
-        run: npm install -g npm@^11.5.1
+        run: npm install -g npm@11.5.1
 
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
