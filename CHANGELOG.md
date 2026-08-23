@@ -139,6 +139,37 @@ to the public API. Still pre-1.0: a future breaking change remains possible
 and will be called out here, but the "under active development, do not use
 in production" caveat no longer reflects the package's actual state.
 
+> **Correction (2026-08-23):** The paragraph above overstates what had
+> actually happened. All three were, and as of this correction still are,
+> **open, unmerged pull requests** proposing integration — not merged,
+> shipped, or production dependencies, and "integrated" above should not
+> have been past tense. Verified directly against the live PRs rather than
+> assumed:
+>
+> - **Dyad** — [dyad-sh/dyad#4341](https://github.com/dyad-sh/dyad/pull/4341)
+>   (open, not merged): a real, substantive PR pinning
+>   `prefix-safe-json@0.0.1-alpha.4` and using its AI SDK stream adapter to
+>   gate Dyad's auto-apply path on confirmed-safe stream termination.
+> - **CodePilot** — [op7418/CodePilot#676](https://github.com/op7418/CodePilot/pull/676)
+>   (open, not merged): a real, substantive PR installing
+>   `prefix-safe-json@0.0.1-alpha.4` from the public npm registry and using
+>   `createAiSdkExecutionGuard()` to defer a shell-executing tool's real
+>   side effect until the stream's terminal state is confirmed safe.
+> - **Apache Maka** — [apache/maka#3434](https://github.com/apache/maka/pull/3434)
+>   (open, not merged): validates the identical problem class this package
+>   exists for — gating tool execution on raw stream completion, not just
+>   JSON validity — but explicitly does **not** depend on this package. The
+>   PR's own description states plainly that it "adds no new runtime
+>   package, no `prefix-safe-json` dependency"; the execution-safety logic
+>   is a Maka-owned native implementation. Grouping Maka with the other two
+>   as if it were also a dependency adopter was incorrect.
+>
+> This note corrects the framing rather than silently editing the original
+> paragraph, which is left as written above because it reflects what was
+> believed (incorrectly) at release time. PR status (open/merged) can
+> change after this correction was written — re-check the linked PRs
+> directly for current status rather than trusting this note indefinitely.
+
 ### Changed
 
 - **package**: version `0.0.1-alpha.4` → `0.1.0`. Drops the `alpha`
