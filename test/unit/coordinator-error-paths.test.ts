@@ -126,4 +126,62 @@ describe("Coordinator error paths (coverage gaps)", () => {
     const call = coord.snapshot().calls[0];
     expect(call?.status).toBe("salvaged");
   });
+
+  it("flags a genuinely conflicting second terminal reason with its own diagnostic code, distinct from a plain late event", () => {
+    const coord = createToolCallStreamCoordinator();
+    const ref = { sourceKey: "a" };
+    coord.push({
+      type: "tool_call_start",
+      callRef: ref,
+      provider: "openai",
+      name: "search",
+    } as unknown as NormalizedToolStreamEvent);
+    coord.push({
+      type: "tool_call_arguments_delta",
+      callRef: ref,
+      delta: '{"query":"x"}',
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+    coord.push({
+      type: "tool_call_end",
+      callRef: ref,
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+    coord.push({
+      type: "provider_stream_end",
+      reason: "complete",
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+
+    const decidedCall = coord.snapshot().calls[0];
+    expect(decidedCall?.status).toBe("complete");
+
+    // A second, contradictory terminal event arrives after the stream
+    // already ended (e.g. a duplicate/racing "finish" the provider sent
+    // with a different reason) - it must not be able to move execution
+    // confidence in either direction.
+    coord.push({
+      type: "provider_stream_end",
+      reason: "cancelled",
+      provider: "openai",
+    } as unknown as NormalizedToolStreamEvent);
+
+    const snap = coord.snapshot();
+    expect(snap.diagnostics.some((d) => d.code === "E_TERMINAL_REASON_CONFLICT" && d.severity === "fatal")).toBe(true);
+    expect(snap.calls[0]?.status).toBe("complete"); // unchanged
+  });
+
+  it("still reports the plain late-event code (not a terminal conflict) for a harmless duplicate of the SAME reason", () => {
+    const coord = createToolCallStreamCoordinator();
+    const ref = { sourceKey: "a" };
+    coord.push({ type: "tool_call_start", callRef: ref, provider: "openai", name: "search" } as unknown as NormalizedToolStreamEvent);
+    coord.push({ type: "tool_call_arguments_delta", callRef: ref, delta: '{"query":"x"}', provider: "openai" } as unknown as NormalizedToolStreamEvent);
+    coord.push({ type: "tool_call_end", callRef: ref, provider: "openai" } as unknown as NormalizedToolStreamEvent);
+    coord.push({ type: "provider_stream_end", reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
+    coord.push({ type: "provider_stream_end", reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
+
+    const diagnostics = coord.snapshot().diagnostics;
+    expect(diagnostics.some((d) => d.code === "E_EVENT_AFTER_STREAM_END")).toBe(true);
+    expect(diagnostics.some((d) => d.code === "E_TERMINAL_REASON_CONFLICT")).toBe(false);
+  });
 });

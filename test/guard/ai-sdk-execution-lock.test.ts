@@ -35,8 +35,8 @@ describe("createAiSdkExecutionLock", () => {
     });
     expect("execute" in locked.write_file).toBe(false);
     expect("execute" in locked.delete_file).toBe(false);
-    expect((locked.write_file as { needsApproval: unknown }).needsApproval).toBe(true);
-    expect((locked.delete_file as { needsApproval: unknown }).needsApproval).toBe(true);
+    expect((locked.write_file as unknown as { needsApproval: unknown }).needsApproval).toBe(true);
+    expect((locked.delete_file as unknown as { needsApproval: unknown }).needsApproval).toBe(true);
   });
 
   it("does not mutate the caller's original tool definitions", () => {

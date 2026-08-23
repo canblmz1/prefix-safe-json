@@ -21,7 +21,10 @@
     "src/diagnostics/factory.ts",
     "src/gate/decide.ts",
     "src/gate/gate.ts",
-    "src/providers/ai-sdk.ts"
+    "src/providers/ai-sdk.ts",
+    "src/coordinator/coordinator.ts",
+    "src/guard/provider-guard.ts",
+    "src/guard/ai-sdk-execution-lock.ts"
   ],
   "timeoutMS": 10000,
   "timeoutFactor": 2
