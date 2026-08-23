@@ -105,14 +105,18 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   count, concurrent call count, tool name length) never reach `execute` —
   a limit breach is `reject`/`resource_limit`, checked before every other
   status-based outcome.
-- On the Vercel AI SDK `ai@6`+ specifically: a tool wrapped with
-  `createAiSdkExecutionLock()` cannot have its real handler invoked by the
-  SDK's own tool loop at all — not detected afterward, structurally
-  excluded before `execute` is ever reached (verified directly against
-  `ai@6`/`ai@7`'s own real source, not their published types). This is the
-  one guarantee in this list that constrains something *upstream* of this
-  library's own trust boundary — see "Non-guarantees" below for exactly how
-  far it reaches and where it stops.
+- On the Vercel AI SDK, across `ai@5`/`ai@6`/`ai@7`: a local, user-defined
+  tool wrapped with `createAiSdkExecutionLock()` and passed through
+  unchanged cannot have `execute`, `onInputStart`, `onInputDelta`, or
+  `onInputAvailable` invoked by the SDK's own tool loop at all — not
+  detected afterward, structurally excluded because none of the four exist
+  on the object the SDK receives (verified directly against each major's
+  own real source, not their published types; on `ai@6`+ the SDK's own
+  `needsApproval` mechanism additionally backstops `execute` specifically).
+  Rejects (throws) rather than silently wrapping a provider-executed tool.
+  This is the one guarantee in this list that constrains something
+  *upstream* of this library's own trust boundary — see "Non-guarantees"
+  below for exactly how far it reaches and where it stops.
 
 ## Non-guarantees
 
@@ -168,19 +172,29 @@ different problems with different guarantees:
 
 - If an SDK or caller already executed an irreversible action before this
   library's decision was consulted — most concretely, a native AI SDK
-  `execute` callback wired directly onto the same tool definition this
-  library is meant to gate, on `ai@5`, or on any major bypassing
-  `createAiSdkExecutionLock()` — **this library cannot undo that first
-  execution.** What it can and does do, once it observes direct evidence
-  that this happened (the `sdk_execution_observed` guarantee above), is
-  refuse to *also* authorize a second, caller-driven execution of the same
-  call.
-- On `ai@6`+, using `createAiSdkExecutionLock()`, this library's decision
-  *is* the thing controlling execution: the SDK's own tool loop is
-  structurally incapable of running the real handler regardless of what
-  this library decides, because there is no `execute` callback anywhere
-  for it to call. This is the one case in this document where decision
-  integrity and execution ownership coincide.
+  `execute`/`onInputStart`/`onInputDelta`/`onInputAvailable` callback wired
+  directly onto the same tool definition this library is meant to gate, on
+  any major bypassing `createAiSdkExecutionLock()`, or a
+  **provider-executed** tool (`isProviderExecuted: true` — its operation
+  runs entirely on the model provider's own remote infrastructure, outside
+  this library's process and reach regardless of what wraps it) —
+  **this library cannot undo that first execution.** What it can and does
+  do, for a bypassed `execute` specifically, once it observes direct
+  evidence that this happened (the `sdk_execution_observed` guarantee
+  above), is refuse to *also* authorize a second, caller-driven execution
+  of the same call. There is no equivalent detection for a bypassed
+  `onInputStart`/`onInputDelta`/`onInputAvailable` — those callbacks leave
+  no observable trace on `fullStream` at all.
+- Using `createAiSdkExecutionLock()`, on a local, user-defined tool
+  definition passed through it unchanged: this library's decision *is* the
+  thing controlling execution, because none of `execute`, `onInputStart`,
+  `onInputDelta`, or `onInputAvailable` exist on the object the SDK
+  receives, on any of `ai@5`/`ai@6`/`ai@7` (verified directly against each
+  major's own real source, not their published types). This is the one
+  case in this document where decision integrity and execution ownership
+  coincide — and it is scoped precisely to this function's own output,
+  unchanged: it does not extend to a tool that bypasses the function, one
+  mutated/reconstructed afterward, or a provider-executed tool.
 
 The precondition for every *other* guarantee in this document to mean
 anything at all is that this library is consulted *before* the irreversible

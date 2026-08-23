@@ -217,3 +217,86 @@ describe("real ai@5 lifecycle — terminal/evidence cases still hold via raw-evi
     expect(final.decisions.every((d) => d.action !== "execute")).toBe(true);
   });
 });
+
+describe("real ai@5 lifecycle — P1: input-lifecycle callback neutralization (onInputStart/onInputDelta/onInputAvailable)", () => {
+  // ai@5 has no needsApproval at all (already established above), so unlike
+  // v6/v7 there is no "needsApproval alone isn't enough" framing here - the
+  // callback trio was always unconditional on this major. Verified directly
+  // against ai@5's own runtime source, independent of v6/v7.
+  function freshCounts() {
+    return { execute: 0, onInputStart: 0, onInputDelta: 0, onInputAvailable: 0 };
+  }
+
+  it("LOCKED, safe call: all four counts stay 0 through the entire drained stream and through guard.finish(); manual dispatch afterward runs exactly once", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          execute: async () => {
+            counts.execute += 1;
+            return { ok: true };
+          },
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      }),
+    });
+
+    const guard = createAiSdkExecutionGuard({ schemas: { write_file: WRITE_FILE_SCHEMA.jsonSchema } });
+    for await (const part of result.fullStream) guard.push(part);
+    expect(counts).toEqual(freshCounts());
+
+    const final = guard.finish();
+    const decision = final.decisions.find((d) => d.name === "write_file");
+    expect(decision?.action).toBe("execute");
+    if (decision?.action === "execute") ledger.execute("call_1", decision.value);
+    expect(ledger.count).toBe(1);
+    expect(counts).toEqual(freshCounts());
+  });
+
+  it("UNLOCKED CONTROL: the SDK genuinely invokes onInputStart/onInputDelta/onInputAvailable under this exact stream on ai@5 too", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: {
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      },
+    });
+    for await (const _part of result.fullStream) {
+      /* drain */
+    }
+    expect(counts.onInputStart).toBe(1);
+    expect(counts.onInputDelta).toBeGreaterThan(0);
+    expect(counts.onInputAvailable).toBe(1);
+  });
+});

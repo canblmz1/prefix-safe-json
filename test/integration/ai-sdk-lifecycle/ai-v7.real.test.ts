@@ -330,3 +330,144 @@ describe("real ai@7 lifecycle — needsApproval structural proof (source-level g
     expect(nativeCalls).toBe(0);
   });
 });
+
+describe("real ai@7 lifecycle — P1: input-lifecycle callback neutralization (onInputStart/onInputDelta/onInputAvailable)", () => {
+  // Real source finding (not from published types): ai@7's
+  // invokeToolCallbacksFromStream is a SEPARATE transform stream from
+  // executeToolsFromStream/resolveToolApproval, with zero reference to
+  // needsApproval or approval status anywhere in it. onInputStart fires on
+  // "tool-input-start", onInputDelta on every "tool-input-delta",
+  // onInputAvailable on "tool-call" - all three unconditionally, structural
+  // properties of the stream itself, not gated by safety or approval.
+  function freshCounts() {
+    return { execute: 0, onInputStart: 0, onInputDelta: 0, onInputAvailable: 0 };
+  }
+
+  it("LOCKED, safe call: all four counts stay 0 through the entire drained stream and through guard.finish(); manual dispatch afterward runs exactly once", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          execute: async () => {
+            counts.execute += 1;
+            return { ok: true };
+          },
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      }),
+    });
+
+    const guard = createAiSdkExecutionGuard({ schemas: { write_file: WRITE_FILE_SCHEMA.jsonSchema } });
+    for await (const part of result.fullStream) guard.push(part);
+
+    // The entire stream - every chunk that could ever trigger a lifecycle
+    // callback - has already been consumed at this point, strictly before
+    // guard.finish() is even called.
+    expect(counts).toEqual(freshCounts());
+
+    const final = guard.finish();
+    const decision = final.decisions.find((d) => d.name === "write_file");
+    expect(decision?.action).toBe("execute");
+    if (decision?.action === "execute") ledger.execute("call_1", decision.value);
+    expect(ledger.count).toBe(1);
+    expect(counts).toEqual(freshCounts()); // still all 0 - manual dispatch never touches the locked tool's own (removed) callbacks
+  });
+
+  it("UNLOCKED CONTROL: the SDK genuinely invokes onInputStart/onInputDelta/onInputAvailable under this exact stream, and needsApproval: true alone does not stop them", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: {
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          needsApproval: true, // the exact thing the OLD createAiSdkExecutionLock relied on alone
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+          // deliberately no `execute` - isolates whether needsApproval:true
+          // suppresses the OTHER three callbacks even with nothing else in play.
+        },
+      },
+    });
+    for await (const _part of result.fullStream) {
+      /* drain */
+    }
+
+    // Proves the exact bug this whole test file exists to catch: needsApproval
+    // alone does not touch this callback trio at all.
+    expect(counts.onInputStart).toBe(1);
+    expect(counts.onInputDelta).toBeGreaterThan(0);
+    expect(counts.onInputAvailable).toBe(1);
+  });
+
+  it("LOCKED, truncated/never-resolves-to-executable input: callback counts stay 0 too - not just a safe-path convenience", async () => {
+    const counts = freshCounts();
+    const truncatedRaw = '{"path":"a.txt","content":"cut';
+    const model = mockModel([
+      streamStart(),
+      { type: "tool-input-start", id: "call_1", toolName: "write_file" },
+      { type: "tool-input-delta", id: "call_1", delta: truncatedRaw },
+      { type: "tool-input-end", id: "call_1" },
+      toolCallPart("call_1", "write_file", truncatedRaw + '"}'),
+      finishPart("tool-calls"),
+    ]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          execute: async () => {
+            counts.execute += 1;
+          },
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      }),
+    });
+
+    const guard = createAiSdkExecutionGuard({ schemas: { write_file: WRITE_FILE_SCHEMA.jsonSchema } });
+    for await (const part of result.fullStream) guard.push(part);
+    expect(counts).toEqual(freshCounts());
+
+    const final = guard.finish();
+    expect(final.decisions.find((d) => d.name === "write_file")?.action).not.toBe("execute");
+    expect(ledger.count).toBe(0);
+    expect(counts).toEqual(freshCounts());
+  });
+});

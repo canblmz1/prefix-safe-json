@@ -366,47 +366,89 @@ library will refuse to *also* authorize execution once it observes the
 evidence - of every call in the stream, if the evidence can't be
 attributed to one - but it never had the chance to stop the first one.
 
-### Closing the first-execution gap on `ai@6`+: `createAiSdkExecutionLock()`
+### Closing the first-execution gap: `createAiSdkExecutionLock()`
 
 Everything above is *detection* - it stops a second, library-authorized
 execution, but by definition can only observe the SDK's own first one after
 it already happened. `createAiSdkExecutionLock()`
 (`src/guard/ai-sdk-execution-lock.ts`, `@public (Experimental)`) closes that
-specific gap wherever the AI SDK itself makes it closable.
+specific gap for **local, user-defined tool definitions, unchanged, passed
+through it**.
 
-Wrapping a tool definition with it does two things: drops whatever
-`execute` the caller supplied, and forces `needsApproval: true`. On `ai@6`+,
-where the SDK's own tool-approval mechanism exists
+**The guarantee, precisely stated:** for a tool object returned by this
+function and passed unmodified to `streamText`/`generateText`, none of
+`execute`, `onInputStart`, `onInputDelta`, or `onInputAvailable` can run
+before this library's gate reaches a decision, because none of them exist
+on the object the SDK receives. This is deliberately not phrased as "the SDK
+cannot execute your handler" in the abstract - it is a claim about this
+function's own output specifically, and it stops applying the moment a tool
+definition bypasses the function, gets mutated/reconstructed afterward, or
+is provider-executed (see below).
+
+**Why all four fields, not just `execute`.** An earlier version of this
+function only removed `execute` and set `needsApproval: true`, reasoning
+that `ai@6`+'s own approval mechanism would keep the SDK from calling
+anything else. That reasoning had a real gap: verified directly against
+`ai@5`/`ai@6`/`ai@7`'s own actual runtime source (not their published
+types), `onInputStart`/`onInputDelta`/`onInputAvailable` are invoked by a
+transform stream (`invokeToolCallbacksFromStream` in `ai@7`; differently
+named internals in `ai@6`/`ai@5`, independently confirmed) with **zero
+reference to `needsApproval` or approval status anywhere in it** -
+`onInputAvailable`'s own doc comment states it "is called when a tool call
+can be started, even if the execute function is not provided." A caller
+could put an irreversible side effect inside any of the three and
+`needsApproval: true` alone would not stop it. This function now removes
+all four fields, confirmed by real `streamText()` calls against all three
+majors that a caller-supplied implementation of each never fires (see the
+test files below) - including an explicit unlocked control proving the SDK
+genuinely would have invoked them under the identical stream.
+
+**On `ai@6`+ specifically**, forcing `needsApproval: true` still closes the
+`execute` gap through the SDK's own tool-approval mechanism
 (`needsApproval`/`tool-approval-request`/`experimental_toolApprovalSecret` -
-shipped in `ai@6`, December 2025), this is not a convention this library
-merely documents and hopes is followed: verified directly against `ai@6`
-and `ai@7`'s own real source (not their published types, the actual
-`executeToolsFromStream`/`isApprovalNeeded` implementation each major ships)
-that a tool call pending approval is never added to the set of calls the
-SDK actually executes. `execute` is not merely undefined for that call -
-there is provably no code path left that reaches it. Real execution stays
-exactly where it already was in the safe pattern above: driven manually
-from `guard.finish().decisions`, using the value the gate itself authorized
-from raw evidence.
+shipped in `ai@6`, December 2025): verified directly against `ai@6` and
+`ai@7`'s own real source (`executeToolsFromStream`/`isApprovalNeeded`) that
+a tool call pending approval is never added to the set of calls the SDK
+actually executes. Real execution stays exactly where it already was in the
+safe pattern above: driven manually from `guard.finish().decisions`, using
+the value the gate itself authorized from raw evidence.
 
-`ai@5` has no `needsApproval` at all (verified directly against its
+**Provider-executed tools are rejected, not silently wrapped.** A tool with
+`isProviderExecuted: true` runs its real operation entirely on the model
+provider's own remote infrastructure - there is no local `execute` (or
+`onInputStart`/etc.) for this function to remove, because the side effect
+never happens in this process. `createAiSdkExecutionLock()` throws for one
+rather than returning an object that would falsely imply it had done
+something to it.
+
+**`ai@5` has no `needsApproval` at all** (verified directly against its
 published types: the only match for the string "approval" anywhere in
-`ai@5`'s entire type declaration file is an unrelated JSDoc comment).
-`createAiSdkExecutionLock()` still helps there - it still drops `execute`,
-so a *wrapped* tool has nothing for the SDK to call regardless of major -
-but it cannot protect a tool definition that bypasses the wrapper entirely
-and attaches `execute` directly. That bypass case is exactly the
-"Unprotected / misuse pattern" above, on every major, and the
-`sdk_execution_observed` detection this whole section describes remains its
-only backstop.
+`ai@5`'s entire type declaration file is an unrelated JSDoc comment) - the
+forced-`true` half of this function is a harmless no-op there. Its
+callback-removal half still applies on every major, `ai@5` included.
+
+**What this cannot protect against, on any major:** a tool definition that
+bypasses this function entirely and attaches `execute`/`onInputStart`/
+`onInputDelta`/`onInputAvailable` directly. That bypass case is exactly the
+"Unprotected / misuse pattern" above. The `sdk_execution_observed` detection
+this whole section describes remains a backstop for a bypassed `execute`
+specifically (via `tool-result`/`tool-error` evidence on `fullStream`) - it
+has **no equivalent** for a bypassed `onInputStart`/`onInputDelta`/
+`onInputAvailable`, since those callbacks leave no observable trace on
+`fullStream` at all. Calling `createAiSdkExecutionLock()` is the only
+defense for that trio; there is nothing to detect after the fact.
 
 See `test/guard/ai-sdk-execution-observed.test.ts`,
 `test/unit/coordinator-sdk-execution-observed.test.ts`,
 `test/unit/execution-gate-decision-table.test.ts`,
-`test/guard/ai-sdk-execution-lock.test.ts`, and
+`test/guard/ai-sdk-execution-lock.test.ts` (including its type-level
+regression tests proving `execute`/`onInputStart`/`onInputDelta`/
+`onInputAvailable` do not exist on the locked type at all, not merely
+optional-and-absent), and
 `test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts` /
-`ai-v6.real.test.ts` / `ai-v7.real.test.ts` for the full evidence and test
-matrix: concurrent-call isolation, duplicate/reordered evidence,
+`ai-v6.real.test.ts` / `ai-v7.real.test.ts` (each with a dedicated "P1:
+input-lifecycle callback neutralization" suite) for the full evidence and
+test matrix: concurrent-call isolation, duplicate/reordered evidence,
 cross-guard-instance isolation, unattributable evidence disqualifying an
 entire stream (including a call that starts after the evidence arrives),
 rejection-reason priority against every other disqualifier, and - the
@@ -414,8 +456,8 @@ rejection-reason priority against every other disqualifier, and - the
 each major's own official (`ai@6`/`ai@7`) or hand-built-to-spec (`ai@5`,
 avoiding an unrelated `msw` dependency the official test double
 transitively requires) provider test double, not hand-constructed
-`fullStream` event objects, proving both the lock's real guarantee on
-`ai@6`/`ai@7` and its real limit on `ai@5` with actual SDK behavior rather
+`fullStream` event objects, proving both the lock's real guarantee on every
+major and its real limits with actual SDK behavior rather
 than an assumption about it.
 
 ## Fail-closed guarantees

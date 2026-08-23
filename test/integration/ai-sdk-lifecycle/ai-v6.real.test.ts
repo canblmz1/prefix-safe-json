@@ -259,3 +259,132 @@ describe("real ai@6 lifecycle — concurrency and identity isolation", () => {
     expect(final2.decisions.find((d) => d.name === "write_file")?.action).not.toBe("execute");
   });
 });
+
+describe("real ai@6 lifecycle — P1: input-lifecycle callback neutralization (onInputStart/onInputDelta/onInputAvailable)", () => {
+  // Verified directly against ai@6's own runtime source (independent from
+  // ai@7's - different internal function names, same real behavior): these
+  // three callbacks fire in a code path with zero reference to needsApproval
+  // or approval status.
+  function freshCounts() {
+    return { execute: 0, onInputStart: 0, onInputDelta: 0, onInputAvailable: 0 };
+  }
+
+  it("LOCKED, safe call: all four counts stay 0 through the entire drained stream and through guard.finish(); manual dispatch afterward runs exactly once", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          execute: async () => {
+            counts.execute += 1;
+            return { ok: true };
+          },
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      }),
+    });
+
+    const guard = createAiSdkExecutionGuard({ schemas: { write_file: WRITE_FILE_SCHEMA.jsonSchema } });
+    for await (const part of result.fullStream) guard.push(part);
+    expect(counts).toEqual(freshCounts());
+
+    const final = guard.finish();
+    const decision = final.decisions.find((d) => d.name === "write_file");
+    expect(decision?.action).toBe("execute");
+    if (decision?.action === "execute") ledger.execute("call_1", decision.value);
+    expect(ledger.count).toBe(1);
+    expect(counts).toEqual(freshCounts());
+  });
+
+  it("UNLOCKED CONTROL: the SDK genuinely invokes onInputStart/onInputDelta/onInputAvailable under this exact stream, and needsApproval: true alone does not stop them", async () => {
+    const counts = freshCounts();
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: {
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          needsApproval: true,
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      },
+    });
+    for await (const _part of result.fullStream) {
+      /* drain */
+    }
+    expect(counts.onInputStart).toBe(1);
+    expect(counts.onInputDelta).toBeGreaterThan(0);
+    expect(counts.onInputAvailable).toBe(1);
+  });
+
+  it("LOCKED, truncated/never-resolves-to-executable input: callback counts stay 0 too - not just a safe-path convenience", async () => {
+    const counts = freshCounts();
+    const truncatedRaw = '{"path":"a.txt","content":"cut';
+    const model = mockModel([
+      streamStart(),
+      { type: "tool-input-start", id: "call_1", toolName: "write_file" },
+      { type: "tool-input-delta", id: "call_1", delta: truncatedRaw },
+      { type: "tool-input-end", id: "call_1" },
+      toolCallPart("call_1", "write_file", truncatedRaw + '"}'),
+      finishPart("tool-calls"),
+    ]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: {
+          description: "d",
+          inputSchema: WRITE_FILE_SCHEMA,
+          execute: async () => {
+            counts.execute += 1;
+          },
+          onInputStart: () => {
+            counts.onInputStart += 1;
+          },
+          onInputDelta: () => {
+            counts.onInputDelta += 1;
+          },
+          onInputAvailable: () => {
+            counts.onInputAvailable += 1;
+          },
+        },
+      }),
+    });
+
+    const guard = createAiSdkExecutionGuard({ schemas: { write_file: WRITE_FILE_SCHEMA.jsonSchema } });
+    for await (const part of result.fullStream) guard.push(part);
+    expect(counts).toEqual(freshCounts());
+
+    const final = guard.finish();
+    expect(final.decisions.find((d) => d.name === "write_file")?.action).not.toBe("execute");
+    expect(ledger.count).toBe(0);
+    expect(counts).toEqual(freshCounts());
+  });
+});

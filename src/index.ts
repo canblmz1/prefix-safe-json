@@ -108,21 +108,24 @@ export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from 
 
 /**
  * @public (Experimental)
- * Structural execution lock for the Vercel AI SDK. Wrapping a tool
- * definition with this drops whatever `execute` the caller supplied and (on
- * `ai@6`+, where the SDK's own `needsApproval` mechanism exists) forces the
- * SDK to treat the call as permanently pending approval - either way, the
- * SDK's own tool loop cannot call the real handler before this library's
- * gate has decided anything. On `ai@5` (no `needsApproval` at all) this
- * still stops the SDK from calling anything, just because there is no
- * `execute` left to call, not because approval was withheld - see the
- * function's own doc comment for the exact distinction and its real limit:
- * a tool that bypasses this function entirely and attaches `execute`
- * directly is not protected on any major. Real execution stays exactly
- * where it already was: driven manually from `guard.finish().decisions`.
- * See `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`.
+ * Removes every AI SDK-invoked callback field capable of running caller code
+ * before this library's gate reaches a decision - `execute`,
+ * `onInputStart`, `onInputDelta`, and `onInputAvailable` (verified directly
+ * against `ai@5`/`ai@6`/`ai@7`'s own real source that all three fire
+ * unconditionally, with zero reference to `needsApproval` or approval
+ * status - `needsApproval: true` alone does not stop them). Also forces
+ * `needsApproval: true`, which still closes the `execute` gap on `ai@6`+ via
+ * the SDK's own approval mechanism. Throws for a provider-executed tool
+ * (`isProviderExecuted: true`) rather than silently implying a guarantee
+ * this function cannot make for execution that happens entirely on the
+ * provider's remote infrastructure. Real execution stays exactly where it
+ * already was: driven manually from `guard.finish().decisions`. See the
+ * function's own doc comment for the exact, precisely-scoped guarantee and
+ * its real limits, and
+ * `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`.
  */
 export { createAiSdkExecutionLock } from "./guard/ai-sdk-execution-lock.js";
+export type { LockedAiSdkTool, LockedAiSdkTools } from "./guard/ai-sdk-execution-lock.js";
 
 // Provider API
 /**
