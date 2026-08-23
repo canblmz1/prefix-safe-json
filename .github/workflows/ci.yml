@@ -100,6 +100,93 @@ jobs:
       - name: Run Tests (with coverage)
         run: pnpm run test:coverage
 
+  # `pack:check` above (`pnpm pack --dry-run`) only proves what WOULD be
+  # packed - it never actually installs the tarball anywhere. This job packs
+  # for real and installs that exact tarball into an isolated scratch
+  # project, matching what a real `npm install prefix-safe-json` consumer
+  # gets - not source, not a workspace symlink. Previously this only
+  # happened in publish.yml's own release path (so a packaging regression
+  # was only caught the moment a release was already being attempted);
+  # every PR now gets the same signal. One Node version only (this tests
+  # packaging mechanics, not per-platform runtime behavior, which the
+  # 2x3 matrix above already covers) - kept fast on purpose.
+  package-smoke:
+    name: Package smoke (clean-room tarball install)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack the real tarball
+        run: pnpm pack --out prefix-safe-json-smoke.tgz
+
+      - name: Set up an isolated JS consumer project
+        run: |
+          mkdir -p /tmp/consumer-js
+          cp prefix-safe-json-smoke.tgz /tmp/consumer-js/
+          cd /tmp/consumer-js
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund ./prefix-safe-json-smoke.tgz
+
+      - name: JS clean-room smoke — import and exercise a Stable API
+        run: |
+          cat > /tmp/consumer-js/smoke.mjs <<'EOF'
+          import { createParser, createToolCallExecutionGate } from "prefix-safe-json";
+          const parser = createParser();
+          const result = parser.push('{"a":1}');
+          if (result.syntax !== "root_complete") throw new Error("parser smoke failed: " + JSON.stringify(result));
+          const gate = createToolCallExecutionGate();
+          if (typeof gate.finish !== "function") throw new Error("gate smoke failed: missing finish()");
+          console.log("JS package smoke: OK");
+          EOF
+          node /tmp/consumer-js/smoke.mjs
+
+      - name: Set up an isolated TS consumer project
+        run: |
+          mkdir -p /tmp/consumer-ts
+          cp prefix-safe-json-smoke.tgz /tmp/consumer-ts/
+          cd /tmp/consumer-ts
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund ./prefix-safe-json-smoke.tgz typescript@5.9.3 @types/node@22
+
+      - name: TS clean-room smoke — compile a representative Stable usage against the built .d.ts
+        run: |
+          cat > /tmp/consumer-ts/smoke.ts <<'EOF'
+          import { createToolCallExecutionGate, type ExecutionReason } from "prefix-safe-json";
+          function describe(reason: ExecutionReason): string {
+            switch (reason) {
+              case "complete": case "truncated": case "malformed": case "resource_limit":
+              case "provider_error": case "content_filtered": case "sdk_execution_observed":
+              case "schema_invalid": case "unknown": case "stream_incomplete":
+                return reason;
+            }
+          }
+          const gate = createToolCallExecutionGate();
+          console.log(describe("sdk_execution_observed"), gate.finish().decisions.length);
+          EOF
+          cat > /tmp/consumer-ts/tsconfig.json <<'EOF'
+          { "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true }, "include": ["smoke.ts"] }
+          EOF
+          cd /tmp/consumer-ts && ./node_modules/.bin/tsc --noEmit -p tsconfig.json && echo "TS package smoke: OK"
+
   dependency-review:
     name: Dependency Review
     # PRs only - there is no "diff" to review on a direct push.
