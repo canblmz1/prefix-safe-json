@@ -316,6 +316,20 @@ jobs:
       needs.mutation-test.result == 'success' &&
       needs.release-fuzz.result == 'success'
     runs-on: ubuntu-latest
+    # Separates "a version-changing commit landed on main" (which the four
+    # jobs above already validate fully and automatically, on every push -
+    # useful even for an accidental version bump, since it's free signal
+    # about whether a release would actually be safe) from "a human
+    # authorized THIS specific npm publish". Without this, those two things
+    # were the same event: any push to main that happened to change
+    # package.json's version to something not yet on npm - intentional
+    # release or not - published automatically the moment CI passed.
+    # `environment: npm-publish` requires a manual approval in the Actions
+    # UI before this job (and only this job - release-intent/test-matrix/
+    # coverage/mutation-test/release-fuzz above are unaffected and still run
+    # automatically) is allowed to start, regardless of how many of its
+    # `needs:` already succeeded.
+    environment: npm-publish
     # id-token: write is scoped to this job only (not the top-level block,
     # which the other jobs also would have inherited) - it's the OIDC
     # permission npm's `--provenance` flag needs to obtain a Sigstore-signed
