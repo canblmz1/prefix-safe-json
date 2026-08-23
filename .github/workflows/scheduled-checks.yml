@@ -117,10 +117,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # Measured locally at ~27 minutes for a full run (2184 killed / 264
-    # survived / 83 timeout mutants across 10 mutated files, 89.29% score).
-    # 60 minutes leaves real headroom for a shared/slower CI runner without
-    # tuning the cap to the exact observed number.
+    # Measured locally at ~30.5 minutes for a full run against the current
+    # break:85.01 config (2185 killed / 294 survived / 52 timeout / 8
+    # no-coverage mutants across 10 mutated files, 88.11% score - above the
+    # threshold, so the job exits 0). 60 minutes leaves real headroom for a
+    # shared/slower CI runner without tuning the cap to the exact observed
+    # number.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -140,13 +142,14 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Mutation testing
-        # stryker.config.json sets no explicit break threshold today, so
-        # this job's own exit code (Stryker fails the process on a
-        # genuinely low score against its internal defaults, or on a
-        # runner/config error) is what gates it - nothing here weakens or
-        # invents a threshold on top of that. See NEEDS_CODE_FIX /
-        # DEFERRED items in the report if a real threshold should be
-        # adopted in stryker.config.json itself.
+        # RELEASE.md requires "mutation testing... score > 85%".
+        # stryker.config.json's thresholds.break: 85.01 enforces exactly
+        # that (Stryker's break check is "score < break fails", so 85.01
+        # is the smallest value making "score >= break" equivalent to
+        # RELEASE.md's strict ">85" at the precision Stryker compares at -
+        # see stryker.config.json for the full reasoning). This step fails
+        # whenever a real mutation run comes in at or below that bar, not
+        # merely when Stryker itself errors out.
         run: pnpm run test:mutate
 
       - name: Upload mutation report
