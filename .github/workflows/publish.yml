@@ -6,8 +6,12 @@ on:
     paths:
       - "package.json"
 
+# Default to read-only; only the `publish` job below needs anything more,
+# and it declares its own job-level permissions block instead of relying
+# on this one (a job-level `permissions:` replaces the top-level one for
+# that job rather than adding to it).
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Duplicated from ci.yml rather than referenced across workflow files on
@@ -17,10 +21,13 @@ jobs:
   # has no guaranteed ordering against this push's own ci.yml run - both are
   # real gotchas for what is meant to be an unambiguous npm-publish gate.
   # This job is that gate: every OS/Node combination must pass before
-  # `publish` (needs: test-matrix, below) is even considered.
+  # `publish` (needs: [test-matrix, mutation-test], below) is even
+  # considered.
   test-matrix:
     name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -28,15 +35,15 @@ jobs:
         node-version: ["18", "20", "22"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
         with:
           version: 10
 
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -50,8 +57,8 @@ jobs:
       - name: Lint
         run: pnpm run lint --max-warnings=0
 
-      - name: Run Tests
-        run: pnpm run test
+      - name: Run Tests (with coverage)
+        run: pnpm run test:coverage
 
       - name: Build
         run: pnpm run build
@@ -68,31 +75,72 @@ jobs:
       - name: Pack Check
         run: pnpm run pack:check
 
-  publish:
-    needs: test-matrix
+  # Runs in parallel with test-matrix (not chained after it) so this gate
+  # adds ~its own runtime to the release, not test-matrix's runtime plus
+  # its own. A single Linux/Node runner, not the 3x3 matrix - mutation
+  # testing reruns the suite per-mutant, so multiplying that by 9 platform
+  # legs would buy essentially no extra signal for a large, avoidable time
+  # cost. See this workstream's report for the measured runtime this
+  # timeout is sized against.
+  mutation-test:
+    name: Mutation testing
     runs-on: ubuntu-latest
-    # id-token: write is scoped to this job only (not the top-level block,
-    # which test-matrix also inherits) - it's the OIDC permission npm's
-    # `--provenance` flag needs to obtain a Sigstore-signed attestation at
-    # publish time, and only the publish step ever runs. contents: write is
-    # repeated here because a job-level `permissions:` block replaces the
-    # top-level one for that job rather than adding to it, and this job's
-    # own "Tag the release" step still needs it to push a tag.
     permissions:
-      contents: write
-      id-token: write
+      contents: read
+    # Measured locally at ~27 minutes for a full run (2184 killed / 264
+    # survived / 83 timeout mutants across 10 mutated files, 89.29% score).
+    # 60 minutes leaves real headroom for a shared/slower CI runner without
+    # tuning the cap to the exact observed number.
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
         with:
           version: 10
 
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Mutation testing
+        # stryker.config.json sets no explicit break threshold - this is a
+        # release-time signal gate on Stryker's own pass/fail exit code,
+        # not a threshold invented here. See stryker.config.json if a
+        # numeric floor should be adopted going forward.
+        run: pnpm run test:mutate
+
+  publish:
+    needs: [test-matrix, mutation-test]
+    runs-on: ubuntu-latest
+    # id-token: write is scoped to this job only (not the top-level block,
+    # which the other jobs also would have inherited) - it's the OIDC
+    # permission npm's `--provenance` flag needs to obtain a Sigstore-signed
+    # attestation at publish time, and only the publish step ever runs.
+    # contents: write is scoped here too (not at the top level) because
+    # this job's own "Tag the release" step needs to push a tag - test-matrix
+    # and mutation-test never touch repository contents and stay read-only.
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: "pnpm"
@@ -163,6 +211,15 @@ jobs:
       - name: Pack check
         if: steps.version-check.outputs.should_publish == 'true'
         run: pnpm run pack:check
+
+      # Distinguishes what actually ships (this package's one runtime
+      # dependency, ajv) from devDependency-only advisories, which are
+      # tracked separately (see the scheduled dependency-audit workflow)
+      # and must never block a release on their own. A real production
+      # vulnerability, unlike those, genuinely should stop a publish.
+      - name: Production dependency audit
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm audit --prod --audit-level=high
 
       # The exact bug this step exists to catch: `npm publish` packs
       # whatever is in THIS job's own working directory, which shares
@@ -235,6 +292,19 @@ jobs:
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
+
+      # Trusted Publishing prep (repository side only - see this
+      # workstream's NPM_ACCOUNT_ACTION_REQUIRED note for the npm-website
+      # step a human still has to do before this has any effect): npm's
+      # OIDC-based Trusted Publishing needs npm CLI >=11.5.1. The Node 22
+      # install above may bundle an older npm. This is harmless either way
+      # right now - NODE_AUTH_TOKEN below still authenticates publish
+      # exactly as before - it just means the CLI is already
+      # Trusted-Publishing-capable the moment the npm-side registration
+      # exists, with no further workflow change required here.
+      - name: Ensure npm CLI supports Trusted Publishing (>=11.5.1)
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: npm install -g npm@^11.5.1
 
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
