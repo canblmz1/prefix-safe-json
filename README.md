@@ -4,8 +4,8 @@
 
 **Don't execute incomplete AI tool calls.**
 
-`prefix-safe-json` is a fail-closed integrity layer for streamed LLM tool
-calls. It distinguishes complete, unfabricated arguments from truncated
+`prefix-safe-json` is a fail-closed execution-integrity layer for streamed
+LLM tool calls. It distinguishes complete, unfabricated arguments from truncated
 ones — including ones a syntax-level JSON repairer can make *look* complete
 — before they reach a tool with real side effects (writing a file, running a
 command, sending a request).
@@ -164,6 +164,8 @@ This library parses each chunk incrementally and provides:
 
 > The parser never fabricates missing data. It clearly distinguishes what is definite, what is pending, what was deterministically repaired, and what is lost.
 
+> **Valid JSON is not safe generation completion. Safe generation completion is not permission to execute a side effect.** Structural validity, confirmed completeness, and execution authority are three separate questions — the gate layer (below) answers all three before ever returning `execute`, not just the first. See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the full guarantee/non-guarantee list.
+
 ## Why not a general "partial JSON" parser?
 
 Most streaming JSON helpers (including ones already used in the wild for
@@ -254,7 +256,9 @@ It does **not**:
   with complete, schema-valid arguments is still reported `execute`)
 
 See [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#limitations---what-this-does-not-protect-against)
-for the full list, including known internal limitations.
+for the full list, including known internal limitations, and
+[`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the complete security
+objective, trust boundaries, and guarantee/non-guarantee list.
 
 ## Current Status
 
@@ -273,6 +277,7 @@ for the full list, including known internal limitations.
 - Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
 - `createToolCallExecutionGate()` — a fail-closed `execute` / `retry` / `reject` decision per tool call, built on top of the coordinator (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md))
 - `createAiSdkExecutionGuard()` — a drop-in high-level guard for the Vercel AI SDK's `fullStream`, composing a provider adapter with the execution gate; every `ExecutionDecision` also carries an `evidence` object explaining why (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#high-level-guards))
+- SDK execution-ownership detection — direct evidence that the AI SDK's own tool loop already invoked a call (attributed or, when it can't be, stream-wide) permanently blocks this library from also authorizing it, with the highest rejection-reason priority of any disqualifier (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence))
 
 ### Not Yet Implemented
 
@@ -316,6 +321,9 @@ npm install prefix-safe-json
 ```
 
 ESM only — `import`, not `require`. There is currently no CommonJS build.
+Node `>=18.0.0`. See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for
+the full ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
+compatibility matrix.
 
 ## Low-level API: Quick Start
 

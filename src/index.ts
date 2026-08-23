@@ -1,5 +1,15 @@
 // ---------------------------------------------------------------------------
 // Public API — prefix-safe-json
+//
+// Every exported function/class carries its own `@public (Stable)` or
+// `@public (Experimental)` classification directly above its own
+// declaration - never one comment shared across multiple export
+// statements, since a JSDoc/TSDoc comment attaches only to the single
+// declaration immediately following it, not to every statement a reader's
+// eye groups it with visually. Type-only exports grouped under a
+// `// <Section> API` comment inherit the classification of the
+// function/class they are declared alongside in that same section, unless
+// individually annotated otherwise.
 // ---------------------------------------------------------------------------
 
 /**
@@ -39,7 +49,9 @@ export type {
   ParserLimits,
 } from "./types.js";
 
+/** @public (Stable) Default resource limits applied when none are supplied to `createParser()`. */
 export { DEFAULT_LIMITS } from "./limits.js";
+/** @public (Stable) Machine-readable parser diagnostic codes (see `Diagnostic.code`). */
 export { DiagnosticCode } from "./diagnostics/codes.js";
 
 // Coordinator API
@@ -56,6 +68,13 @@ export type {
   CoordinatorDiagnostic,
 } from "./coordinator/types.js";
 export type { NormalizedToolStreamEvent, ProviderName } from "./coordinator/protocol.js";
+/**
+ * @public (Stable)
+ * Diagnostic code a custom `ProviderStreamAdapter` can emit (as a
+ * stream-wide `provider_diagnostic`, no `callRef`) to signal a
+ * content-safety/policy termination - the gate matches on this exact code
+ * to report `reason: "content_filtered"`. See docs/EXECUTION_GATE.md.
+ */
 export { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "./coordinator/diagnostic-codes.js";
 
 // Execution Safety Gate API
@@ -90,14 +109,55 @@ export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from 
 // Provider API
 export type { ProviderStreamAdapter } from "./providers/adapter.js";
 
+// Provider adapters for various LLM network shapes. Each is independently
+// classified below - see docs/COMPATIBILITY.md for what "verified" means
+// per adapter (a specific tested SDK version vs. a documented wire shape).
+// All six may change if the upstream API/SDK shape they target changes.
+
 /**
  * @public (Experimental)
- * Provider adapters for various LLM network shapes.
- * These are experimental and may change if upstream APIs change.
+ * OpenAI Chat Completions (legacy `function_call`) and Responses API
+ * streaming tool-call shape.
  */
 export { OpenAIStreamAdapter } from "./providers/openai.js";
+
+/**
+ * @public (Experimental)
+ * Generic OpenAI-compatible `choices[].delta.tool_calls[]` streaming
+ * shape, shared by OpenAI's current API and most compatible endpoints.
+ */
 export { OpenAICompatibleStreamAdapter } from "./providers/openai-compatible.js";
+
+/**
+ * @public (Experimental)
+ * Anthropic Messages API streaming tool-call shape
+ * (`content_block_delta` / `input_json_delta`).
+ */
 export { AnthropicStreamAdapter } from "./providers/anthropic.js";
+
+/**
+ * @public (Experimental)
+ * Gemini's structured `functionCall` shape. Unlike the other adapters,
+ * Gemini delivers function-call arguments as an already-parsed object, not
+ * incremental raw JSON text - see docs/COMPATIBILITY.md for what that
+ * means for this adapter's guarantees.
+ */
 export { GeminiStreamAdapter } from "./providers/gemini.js";
+
+/**
+ * @public (Experimental)
+ * OpenRouter's streaming tool-call shape (a thin extension of the
+ * OpenAI-compatible shape above).
+ */
 export { OpenRouterStreamAdapter } from "./providers/openrouter.js";
+
+/**
+ * @public (Experimental)
+ * Vercel AI SDK's `fullStream` tool-call part shape
+ * (`tool-input-start`/`-delta`/`-end`, `tool-call`, `tool-result`,
+ * `tool-error`, `finish`, `error`, `abort`). Verified against `ai@5.0.240`,
+ * `ai@6.0.259`, `ai@7.0.70` - see docs/COMPATIBILITY.md. Prefer
+ * `createAiSdkExecutionGuard()` (Stable, above) for the common case; use
+ * this directly only if you need the adapter instance itself.
+ */
 export { AiSdkStreamAdapter } from "./providers/ai-sdk.js";
