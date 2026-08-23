@@ -1,0 +1,161 @@
+name: Scheduled Checks
+
+# Everything here is either too slow, too repetition-heavy, or too noisy
+# (against pre-existing, already-known state) to run on every PR/push:
+#   - an extended fuzz soak (many more random samples than the fixed
+#     numRuns baked into test/fuzz/fast-check.test.ts)
+#   - mutation testing (reruns the suite once per mutant - inherently slow)
+#   - a full, informational dependency audit (including devDependencies,
+#     which are known to carry pre-existing advisories that don't affect
+#     the published package - see the production-only step below for the
+#     one that actually gates on anything)
+# None of this needs the 3-OS x 3-Node matrix build-and-test already
+# covers on every PR; each job here runs on a single Linux/Node runner.
+
+on:
+  schedule:
+    # Sunday 04:00 UTC - offset from codeql.yml's Monday 03:17 slot so the
+    # two scheduled workflows don't contend for runners at the same time.
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extended-fuzz-soak:
+    name: Extended fuzz soak
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Measured locally: 5 sequential invocations of `pnpm run test:fuzz`
+    # took 73.6s total (~14.7s/iteration, dominated by Vitest/Vite process
+    # start-up, not the ~1.8s of actual test execution each run reports).
+    # 60 iterations is therefore ~15 minutes in practice; the cap below is
+    # headroom, not the expected runtime - it exists so a genuine hang
+    # can't run indefinitely ("no infinite fuzzing").
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Extended fuzz soak
+        # test/fuzz/fast-check.test.ts calls fc.assert with a fixed
+        # numRuns:1000 and no explicit seed, so each independent process
+        # invocation draws a fresh random seed. Running the same command N
+        # times therefore explores N times the random input space of a
+        # single run (~60,000 samples per property here), not N identical
+        # repeats - unlike test:fuzz's own fixed 40-case corpus.test.ts,
+        # which is deterministic either way. This loop is the only way to
+        # get that extra coverage without changing numRuns/seed handling
+        # inside test/fuzz/fast-check.test.ts itself, which is out of
+        # scope for this workstream (test/** is owned by the other,
+        # parallel workstream).
+        #
+        # fast-check prints a reproducible seed and shrunk counterexample
+        # on any failure by default; that output lands directly in this
+        # step's own log, so no extra artifact capture is needed.
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            echo "=== fuzz soak iteration $i/60 ==="
+            pnpm run test:fuzz
+          done
+
+  dependency-audit:
+    name: Dependency audit (production vs. dev-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Production dependency audit (blocking)
+        # The tree that actually ships to consumers - currently just ajv.
+        # This is the one that should genuinely fail the job.
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Full dependency audit, including dev-only (informational)
+        # Known to currently report pre-existing devDependency advisories
+        # (vite/vitest/esbuild/nanoid/qs, via stryker-mutator's own
+        # dependency chain) that do not affect the published tarball. This
+        # step intentionally never fails the job - see
+        # DEFERRED_DEV_DEPENDENCY_UPGRADE in this workstream's report for
+        # why those aren't being bumped here. Its purpose is visibility
+        # (readable in the run log) rather than a gate.
+        run: pnpm audit || true
+
+  mutation-test:
+    name: Mutation testing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Measured locally at ~30.5 minutes for a full run against the current
+    # break:85.01 config (2185 killed / 294 survived / 52 timeout / 8
+    # no-coverage mutants across 10 mutated files, 88.11% score - above the
+    # threshold, so the job exits 0). 60 minutes leaves real headroom for a
+    # shared/slower CI runner without tuning the cap to the exact observed
+    # number.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
+        with:
+          version: 10
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Mutation testing
+        # RELEASE.md requires "mutation testing... score > 85%".
+        # stryker.config.json's thresholds.break: 85.01 enforces exactly
+        # that (Stryker's break check is "score < break fails", so 85.01
+        # is the smallest value making "score >= break" equivalent to
+        # RELEASE.md's strict ">85" at the precision Stryker compares at -
+        # see stryker.config.json for the full reasoning). This step fails
+        # whenever a real mutation run comes in at or below that bar, not
+        # merely when Stryker itself errors out.
+        run: pnpm run test:mutate
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 14
