@@ -14,6 +14,87 @@ permissions:
   contents: read
 
 jobs:
+  # Cheap first gate. This workflow triggers on any push to main that
+  # touches package.json, which includes edits that don't change the
+  # version at all (a devDependency bump, a script tweak) or that bump it
+  # to a version already published (e.g. a re-push after a failed release
+  # PR). Before this job existed, that "should this actually run"
+  # determination only happened deep inside `publish`, AFTER the full 3x3
+  # matrix, coverage, mutation testing (~30 min), and the 10+ minute
+  # release-fuzz gate had all already run to completion for nothing. This
+  # job does only a checkout and a single `npm view` lookup, and every
+  # expensive job below is now conditional on its result.
+  release-intent:
+    name: Release intent
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      # Deliberately does NOT treat every non-zero `npm view` result as
+      # "unpublished" - that would fail OPEN on a registry timeout/network
+      # blip/auth hiccup, letting an unverifiable state slide straight into
+      # a full release run. `npm view <pkg>@<version> --json` puts a
+      # structured `{"error":{"code":...}}` on stdout (confirmed
+      # empirically, separately from the human-readable text npm also
+      # writes to stderr) whenever it fails, so the exact npm-reported
+      # error code is checked directly:
+      #   - exit 0                          -> version exists -> should_publish=false
+      #   - exit != 0, error.code == "E404" -> registry confirms no such
+      #                                         version -> should_publish=true
+      #   - exit != 0, anything else (network/timeout/auth/unexpected)
+      #                                      -> FAIL this job. Do not guess.
+      - name: Check whether the local version is unpublished
+        id: check
+        run: |
+          set +e
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          echo "Local version: $LOCAL_VERSION"
+          echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+
+          NPM_STDOUT=$(npm view "prefix-safe-json@$LOCAL_VERSION" version --json 2>/tmp/npm-view-stderr.log)
+          NPM_EXIT=$?
+          set -e
+
+          if [ "$NPM_EXIT" -eq 0 ]; then
+            echo "Version $LOCAL_VERSION is already published; skipping the release workflow."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ERROR_CODE=$(printf '%s' "$NPM_STDOUT" | node -e '
+            let data = "";
+            process.stdin.on("data", (d) => { data += d; });
+            process.stdin.on("end", () => {
+              try {
+                const parsed = JSON.parse(data);
+                process.stdout.write((parsed.error && parsed.error.code) || "");
+              } catch {
+                process.stdout.write("");
+              }
+            });
+          ')
+
+          if [ "$ERROR_CODE" = "E404" ]; then
+            echo "Version $LOCAL_VERSION is not published yet (npm E404 - confirmed, not assumed)."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error::npm lookup for prefix-safe-json@$LOCAL_VERSION failed with an unexpected error (code: '${ERROR_CODE:-<none>}', not E404). Failing closed - NOT assuming this version is unpublished."
+          echo "--- npm stderr ---"
+          cat /tmp/npm-view-stderr.log
+          exit 1
+
   # Duplicated from ci.yml rather than referenced across workflow files on
   # purpose: `needs:` only works between jobs in the SAME workflow file, and
   # the alternative (a `workflow_run` trigger watching ci.yml) resolves the
@@ -21,11 +102,14 @@ jobs:
   # has no guaranteed ordering against this push's own ci.yml run - both are
   # real gotchas for what is meant to be an unambiguous npm-publish gate.
   # This job is that gate: every OS/Node combination must pass before
-  # `publish` (needs: [test-matrix, coverage, mutation-test, release-fuzz],
-  # below) is even considered.
+  # `publish` (needs: [release-intent, test-matrix, coverage, mutation-test,
+  # release-fuzz], below) is even considered. Skipped entirely (not failed)
+  # when release-intent determines nothing needs publishing.
   test-matrix:
     name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    needs: release-intent
+    if: needs.release-intent.result == 'success' && needs.release-intent.outputs.should_publish == 'true'
     permissions:
       contents: read
     strategy:
@@ -83,6 +167,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    needs: release-intent
+    if: needs.release-intent.result == 'success' && needs.release-intent.outputs.should_publish == 'true'
     permissions:
       contents: read
     steps:
@@ -115,12 +201,16 @@ jobs:
   mutation-test:
     name: Mutation testing
     runs-on: ubuntu-latest
+    needs: release-intent
+    if: needs.release-intent.result == 'success' && needs.release-intent.outputs.should_publish == 'true'
     permissions:
       contents: read
-    # Measured locally at ~27 minutes for a full run (2184 killed / 264
-    # survived / 83 timeout mutants across 10 mutated files, 89.29% score).
-    # 60 minutes leaves real headroom for a shared/slower CI runner without
-    # tuning the cap to the exact observed number.
+    # Measured locally at ~30.5 minutes for a full run against the current
+    # break:85.01 config (2185 killed / 294 survived / 52 timeout / 8
+    # no-coverage mutants across 10 mutated files, 88.11% score - above the
+    # threshold, so the job exits 0). 60 minutes leaves real headroom for a
+    # shared/slower CI runner without tuning the cap to the exact observed
+    # number.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -140,10 +230,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Mutation testing
-        # stryker.config.json sets no explicit break threshold - this is a
-        # release-time signal gate on Stryker's own pass/fail exit code,
-        # not a threshold invented here. See stryker.config.json if a
-        # numeric floor should be adopted going forward.
+        # RELEASE.md requires "mutation testing... score > 85%".
+        # stryker.config.json's thresholds.break: 85.01 enforces exactly
+        # that (Stryker's break check is "score < break fails", so 85.01
+        # is the smallest value making "score >= break" equivalent to
+        # RELEASE.md's strict ">85" at the precision Stryker compares at -
+        # see stryker.config.json for the full reasoning). This step - and
+        # therefore this job, and therefore `publish`, which needs it -
+        # fails whenever a real mutation run comes in at or below that bar,
+        # not merely when Stryker itself errors out.
         run: pnpm run test:mutate
 
   # RELEASE.md's own checklist: "Run `npm run test:fuzz` for 10+ minutes."
@@ -154,12 +249,14 @@ jobs:
   # iterations that turns out to be on the runner of the day, rather than
   # guessing a fixed count that might fall short on a slower shared runner.
   # Single Linux/Node runner, in parallel with test-matrix/mutation-test -
-  # mutation testing already dominates release latency (~27 min measured),
+  # mutation testing already dominates release latency (~30 min measured),
   # so a ~10-15 min fuzz job alongside it should not extend the critical
   # path.
   release-fuzz:
     name: Release fuzz gate (10+ minutes)
     runs-on: ubuntu-latest
+    needs: release-intent
+    if: needs.release-intent.result == 'success' && needs.release-intent.outputs.should_publish == 'true'
     permissions:
       contents: read
     timeout-minutes: 20
@@ -199,7 +296,24 @@ jobs:
           done
 
   publish:
-    needs: [test-matrix, coverage, mutation-test, release-fuzz]
+    needs: [release-intent, test-matrix, coverage, mutation-test, release-fuzz]
+    # Written out explicitly against each needed job's own `.result`
+    # (never relying on the implicit "all needs succeeded" default a job
+    # gets when it has NO if: of its own) precisely because this job DOES
+    # define a custom if: below - and once a job has any if:, GitHub
+    # Actions stops applying that implicit check automatically, making an
+    # unchecked custom if: exactly the shape of bug that could let a
+    # skipped or failed gate slide through unnoticed. `result` is
+    # distinctly "skipped" (not "success") for the four jobs above when
+    # release-intent said should_publish=false, so this also naturally
+    # skips `publish` in that case without needing separate handling.
+    if: |
+      needs.release-intent.result == 'success' &&
+      needs.release-intent.outputs.should_publish == 'true' &&
+      needs.test-matrix.result == 'success' &&
+      needs.coverage.result == 'success' &&
+      needs.mutation-test.result == 'success' &&
+      needs.release-fuzz.result == 'success'
     runs-on: ubuntu-latest
     # id-token: write is scoped to this job only (not the top-level block,
     # which the other jobs also would have inherited) - it's the OIDC
@@ -231,29 +345,61 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # npm refuses to publish over an existing version, so this is the
-      # actual gate - without it, every push touching package.json
-      # (a new devDependency, a script tweak, anything) would attempt a
-      # publish and fail loudly instead of just skipping quietly.
-      #
-      # Check the exact local version instead of the package's default
-      # dist-tag. For prereleases, `npm view <pkg> version` can resolve
-      # `latest` (for example alpha.2) even when the local prerelease
-      # (for example alpha.3 under `next`) is already published.
-      - name: Check whether the local version is unpublished
+      # This is the SECOND exact-version check, not the only one -
+      # release-intent (top of this file) already made the same
+      # determination before the expensive matrix/coverage/mutation/fuzz
+      # gates ran, specifically so a version that's already published
+      # never pays for any of that. This one exists for a different
+      # reason: those gates can take upwards of 30 minutes, during which
+      # someone could publish this exact version by another route (a
+      # manual `npm publish`, a concurrent/retried run of this same
+      # workflow). Re-checking here, immediately before the real
+      # `npm publish` call below, is what actually closes that window -
+      # the preflight result alone is stale by the time execution reaches
+      # this point. Uses the identical fail-closed E404-vs-anything-else
+      # distinction as release-intent's check (see there for why every
+      # non-zero `npm view` result is not treated as "unpublished").
+      - name: Check whether the local version is unpublished (pre-publish recheck)
         id: version-check
         run: |
+          set +e
           LOCAL_VERSION=$(node -p "require('./package.json').version")
           echo "Local version: $LOCAL_VERSION"
           echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
 
-          if npm view "prefix-safe-json@$LOCAL_VERSION" version >/dev/null 2>&1; then
-            echo "Version $LOCAL_VERSION is already published; skipping publish."
+          NPM_STDOUT=$(npm view "prefix-safe-json@$LOCAL_VERSION" version --json 2>/tmp/npm-view-stderr.log)
+          NPM_EXIT=$?
+          set -e
+
+          if [ "$NPM_EXIT" -eq 0 ]; then
+            echo "Version $LOCAL_VERSION is already published (published since release-intent's check ran); skipping publish."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Version $LOCAL_VERSION is not published yet."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          ERROR_CODE=$(printf '%s' "$NPM_STDOUT" | node -e '
+            let data = "";
+            process.stdin.on("data", (d) => { data += d; });
+            process.stdin.on("end", () => {
+              try {
+                const parsed = JSON.parse(data);
+                process.stdout.write((parsed.error && parsed.error.code) || "");
+              } catch {
+                process.stdout.write("");
+              }
+            });
+          ')
+
+          if [ "$ERROR_CODE" = "E404" ]; then
+            echo "Version $LOCAL_VERSION is still not published (npm E404 - confirmed, not assumed)."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::error::npm lookup for prefix-safe-json@$LOCAL_VERSION failed with an unexpected error (code: '${ERROR_CODE:-<none>}', not E404). Failing closed - NOT assuming this version is unpublished, NOT proceeding to publish."
+          echo "--- npm stderr ---"
+          cat /tmp/npm-view-stderr.log
+          exit 1
 
       # test-matrix (needs:, above) already verified typecheck/lint/test
       # pass on every supported Node version and OS - that part really is
