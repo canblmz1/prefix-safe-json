@@ -8,7 +8,18 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
-### Security / Safety
+## [0.2.0] - 2026-08-23
+
+Substantial execution-integrity hardening plus a public API surface
+expansion, documentation/trust corrections, and CI/supply-chain
+hardening. Pre-1.0 (see `docs/COMPATIBILITY.md`'s versioning policy);
+0.2.0 rather than 0.1.2 specifically because of the `sdk_execution_observed`
+union expansion documented under "API compatibility" below — additive at
+runtime, but a real source-compatibility consideration for downstream
+exhaustive `switch` consumers, which this project treats as more than a
+patch-level change even pre-1.0.
+
+### Execution integrity
 
 - **guard**: `createAiSdkExecutionGuard()`/`AiSdkStreamAdapter` now detect
   when the Vercel AI SDK's own tool loop already invoked a call's `execute`
@@ -47,7 +58,7 @@ coverage) a version bump requires.
     `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`
     and `docs/THREAT_MODEL.md`.
 
-### Public API
+### API compatibility
 
 - **`ExecutionReason`** (`src/gate/types.ts`) and **`ToolCallState["status"]`**
   (`src/coordinator/types.ts`) both gain one new literal:
@@ -99,6 +110,71 @@ coverage) a version bump requires.
   TSDoc/TypeDoc parsing, only `OpenAIStreamAdapter` did. `DEFAULT_LIMITS`,
   `DiagnosticCode`, and `CONTENT_FILTERED_DIAGNOSTIC_CODE` — value exports
   with no classification comment at all — now have one too.
+- **`experiments/**`** (20 files, 5 targets: `vercel-ai`, `mastra`,
+  `stagehand`, `goose`, `langchainjs`) removed entirely. Every claimed
+  commit SHA, upstream file path, and benchmark number was checked
+  directly against the real repositories (`vercel/ai`, `mastra-ai/mastra`,
+  `browserbase/stagehand`, `block/goose`, `langchain-ai/langchainjs`) —
+  none of it held up: no claimed commit resolves (one claimed hash isn't
+  even valid hexadecimal), most claimed file paths don't exist, and the
+  benchmark numbers fall in the same range a prior cleanup already found
+  fabricated once (see `[0.0.1-alpha.0]` below). Deleted rather than
+  rewritten into plausible-sounding replacements; git history preserves
+  what was removed.
+
+### External adoption correction
+
+The `[0.1.0]` entry below originally described three external codebases
+as "integrated," past tense; a dated correction is attached directly to
+that entry and is not reproduced verbatim here to avoid two slightly
+different copies drifting apart. Restated at the level that matters for
+this release: [dyad-sh/dyad#4341](https://github.com/dyad-sh/dyad/pull/4341)
+and [op7418/CodePilot#676](https://github.com/op7418/CodePilot/pull/676)
+are real, substantive, but **open and unmerged** PRs proposing a
+`prefix-safe-json` dependency — not shipped or production integrations.
+[apache/maka#3434](https://github.com/apache/maka/pull/3434) validates
+the same execution-integrity problem class this package addresses, but
+its own PR text states plainly that it uses a Maka-owned native
+implementation with **no** `prefix-safe-json` dependency at all. None of
+the three should be read as a merged, production adoption of this
+package.
+
+### CI / supply-chain
+
+- **CodeQL** (`codeql.yml`, new): static analysis on push/PR/weekly
+  schedule.
+- **Dependency Review** on PRs (`ci.yml`).
+- **Coverage gate**: `vitest.config.ts` now enforces `>=95%` on
+  statements/branches/functions/lines as a dedicated, required CI job —
+  previously measured but not gated in CI.
+- **Mutation gate**: `stryker.config.json`'s `thresholds.break: 85.01`
+  (the smallest value making Stryker's `score < break` check equivalent
+  to a strict `>85%` bar) — enforced ahead of any release publish and in
+  a weekly scheduled run.
+- **Scheduled checks** (`scheduled-checks.yml`, new): extended fuzz soak,
+  mutation testing, and a production-vs-dev-only dependency audit split
+  (`pnpm audit --prod --audit-level=high` blocking; a full audit
+  including devDependencies is informational-only, since pre-existing
+  dev-only advisories don't affect the published tarball).
+- Every GitHub Actions step across every workflow is pinned to a full
+  commit SHA; every job declares least-privilege `permissions:`; zero
+  `pull_request_target` anywhere.
+- **`publish.yml` hardening**: a cheap `release-intent` preflight
+  (fail-closed on any non-`E404` npm lookup error — never assumes a
+  version is unpublished on an ambiguous failure) gates the expensive
+  3×3 matrix/coverage/mutation/10+-minute release-fuzz jobs so they only
+  run for an actually-unpublished version; a second exact-version
+  recheck runs immediately before the real `npm publish` call, closing
+  the TOCTOU window the ~30+ minute gate chain otherwise leaves open;
+  provenance (`--provenance`) preserved; installed-tarball consumer
+  smoke test preserved and extended to exercise
+  `sdk_execution_observed`.
+- **Trusted Publishing: preparation only.** The publish job pins the npm
+  CLI to the exact version (`11.5.1`) npm requires for OIDC-based Trusted
+  Publishing. `NODE_AUTH_TOKEN`/`secrets.NPM_TOKEN` remains the actual
+  publish auth path in this release — registering this package as a
+  Trusted Publisher on npm's website is a separate, human, account-side
+  action not completed by this release.
 
 ## [0.1.1] - 2026-08-22
 
