@@ -8,6 +8,98 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Security / Safety
+
+- **guard**: `createAiSdkExecutionGuard()`/`AiSdkStreamAdapter` now detect
+  when the Vercel AI SDK's own tool loop already invoked a call's `execute`
+  callback — proof that execution authority already left this library's
+  hands, independent of whatever the call's arguments or the stream's
+  finish reason look like. A `tool-result` part (the callback returned,
+  including a no-op implementation) and a `tool-error` part (it threw) get
+  identical treatment: neither proves the absence of a partial side effect,
+  so both fail closed the same way.
+  - **Attributed** evidence (a real `toolCallId`) poisons only that
+    specific call, immediately and irreversibly: `ToolCallState.status`
+    becomes `"sdk_execution_observed"` the moment the evidence arrives,
+    mid-stream, and no later event for that call can move it back.
+  - **Unattributable** evidence (no usable `toolCallId`) cannot be
+    guessed onto one call without risking the opposite failure mode
+    (the real target stays free to execute while an unrelated call is
+    wrongly punished) — so it fails closed for **every** call the gate
+    ever decides in that guard/coordinator instance, including a call
+    that starts after the evidence arrives. Evidence never crosses
+    guard/coordinator instances.
+  - `sdk_execution_observed` has the highest rejection-reason priority of
+    any disqualifier — it is checked, and wins, before `resource_limit`,
+    `provider_error`, `content_filtered`, and every structural
+    truncation/malformedness case. Those are all statements about the
+    arguments or stream being unusable, safe to retry at a caller's
+    discretion; `sdk_execution_observed` is a statement that execution
+    already happened, which a caller must never retry the same way.
+  - This closes a real gap, not a theoretical one: previously an
+    unattributable `tool-result`/`tool-error` was recorded as a
+    diagnostic but never consulted by the decision logic, so an
+    unrelated in-flight call could still be reported `action: "execute"`
+    even though the SDK had already run *some* call in that same stream.
+  - As before this cannot undo a side effect the SDK's own callback
+    already produced — it only prevents this library from *also*
+    authorizing a second, caller-driven execution of it. See
+    `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`
+    and `docs/THREAT_MODEL.md`.
+
+### Public API
+
+- **`ExecutionReason`** (`src/gate/types.ts`) and **`ToolCallState["status"]`**
+  (`src/coordinator/types.ts`) both gain one new literal:
+  `"sdk_execution_observed"`. This is additive at the value/runtime level —
+  existing code that only reads/compares specific known literals is
+  unaffected — but it is breaking-*shaped* for any downstream consumer with
+  an **exhaustive** TypeScript `switch`/type-narrowing over either union
+  (e.g. `switch (reason) { case "complete": ...; case "truncated": ...; }`
+  with no `default`): such code will need a new case added, or it will fail
+  to compile under `noImplicitReturns`/exhaustiveness checking, or silently
+  fall through a `default` if one exists. This is not being called a
+  SemVer-major change: the project is pre-1.0, and per the versioning
+  policy in `docs/COMPATIBILITY.md`, additive union members on public
+  discriminated-union reason/status types are treated as a normal minor
+  change at this stage, not a breaking one — but it is disclosed explicitly
+  here because it is a real source-compatibility consideration for anyone
+  exhaustively switching on these types, whatever the version number says.
+- **`AiSdkStreamAdapter`** now also normalizes the `tool-result` fullStream
+  part (previously silently ignored) into a `provider_diagnostic`, and the
+  existing `tool-error` handling now shares its diagnostic code constant
+  with the new `tool-result` handling internally. No change to
+  `AiSdkStreamAdapter`'s own public shape or `@public (Experimental)`
+  classification.
+
+### Documentation
+
+- **README/`docs/EXECUTION_GATE.md`**: documented the safe AI SDK
+  integration pattern precisely — never attach a native `execute` callback
+  (not even a no-op one) to a tool definition whose real operation this
+  library is meant to gate, because the SDK's own tool loop invoking it at
+  all (regardless of what it returns) is exactly the evidence described
+  above. Previously said "or a no-op one" was an acceptable alternative to
+  omitting `execute` entirely; corrected, since a no-op callback is still a
+  real callback the SDK invokes and still produces `tool-result`.
+- **`docs/THREAT_MODEL.md`** (new): security objective, trust boundaries,
+  and an explicit guarantees/non-guarantees list for the parser →
+  coordinator → gate → caller pipeline.
+- **`docs/COMPATIBILITY.md`** (new): per-integration compatibility matrix
+  (tested versions, targeted API surface, status, caveats) and the
+  project's ESM/Node/SemVer/Stable-vs-Experimental policy in one place.
+- **`src/index.ts`**: every provider adapter export now carries its own
+  individually-attached `@public (Experimental)` JSDoc comment. Previously
+  one comment block visually preceded all six `export { ... }` statements
+  for the provider adapters, but a JSDoc/TSDoc comment attaches only to the
+  single declaration immediately following it — five of the six adapters
+  (`OpenAICompatibleStreamAdapter`, `AnthropicStreamAdapter`,
+  `GeminiStreamAdapter`, `OpenRouterStreamAdapter`, `AiSdkStreamAdapter`)
+  had no individually-attached classification at all under strict
+  TSDoc/TypeDoc parsing, only `OpenAIStreamAdapter` did. `DEFAULT_LIMITS`,
+  `DiagnosticCode`, and `CONTENT_FILTERED_DIAGNOSTIC_CODE` — value exports
+  with no classification comment at all — now have one too.
+
 ## [0.1.1] - 2026-08-22
 
 **Fixes a broken `0.1.0` publish.** `0.1.0`'s package on npm shipped with no
