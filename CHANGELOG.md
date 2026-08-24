@@ -11,21 +11,39 @@ coverage) a version bump requires.
 ### Execution ownership
 
 - **`createAiSdkExecutionLock()`** (new, `@public (Experimental)`): wraps AI
-  SDK tool definitions so the SDK's own tool loop cannot invoke the real
-  handler at all. Drops any caller-supplied `execute` and forces
-  `needsApproval: true`. On `ai@6`+ (where the SDK's own tool-approval
-  mechanism exists), this is verified directly against `ai@6`/`ai@7`'s own
-  real source — not their published types — that a pending-approval
-  `toolCallId` is never added to the set of calls the SDK actually
-  executes: structural exclusion, not detection after the fact. On `ai@5`
-  (no such mechanism — confirmed against its published types) it still
-  helps, for a narrower reason: a wrapped tool has no `execute` left for
-  the SDK to call regardless of major. A tool that bypasses the wrapper
-  entirely and attaches `execute` directly remains unprotected on every
-  major; the pre-existing `sdk_execution_observed` detection remains the
-  real backstop for that case. Real execution is unchanged: still driven
-  manually from `guard.finish().decisions`. See
-  `docs/EXECUTION_GATE.md#closing-the-first-execution-gap-on-ai6-createaisdkexecutionlock`.
+  SDK tool definitions so the SDK's own tool loop cannot invoke real caller
+  code before this library's gate reaches a decision. Removes `execute`
+  and every SDK-invoked pre-decision input-lifecycle callback -
+  `onInputStart`, `onInputDelta`, `onInputAvailable` - not just `execute`
+  alone: verified directly against `ai@5`/`ai@6`/`ai@7`'s own real source
+  that all three fire in a transform stream entirely independent of
+  `needsApproval`/approval status, so forcing `needsApproval: true` alone
+  does **not** stop them. Also forces `needsApproval: true` unconditionally,
+  which still closes the `execute` gap specifically on `ai@6`+ via the
+  SDK's own approval mechanism (a no-op on `ai@5`, which has no such
+  mechanism). Also rejects, rather than silently accepting: a
+  function-valued `description` (`ai@7`+ invokes it during tool
+  preparation, before the model call begins - arbitrary caller code on the
+  same pre-decision timeline as the callback trio); and any provider tool
+  shape whose real execution location cannot be verified from the object
+  alone - `isProviderExecuted: true`, `ai@6`'s discriminator-less
+  `{ type: "provider" }`, and `ai@5`'s discriminator-less `{ type:
+  "provider-defined" }` are all rejected, while `ai@7`'s `{ type:
+  "provider", isProviderExecuted: false }` is accepted (verified to have no
+  `execute` field at all on that shape, so the SDK can never auto-run it).
+  New exported mapped types `LockedAiSdkTool<T>`/`LockedAiSdkTools<TTools>`
+  give the return value a real type - the five affected fields do not exist
+  on a locked tool's type at all, not merely optional-and-absent. A tool
+  that bypasses the wrapper entirely and attaches `execute`/the callback
+  trio directly remains unprotected on every major; the pre-existing
+  `sdk_execution_observed` detection remains the real backstop for a
+  bypassed `execute` specifically, with no equivalent for a bypassed
+  `onInputStart`/`onInputDelta`/`onInputAvailable`. This function is not a
+  sandbox for a tool definition's *other* fields - a schema library's own
+  validation/refinement/transform machinery is caller-provided executable
+  code this library does not run, remove, or guard. Real execution is
+  unchanged: still driven manually from `guard.finish().decisions`. See
+  `docs/EXECUTION_GATE.md#closing-the-first-execution-gap-createaisdkexecutionlock`.
 
 ### Real AI SDK lifecycle evidence
 

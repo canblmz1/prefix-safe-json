@@ -111,13 +111,22 @@ in order from strongest guarantee to weakest:
   alone does **not** stop them, which is exactly the gap this function
   closes). It also forces `needsApproval: true`, which still closes the
   `execute` gap specifically on `ai@6`+ via the SDK's own approval
-  mechanism. The guarantee is precisely about **this function's own
-  output, unchanged, on a local tool definition**: it says nothing about a
-  tool that bypasses this function, one mutated/reconstructed after this
-  function returns it, or a **provider-executed** tool
-  (`isProviderExecuted: true` — its real operation runs entirely on the
-  model provider's remote infrastructure; this function throws rather than
-  silently accepting one). Still dispatch manually from
+  mechanism. It also rejects a **function-valued `description`**
+  (`ai@7`+ invokes it during tool preparation, before the model call even
+  begins — arbitrary caller code on the same pre-decision timeline as the
+  callback trio; a string `description` is unaffected on every major), and
+  any **provider tool shape whose real execution location it cannot
+  verify**: `isProviderExecuted: true` (real operation runs entirely on the
+  model provider's remote infrastructure), `ai@6`'s discriminator-less
+  `{ type: "provider" }`, and `ai@5`'s discriminator-less
+  `{ type: "provider-defined" }` are all rejected rather than silently
+  accepted; `ai@7`'s `{ type: "provider", isProviderExecuted: false }` is
+  accepted (verified to have no `execute` field at all on that shape, so the
+  SDK can never auto-run it). The guarantee is precisely about **this
+  function's own output, unchanged, on a supported local tool definition**:
+  it says nothing about a tool that bypasses this function, one
+  mutated/reconstructed after this function returns it, or a rejected
+  shape. Still dispatch manually from
   `guard.finish().decisions`, exactly as shown above; this only closes the
   door on the SDK (or your own callbacks) doing it *for* you. See
   [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence).

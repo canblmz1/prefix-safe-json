@@ -37,12 +37,15 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  * exactly as before (verified against `ai@6`/`ai@7`'s own
  * `executeToolsFromStream`/`resolveToolApproval` source: a pending-approval
  * `toolCallId` is never added to the set of calls the SDK actually
- * executes).
+ * executes). Also rejects a function-valued `description` (see "Function-
+ * valued description" below) and provider tool shapes whose real execution
+ * location this function cannot verify (see "Provider-executed and
+ * execution-location-ambiguous tools" below).
  *
  * ## The guarantee, precisely
  *
- * For a **local, user-defined tool definition** (see "Provider-executed
- * tools" below for what this excludes) returned by this function and passed
+ * For a **supported local tool definition** (see the two rejection sections
+ * below for what this excludes) returned by this function and passed
  * **unchanged** to `streamText`/`generateText`: none of `execute`,
  * `onInputStart`, `onInputDelta`, or `onInputAvailable` can run before this
  * library's gate reaches a decision, because none of them exist on the
@@ -50,22 +53,62 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  * them, on any of `ai@5`/`ai@6`/`ai@7`. This is a claim about *this
  * function's own output*, not a sandbox: it says nothing about a tool
  * definition that never went through this function, one reconstructed or
- * mutated after this function returns it, or a provider-executed tool.
- * Real execution stays exactly where it already was: driven manually from
+ * mutated after this function returns it, or a rejected shape. Real
+ * execution stays exactly where it already was: driven manually from
  * `guard.finish().decisions`, using the value the gate itself authorized
  * from raw evidence - not `chunk.input`, not anything the SDK derived. This
  * function does not execute anything, queue anything, or introduce a
  * placeholder result.
  *
- * ## Provider-executed tools are rejected, not silently accepted
+ * ## Function-valued description (ai@7+)
  *
- * A tool with `isProviderExecuted: true` (the AI SDK's own discriminant for
- * "this tool's real operation runs entirely on the model provider's remote
- * infrastructure" - web search, code execution, etc.) is outside what any
- * local wrapper can affect: there is no local `execute` for this function to
- * remove in the first place, because the side effect never happens in this
- * process at all. Passing one throws, rather than returning an object that
- * would falsely imply this function had done something to it.
+ * `ai@5`/`ai@6` type `description` as `string` only. `ai@7` additionally
+ * allows a function - verified directly against `ai@7.0.77`'s own real
+ * source (not published types) that `prepareTools()` calls
+ * `resolveToolDescription()`, which invokes that function during tool
+ * preparation, *before* `streamText`/`generateText`'s model call begins and
+ * therefore necessarily before this library's gate can reach any decision.
+ * A function-valued `description` is arbitrary caller code running on this
+ * same pre-decision timeline as the callback trio above, so this function
+ * rejects it rather than silently passing it through under `...rest`. A
+ * string `description` is unaffected on every major.
+ *
+ * ## Provider-executed and execution-location-ambiguous tools
+ *
+ * A locked tool's real execution location is only ever verifiable when the
+ * object shape itself proves it, checked per-major against each major's own
+ * real source, not inferred from a package-name/version string:
+ *
+ * - **`isProviderExecuted: true`** (any major that sets it, chiefly `ai@7`):
+ *   the AI SDK's own discriminant for "this tool's real operation runs
+ *   entirely on the model provider's remote infrastructure" - web search,
+ *   code execution, etc. Outside what any local wrapper can affect - there
+ *   is no local `execute` for this function to remove in the first place,
+ *   because the side effect never happens in this process at all. **Rejected.**
+ * - **`ai@7`'s `{ type: "provider", isProviderExecuted: false }`** (a
+ *   provider-defined-but-locally-executed tool, e.g. a local shell tool with
+ *   a provider-defined schema): verified against `ai@7.0.77`'s own real
+ *   source that this shape structurally has no `execute` field at all (it is
+ *   not part of the type), so the SDK's own `isExecutableTool()` check
+ *   (`typeof tool.execute === "function"`) never auto-runs it - the same
+ *   "no `execute` means never auto-executed" rule an ordinary tool follows.
+ *   **Accepted**, and passed through the same strip-and-relock path as any
+ *   other tool (so a stray `onInputStart`/`onInputDelta`/`onInputAvailable`
+ *   is still removed).
+ * - **`ai@6`'s `{ type: "provider" }`** (any `isProviderExecuted` value other
+ *   than `false`, including absent): verified against `ai@6.0.264`'s own
+ *   real type declarations that this major's provider-tool shape has *no*
+ *   `isProviderExecuted` discriminator at all - `ai@7` added it for exactly
+ *   this reason. This function cannot safely infer local-vs-remote from the
+ *   shape alone. **Rejected as ambiguous**, not silently accepted.
+ * - **`ai@5`'s `{ type: "provider-defined" }`**: verified against
+ *   `ai@5.0.244`'s own real type declarations that this major's
+ *   provider-tool shape also has no execution-location discriminator - some
+ *   provider-defined tools execute locally, some remotely, and nothing in
+ *   the object distinguishes them. **Rejected as ambiguous.**
+ *
+ * Every rejection here throws rather than returning an object that would
+ * falsely imply this function had made a guarantee it cannot verify.
  *
  * ## What this does NOT do
  *
@@ -86,6 +129,17 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  * those callbacks produce no observable `fullStream` evidence of having run
  * at all.
  *
+ * This function is **not a general sandbox for arbitrary side effects**
+ * hidden inside a tool definition's *other* fields. In particular, a JSON
+ * Schema library's own validation/refinement/transform machinery, a getter,
+ * or a Proxy attached to `inputSchema` (or any field this function preserves
+ * unchanged via `...rest`) is caller-provided executable code that this
+ * function has no visibility into and does not run, remove, or guard - a
+ * schema used inside this security boundary must itself be side-effect
+ * free. This is a threat-model boundary, not a reason to drop schema
+ * support: the only fields this function ever removes are the five it
+ * documents removing above.
+ *
  * @example
  * ```ts
  * const result = streamText({
@@ -102,16 +156,100 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  * }
  * ```
  */
+type ShapeProbe = {
+  type?: unknown;
+  isProviderExecuted?: unknown;
+  description?: unknown;
+  execute?: unknown;
+  onInputStart?: unknown;
+  onInputDelta?: unknown;
+  onInputAvailable?: unknown;
+  needsApproval?: unknown;
+  [key: string]: unknown;
+};
+
+/**
+ * Rejects tool shapes whose real execution location this function cannot
+ * verify from the object alone. See the "Provider-executed and
+ * execution-location-ambiguous tools" section of this module's top doc
+ * comment for the exact per-major reasoning; this function only encodes the
+ * resulting decision table.
+ */
+function rejectUnsupportedProviderShape(name: string, definition: ShapeProbe): void {
+  if (definition.isProviderExecuted === true) {
+    throw new Error(
+      `createAiSdkExecutionLock: tool "${name}" is provider-executed (isProviderExecuted: true) - ` +
+        "its real operation runs entirely on the model provider's own infrastructure, which this " +
+        "function has no visibility into or control over. Wrapping it here would falsely imply a " +
+        "guarantee this function cannot make. Do not pass provider-executed tools to this function.",
+    );
+  }
+
+  if (definition.type === "provider") {
+    if (definition.isProviderExecuted === false) {
+      // ai@7's locally-executed provider-defined shape - see the doc comment;
+      // structurally has no `execute` field, so the SDK's own
+      // `isExecutableTool` (`typeof tool.execute === "function"`) never
+      // auto-runs it, and it falls through to the normal strip-and-relock
+      // path below like any other accepted tool.
+      return;
+    }
+    throw new Error(
+      `createAiSdkExecutionLock: tool "${name}" has type "provider" but no isProviderExecuted flag - ` +
+        "this matches ai@6's provider-tool shape, which has no discriminator at all for whether the " +
+        "operation runs on the model provider's remote infrastructure or locally in this process " +
+        "(ai@7 added isProviderExecuted for exactly this reason). This function cannot safely infer " +
+        "which applies from the object shape, so it rejects rather than risk falsely implying a " +
+        "guarantee it cannot verify. Do not pass this tool to createAiSdkExecutionLock.",
+    );
+  }
+
+  if (definition.type === "provider-defined") {
+    throw new Error(
+      `createAiSdkExecutionLock: tool "${name}" has type "provider-defined" - this is ai@5's ` +
+        "provider-tool shape, which (like ai@6's) has no isProviderExecuted or equivalent " +
+        "discriminator: some provider-defined tools execute locally and some execute entirely on " +
+        "the provider's remote infrastructure, and nothing in the object shape distinguishes them. " +
+        "This function cannot safely infer which execution authority applies, so it rejects rather " +
+        "than guess. Do not pass this tool to createAiSdkExecutionLock.",
+    );
+  }
+}
+
+/**
+ * Rejects a function-valued `description`. On ai@7, `prepareTools()` calls
+ * `resolveToolDescription()`, which invokes a function-valued `description`
+ * directly - arbitrary caller code running during tool preparation, before
+ * `streamText`/`generateText`'s model call begins and therefore necessarily
+ * before this library's gate can reach any decision. ai@5/ai@6 only ever
+ * typed `description` as `string`, so this rejects nothing for a caller
+ * following those majors' own types; it is a shape check, not a version
+ * check, and applies identically regardless of which major is installed.
+ */
+function rejectFunctionValuedDescription(name: string, definition: ShapeProbe): void {
+  if (typeof definition.description !== "function") return;
+  throw new Error(
+    `createAiSdkExecutionLock: tool "${name}" has a function-valued "description" - ` +
+      "on ai@7+, the AI SDK's own prepareTools()/resolveToolDescription() calls that function " +
+      "during tool preparation, before streamText/generateText's model call begins, which is " +
+      "arbitrary caller code running before this library's gate can reach any decision. A string " +
+      "description is unaffected and remains supported. Do not pass a function-valued description " +
+      "to createAiSdkExecutionLock; resolve it to a string yourself before calling this function.",
+  );
+}
+
 export function createAiSdkExecutionLock<TTools extends Record<string, object>>(tools: TTools): LockedAiSdkTools<TTools> {
   const locked: Record<string, object> = {};
   for (const [name, definition] of Object.entries(tools)) {
-    if ((definition as { isProviderExecuted?: unknown }).isProviderExecuted === true) {
-      throw new Error(
-        `createAiSdkExecutionLock: tool "${name}" is provider-executed (isProviderExecuted: true) - ` +
-          "its real operation runs entirely on the model provider's own infrastructure, which this " +
-          "function has no visibility into or control over. Wrapping it here would falsely imply a " +
-          "guarantee this function cannot make. Do not pass provider-executed tools to this function.",
-      );
+    const probe = definition as ShapeProbe;
+    rejectUnsupportedProviderShape(name, probe);
+    if (probe.type !== "provider") {
+      // Only the ordinary local-tool code path (type undefined/"function"/"dynamic")
+      // ever reaches prepareTools()'s description-invoking branch; an accepted
+      // `type: "provider"` tool's description is never read by the SDK at all
+      // (see rejectUnsupportedProviderShape's "provider" branch), so checking
+      // it there would reject shapes the SDK can never actually exploit.
+      rejectFunctionValuedDescription(name, probe);
     }
     const {
       execute: _droppedExecute,
@@ -120,14 +258,7 @@ export function createAiSdkExecutionLock<TTools extends Record<string, object>>(
       onInputAvailable: _droppedOnInputAvailable,
       needsApproval: _droppedNeedsApproval,
       ...rest
-    } = definition as {
-      execute?: unknown;
-      onInputStart?: unknown;
-      onInputDelta?: unknown;
-      onInputAvailable?: unknown;
-      needsApproval?: unknown;
-      [key: string]: unknown;
-    };
+    } = probe;
     locked[name] = { ...rest, needsApproval: true };
   }
   return locked as LockedAiSdkTools<TTools>;

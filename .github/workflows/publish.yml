@@ -491,6 +491,7 @@ jobs:
             createToolCallStreamCoordinator,
             createToolCallExecutionGate,
             createAiSdkExecutionGuard,
+            createAiSdkExecutionLock,
           } from 'prefix-safe-json';
 
           const exportsToCheck = {
@@ -498,6 +499,7 @@ jobs:
             createToolCallStreamCoordinator,
             createToolCallExecutionGate,
             createAiSdkExecutionGuard,
+            createAiSdkExecutionLock,
           };
           for (const [name, value] of Object.entries(exportsToCheck)) {
             if (typeof value !== 'function') {
@@ -514,7 +516,47 @@ jobs:
             );
           }
 
-          console.log('OK: installed tarball imports and a real parse round-trips');
+          // createAiSdkExecutionLock (Experimental): exercise the real
+          // packed export, not just check it exists as a function.
+          const locked = createAiSdkExecutionLock({
+            write_file: {
+              description: 'writes a file',
+              inputSchema: {},
+              execute: async () => 'should never run',
+              onInputStart: () => {},
+              onInputDelta: () => {},
+              onInputAvailable: () => {},
+              needsApproval: false,
+            },
+          });
+          for (const field of ['execute', 'onInputStart', 'onInputDelta', 'onInputAvailable']) {
+            if (field in locked.write_file) {
+              throw new Error(`installed createAiSdkExecutionLock did not remove "${field}"`);
+            }
+          }
+          if (locked.write_file.needsApproval !== true) {
+            throw new Error('installed createAiSdkExecutionLock did not force needsApproval: true');
+          }
+          let rejectedFunctionDescription = false;
+          try {
+            createAiSdkExecutionLock({ x: { description: () => 'd', inputSchema: {} } });
+          } catch (error) {
+            rejectedFunctionDescription = /function-valued "description"/.test(error.message);
+          }
+          if (!rejectedFunctionDescription) {
+            throw new Error('installed createAiSdkExecutionLock did not reject a function-valued description');
+          }
+          let rejectedAmbiguousProvider = false;
+          try {
+            createAiSdkExecutionLock({ x: { type: 'provider', id: 'openai.web_search', args: {} } });
+          } catch (error) {
+            rejectedAmbiguousProvider = /no isProviderExecuted flag/.test(error.message);
+          }
+          if (!rejectedAmbiguousProvider) {
+            throw new Error('installed createAiSdkExecutionLock did not reject an ambiguous provider shape');
+          }
+
+          console.log('OK: installed tarball imports and a real parse round-trips, createAiSdkExecutionLock locks and rejects correctly');
           EOF
 
           node smoke.mjs

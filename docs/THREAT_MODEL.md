@@ -105,18 +105,27 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   count, concurrent call count, tool name length) never reach `execute` —
   a limit breach is `reject`/`resource_limit`, checked before every other
   status-based outcome.
-- On the Vercel AI SDK, across `ai@5`/`ai@6`/`ai@7`: a local, user-defined
-  tool wrapped with `createAiSdkExecutionLock()` and passed through
-  unchanged cannot have `execute`, `onInputStart`, `onInputDelta`, or
-  `onInputAvailable` invoked by the SDK's own tool loop at all — not
+- On the Vercel AI SDK, across `ai@5`/`ai@6`/`ai@7`: a **supported** local,
+  user-defined tool wrapped with `createAiSdkExecutionLock()` and passed
+  through unchanged cannot have `execute`, `onInputStart`, `onInputDelta`,
+  or `onInputAvailable` invoked by the SDK's own tool loop at all — not
   detected afterward, structurally excluded because none of the four exist
   on the object the SDK receives (verified directly against each major's
   own real source, not their published types; on `ai@6`+ the SDK's own
   `needsApproval` mechanism additionally backstops `execute` specifically).
-  Rejects (throws) rather than silently wrapping a provider-executed tool.
-  This is the one guarantee in this list that constrains something
-  *upstream* of this library's own trust boundary — see "Non-guarantees"
-  below for exactly how far it reaches and where it stops.
+  Rejects (throws) rather than silently accepting two other classes of
+  pre-decision caller code it cannot neutralize by stripping fields: a
+  function-valued `description` (`ai@7`+ invokes it during tool
+  preparation, before the model call begins), and any provider tool shape
+  whose real execution location cannot be verified from the object alone
+  (`isProviderExecuted: true`; `ai@6`'s discriminator-less
+  `{ type: "provider" }`; `ai@5`'s discriminator-less
+  `{ type: "provider-defined" }`) — `ai@7`'s `{ type: "provider",
+  isProviderExecuted: false }` is accepted, verified to have no `execute`
+  field at all on that shape. This is the one guarantee in this list that
+  constrains something *upstream* of this library's own trust boundary —
+  see "Non-guarantees" below for exactly how far it reaches and where it
+  stops.
 
 ## Non-guarantees
 
@@ -130,7 +139,14 @@ general AI security platform. It is explicitly **not**:
 - **A sandbox.** It never runs, inspects, or constrains the tool
   implementation itself. `action: "execute"` means "safe to treat as the
   real, complete value the model produced," not "safe to run without your
-  own validation, permissions, or side-effect review."
+  own validation, permissions, or side-effect review." This extends to
+  `createAiSdkExecutionLock()` specifically: it is not a general sandbox for
+  arbitrary side effects hidden inside a tool definition's *other* fields.
+  A JSON Schema library's own validation/refinement/transform machinery, a
+  getter, or a Proxy attached to `inputSchema` (or any field the lock
+  preserves unchanged) is caller-provided executable code this library has
+  no visibility into and does not run, remove, or guard — a schema used
+  inside this security boundary must itself be side-effect free.
 - **Prompt-injection prevention.** It says nothing about whether the
   arguments a model *chose* to send are the arguments it *should* have
   sent — only whether they are complete and unfabricated. A model that was
@@ -185,16 +201,19 @@ different problems with different guarantees:
   of the same call. There is no equivalent detection for a bypassed
   `onInputStart`/`onInputDelta`/`onInputAvailable` — those callbacks leave
   no observable trace on `fullStream` at all.
-- Using `createAiSdkExecutionLock()`, on a local, user-defined tool
-  definition passed through it unchanged: this library's decision *is* the
-  thing controlling execution, because none of `execute`, `onInputStart`,
-  `onInputDelta`, or `onInputAvailable` exist on the object the SDK
-  receives, on any of `ai@5`/`ai@6`/`ai@7` (verified directly against each
-  major's own real source, not their published types). This is the one
-  case in this document where decision integrity and execution ownership
-  coincide — and it is scoped precisely to this function's own output,
-  unchanged: it does not extend to a tool that bypasses the function, one
-  mutated/reconstructed afterward, or a provider-executed tool.
+- Using `createAiSdkExecutionLock()`, on a **supported** local, user-defined
+  tool definition passed through it unchanged: this library's decision *is*
+  the thing controlling execution, because none of `execute`,
+  `onInputStart`, `onInputDelta`, or `onInputAvailable` exist on the object
+  the SDK receives, on any of `ai@5`/`ai@6`/`ai@7` (verified directly
+  against each major's own real source, not their published types). This is
+  the one case in this document where decision integrity and execution
+  ownership coincide — and it is scoped precisely to this function's own
+  output, unchanged: it does not extend to a tool that bypasses the
+  function, one mutated/reconstructed afterward, or a rejected shape (a
+  function-valued `description`, or a provider tool shape whose execution
+  location this function cannot verify — see the guarantee above for the
+  exact per-major decision table).
 
 The precondition for every *other* guarantee in this document to mean
 anything at all is that this library is consulted *before* the irreversible

@@ -115,13 +115,20 @@ export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from 
  * unconditionally, with zero reference to `needsApproval` or approval
  * status - `needsApproval: true` alone does not stop them). Also forces
  * `needsApproval: true`, which still closes the `execute` gap on `ai@6`+ via
- * the SDK's own approval mechanism. Throws for a provider-executed tool
- * (`isProviderExecuted: true`) rather than silently implying a guarantee
- * this function cannot make for execution that happens entirely on the
- * provider's remote infrastructure. Real execution stays exactly where it
- * already was: driven manually from `guard.finish().decisions`. See the
- * function's own doc comment for the exact, precisely-scoped guarantee and
- * its real limits, and
+ * the SDK's own approval mechanism. Also rejects two other classes of
+ * pre-decision caller code this library cannot neutralize by stripping
+ * fields: a function-valued `description` (`ai@7`+ invokes it during tool
+ * preparation, before the model call begins), and any provider tool shape
+ * whose real execution location cannot be verified from the object alone -
+ * `isProviderExecuted: true`, `ai@6`'s discriminator-less `{ type:
+ * "provider" }`, and `ai@5`'s discriminator-less `{ type: "provider-defined"
+ * }` are all rejected; `ai@7`'s `{ type: "provider", isProviderExecuted:
+ * false }` (verified to have no `execute` field at all, so the SDK can never
+ * auto-run it) is accepted. Real execution stays exactly where it already
+ * was: driven manually from `guard.finish().decisions`. See the function's
+ * own doc comment for the exact, precisely-scoped guarantee, its real
+ * limits, and the explicit non-sandbox threat-model boundary around
+ * caller-provided schema/validation code, and
  * `docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence`.
  */
 export { createAiSdkExecutionLock } from "./guard/ai-sdk-execution-lock.js";

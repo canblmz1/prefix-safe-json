@@ -413,13 +413,61 @@ actually executes. Real execution stays exactly where it already was in the
 safe pattern above: driven manually from `guard.finish().decisions`, using
 the value the gate itself authorized from raw evidence.
 
-**Provider-executed tools are rejected, not silently wrapped.** A tool with
-`isProviderExecuted: true` runs its real operation entirely on the model
-provider's own remote infrastructure - there is no local `execute` (or
-`onInputStart`/etc.) for this function to remove, because the side effect
-never happens in this process. `createAiSdkExecutionLock()` throws for one
-rather than returning an object that would falsely imply it had done
-something to it.
+**Provider-executed and execution-location-ambiguous tools are rejected, not
+silently wrapped.** A tool's real execution location is only ever verifiable
+when the object shape itself proves it, checked per-major against each
+major's own real source rather than inferred from a package-name/version
+string:
+
+- `isProviderExecuted: true` (any major that sets it, chiefly `ai@7`) runs
+  its real operation entirely on the model provider's own remote
+  infrastructure - there is no local `execute` (or `onInputStart`/etc.) for
+  this function to remove, because the side effect never happens in this
+  process. **Rejected.**
+- `ai@7`'s `{ type: "provider", isProviderExecuted: false }` (a
+  provider-defined-but-locally-executed tool, e.g. a local shell tool with a
+  provider-defined schema): verified against `ai@7.0.77`'s own real source
+  that this shape structurally has no `execute` field at all - the SDK's own
+  `isExecutableTool()` check (`typeof tool.execute === "function"`) can
+  never auto-run it, the same "no `execute` means never auto-executed" rule
+  an ordinary tool follows. **Accepted**, passed through the same
+  strip-and-relock path as any other tool.
+- `ai@6`'s `{ type: "provider" }` has **no `isProviderExecuted`
+  discriminator at all** - `ai@7` added it for exactly this reason. This
+  function cannot safely infer local-vs-remote from the shape alone.
+  **Rejected as ambiguous**, not silently accepted.
+- `ai@5`'s `{ type: "provider-defined" }` also has no execution-location
+  discriminator - some provider-defined tools execute locally, some
+  remotely, and nothing in the object distinguishes them. **Rejected as
+  ambiguous.**
+
+`createAiSdkExecutionLock()` throws for every rejected shape rather than
+returning an object that would falsely imply it had done something to it.
+
+**Function-valued `description` is rejected (`ai@7`+).** `ai@5`/`ai@6` type
+`description` as `string` only. `ai@7` additionally allows a function -
+verified directly against `ai@7.0.77`'s own real source that `prepareTools()`
+calls `resolveToolDescription()`, which invokes that function during tool
+preparation, *before* `streamText`/`generateText`'s model call begins and
+therefore necessarily before this library's gate can reach any decision (real
+`streamText()` calls in `test/integration/ai-sdk-lifecycle/ai-v7.real.test.ts`
+confirm the SDK invokes it at least once per step - twice, in fact, from two
+separate internal call sites - well before any part reaches `fullStream`). A
+function-valued `description` is arbitrary caller code running on that same
+pre-decision timeline as the callback trio above, so this function rejects it
+rather than silently passing it through. A string `description` is
+unaffected and remains supported on every major.
+
+**Not a sandbox for a tool definition's *other* fields.** The guarantees
+above only ever concern the five fields this function removes or requires
+(`execute`, `onInputStart`, `onInputDelta`, `onInputAvailable`,
+`description`-as-function) plus the provider-shape checks. A JSON Schema
+library's own validation/refinement/transform machinery, a getter, or a
+Proxy attached to `inputSchema` (or any other field this function preserves
+unchanged) is caller-provided executable code this library has no visibility
+into and does not run, remove, or guard - a schema used inside this security
+boundary must itself be side-effect free. This is a threat-model boundary,
+not a reason to drop schema support.
 
 **`ai@5` has no `needsApproval` at all** (verified directly against its
 published types: the only match for the string "approval" anywhere in
@@ -447,7 +495,10 @@ regression tests proving `execute`/`onInputStart`/`onInputDelta`/
 optional-and-absent), and
 `test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts` /
 `ai-v6.real.test.ts` / `ai-v7.real.test.ts` (each with a dedicated "P1:
-input-lifecycle callback neutralization" suite) for the full evidence and
+input-lifecycle callback neutralization" suite; `ai-v7.real.test.ts` also
+has "P1-A: function-valued description neutralization" and "P1-B:
+provider-execution shape policy" suites, both with real unlocked-control
+proof alongside the locked-rejection proof) for the full evidence and
 test matrix: concurrent-call isolation, duplicate/reordered evidence,
 cross-guard-instance isolation, unattributable evidence disqualifying an
 entire stream (including a call that starts after the evidence arrives),

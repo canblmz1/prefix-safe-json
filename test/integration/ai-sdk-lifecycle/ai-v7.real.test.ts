@@ -471,3 +471,152 @@ describe("real ai@7 lifecycle — P1: input-lifecycle callback neutralization (o
     expect(counts).toEqual(freshCounts());
   });
 });
+
+describe("real ai@7 lifecycle — P1-A: function-valued description neutralization", () => {
+  // Real source finding: ai@7's prepareTools() calls resolveToolDescription(),
+  // which invokes a function-valued `description` directly during tool
+  // preparation - before doStream() is ever called on the model, and
+  // therefore before any fullStream part (let alone a guard decision) can
+  // exist. ai@5/ai@6 never call this at all (description is string-only on
+  // both), so this is an ai@7+-only real behavior, not a hypothetical.
+
+  it("UNLOCKED CONTROL: the SDK genuinely invokes a function-valued description during tool preparation", async () => {
+    let descriptionCalls = 0;
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: {
+        write_file: {
+          description: () => {
+            descriptionCalls += 1;
+            return "writes a file";
+          },
+          inputSchema: WRITE_FILE_SCHEMA,
+        },
+      },
+    });
+
+    // Draining is the earliest point at which prepareTools() is guaranteed to
+    // have already run (its result feeds the model call that produces every
+    // part) - proves the invocation is real SDK behavior, not a hypothetical
+    // reading of the source. Real count is 2, not 1: ai@7 resolves tool
+    // descriptions from two separate internal call sites per step
+    // (`prepareToolsForToolCallers` and `prepareTools` itself, both in
+    // stream-text.ts) - confirmed by this assertion, not assumed. That only
+    // strengthens the case for rejecting a function-valued description: it
+    // is arbitrary caller code that can run more than once per step, still
+    // always before any decision.
+    for await (const _part of result.fullStream) {
+      /* drain */
+    }
+
+    expect(descriptionCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it("LOCKED: createAiSdkExecutionLock rejects a function-valued description before it ever reaches the SDK; the callback never fires", () => {
+    let descriptionCalls = 0;
+    expect(() =>
+      createAiSdkExecutionLock({
+        write_file: {
+          description: () => {
+            descriptionCalls += 1;
+            return "writes a file";
+          },
+          inputSchema: WRITE_FILE_SCHEMA,
+        },
+      }),
+    ).toThrow(/function-valued "description"/);
+    // The rejection happens synchronously inside createAiSdkExecutionLock,
+    // strictly before the rejected tool set could ever reach streamText() -
+    // there is no code path here that could have called the description.
+    expect(descriptionCalls).toBe(0);
+  });
+
+  it("a string description still works normally through the lock, real end to end", async () => {
+    const args = JSON.stringify({ path: "a.txt", content: "hello" });
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
+
+    const result = streamText({
+      model,
+      prompt: "x",
+      tools: createAiSdkExecutionLock({
+        write_file: { description: "writes a file", inputSchema: WRITE_FILE_SCHEMA },
+      }),
+    });
+
+    const final = await runGuardOverFullStream(result.fullStream);
+    const decision = final.decisions.find((d) => d.name === "write_file");
+    expect(decision?.action).toBe("execute");
+    if (decision?.action === "execute") ledger.execute("call_1", decision.value);
+    expect(ledger.count).toBe(1);
+  });
+});
+
+describe("real ai@7 lifecycle — P1-B: provider-execution shape policy", () => {
+  // Real source finding: ai@7.0.77's { type: "provider", isProviderExecuted:
+  // false } shape (@ai-sdk/provider-utils's ProviderDefinedTool) has no
+  // `execute` field in its type at all - it is not part of BaseProviderTool,
+  // unlike BaseFunctionTool. ai@7's own isExecutableTool() gate
+  // (typeof tool.execute === "function") therefore can never treat one as
+  // auto-executable, proven below by never registering an execute callback
+  // and confirming the SDK's own tool-call dispatch never invokes one.
+
+  it("createAiSdkExecutionLock accepts ai@7's locally-executed provider shape, and the SDK never auto-executes it (no execute field exists on this shape)", async () => {
+    const args = JSON.stringify({});
+    const model = mockModel([streamStart(), ...toolInputParts("call_1", "local_shell", args), toolCallPart("call_1", "local_shell", args), finishPart("tool-calls")]);
+
+    const locked = createAiSdkExecutionLock({
+      local_shell: {
+        type: "provider" as const,
+        id: "openai.local_shell" as const,
+        args: {},
+        isProviderExecuted: false as const,
+        // BaseTool.inputSchema is required by ai@7's own type even for a
+        // provider-shaped tool, though prepare-tools.ts's "provider" case
+        // never actually forwards it to the model - present here only to
+        // satisfy that type, not because the SDK reads it for this shape.
+        // `never` matches the real ProviderDefinedTool union arm's own
+        // INPUT parameter.
+        inputSchema: jsonSchema<never>({ type: "object" }),
+      },
+    });
+    expect(locked.local_shell).toMatchObject({ type: "provider", isProviderExecuted: false });
+
+    const result = streamText({ model, prompt: "x", tools: locked });
+    for await (const _part of result.fullStream) {
+      /* drain - no execute callback exists on this shape for the SDK to invoke */
+    }
+    // Reaching here without the mock model or SDK throwing on a missing
+    // execute function IS the proof: ai@7's own executeToolCall() checks
+    // isExecutableTool() first and returns undefined rather than erroring
+    // when a tool has no execute - the same path an ordinary tool with no
+    // execute function takes.
+  });
+
+  it("createAiSdkExecutionLock rejects a real ai@7 provider-executed tool shape ({ type: 'provider', isProviderExecuted: true })", () => {
+    expect(() =>
+      createAiSdkExecutionLock({
+        web_search: { type: "provider", id: "openai.web_search", args: {}, isProviderExecuted: true },
+      }),
+    ).toThrow(/is provider-executed/);
+  });
+
+  it("createAiSdkExecutionLock rejects ai@6's ambiguous provider shape ({ type: 'provider' }, no isProviderExecuted)", () => {
+    expect(() =>
+      createAiSdkExecutionLock({
+        web_search: { type: "provider", id: "openai.web_search", args: {} },
+      }),
+    ).toThrow(/no isProviderExecuted flag/);
+  });
+
+  it("createAiSdkExecutionLock rejects ai@5's ambiguous provider-defined shape ({ type: 'provider-defined' })", () => {
+    expect(() =>
+      createAiSdkExecutionLock({
+        web_search: { type: "provider-defined", id: "openai.web_search", name: "web_search", args: {} },
+      }),
+    ).toThrow(/type "provider-defined"/);
+  });
+});

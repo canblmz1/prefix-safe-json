@@ -90,6 +90,132 @@ describe("createAiSdkExecutionLock", () => {
       }),
     ).not.toThrow();
   });
+
+  it("preserves a string description unchanged", () => {
+    const locked = createAiSdkExecutionLock({
+      write_file: { description: "writes a file", inputSchema: {} },
+    });
+    expect(locked.write_file.description).toBe("writes a file");
+  });
+
+  it("throws a message identifying the tool and explaining why, for a function-valued description (ai@7+)", () => {
+    let thrown: unknown;
+    try {
+      createAiSdkExecutionLock({
+        write_file: {
+          description: () => "writes a file",
+          inputSchema: {},
+        },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain('tool "write_file"');
+    expect(message).toContain('function-valued "description"');
+    expect(message).toContain("prepareTools()/resolveToolDescription()");
+    expect(message).toContain("during tool preparation, before streamText/generateText's model call begins");
+    expect(message).toContain("before this library's gate can reach any decision");
+    expect(message).toContain("A string description is unaffected");
+    expect(message).toContain("resolve it to a string yourself before calling this function");
+  });
+
+  it("ai@7 locally-executed provider tool ({ type: 'provider', isProviderExecuted: false }) locks successfully", () => {
+    const locked = createAiSdkExecutionLock({
+      local_shell: {
+        type: "provider",
+        id: "openai.local_shell",
+        args: {},
+        isProviderExecuted: false,
+        onInputStart: () => {},
+      },
+    });
+    expect(locked.local_shell).toMatchObject({
+      type: "provider",
+      id: "openai.local_shell",
+      isProviderExecuted: false,
+      needsApproval: true,
+    });
+    expect("onInputStart" in locked.local_shell).toBe(false);
+  });
+
+  it("throws a message identifying the tool and explaining why, for ai@6's ambiguous { type: 'provider' } shape (no isProviderExecuted)", () => {
+    let thrown: unknown;
+    try {
+      createAiSdkExecutionLock({
+        web_search: { type: "provider", id: "openai.web_search", args: {} },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain('tool "web_search"');
+    expect(message).toContain('type "provider" but no isProviderExecuted flag');
+    expect(message).toContain("ai@6's provider-tool shape");
+    expect(message).toContain("operation runs on the model provider's remote infrastructure or locally in this process");
+    expect(message).toContain("cannot safely infer");
+    expect(message).toContain("rejects rather than risk falsely implying");
+    expect(message).toContain("Do not pass this tool to createAiSdkExecutionLock");
+  });
+
+  it("throws a message identifying the tool and explaining why, for ai@5's ambiguous { type: 'provider-defined' } shape", () => {
+    let thrown: unknown;
+    try {
+      createAiSdkExecutionLock({
+        web_search: { type: "provider-defined", id: "openai.web_search", name: "web_search", args: {} },
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain('tool "web_search"');
+    expect(message).toContain('type "provider-defined"');
+    expect(message).toContain("ai@5's");
+    expect(message).toContain("provider-tool shape, which (like ai@6's) has no isProviderExecuted or equivalent");
+    expect(message).toContain("discriminator: some provider-defined tools execute locally and some execute entirely on");
+    expect(message).toContain("nothing in the object shape distinguishes them");
+    expect(message).toContain("rejects rather than guess");
+    expect(message).toContain("Do not pass this tool to createAiSdkExecutionLock");
+  });
+
+  it("does NOT reject a function-valued description on an accepted { type: 'provider', isProviderExecuted: false } tool - the SDK never reads description for that shape", () => {
+    // Real ai@7 source: BaseProviderTool types description as `never` and
+    // prepareTools()'s "provider" case never reads tool.description at all,
+    // so a stray function there is inert - rejecting it would reject a shape
+    // the SDK can never actually exploit. This also distinguishes the real
+    // code from two mutants of the guard around this check: unconditionally
+    // running the description check (would wrongly throw here), and
+    // comparing against "" instead of "provider" (also wrongly throws here,
+    // since "provider" !== "").
+    expect(() =>
+      createAiSdkExecutionLock({
+        local_shell: {
+          type: "provider",
+          id: "openai.local_shell",
+          args: {},
+          isProviderExecuted: false,
+          description: () => "should never be called",
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("locks a dynamic tool ({ type: 'dynamic' }) successfully - not mistaken for a provider shape", () => {
+    const locked = createAiSdkExecutionLock({
+      mcp_tool: {
+        type: "dynamic",
+        description: "an MCP-provided tool",
+        inputSchema: {},
+        execute: async () => "should never run",
+      },
+    });
+    expect(locked.mcp_tool.type).toBe("dynamic");
+    expect("execute" in locked.mcp_tool).toBe(false);
+    expect(locked.mcp_tool.needsApproval).toBe(true);
+  });
 });
 
 describe("createAiSdkExecutionLock — type-level regression (compile-time)", () => {
