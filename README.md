@@ -98,34 +98,78 @@ evidence.
 
 The guard's decisions only mean something if it's the sole thing deciding
 whether your tool function runs. The pattern above works because it never
-gives the AI SDK's own tool-calling loop a chance to run your tool itself:
+gives the AI SDK's own tool-calling loop a chance to run your tool itself —
+in order from strongest guarantee to weakest:
 
-- **Safe, supported pattern** — define your tools *without* an AI SDK-native
-  `execute` callback at all. Not even a no-op one: the guard treats any
-  `tool-result`/`tool-error` it observes as proof the SDK's tool loop
-  already invoked that call, and a no-op callback still produces one —
-  omitting `execute` entirely is what keeps the SDK from running the tool
-  itself in the first place. Consume `fullStream` yourself, and dispatch
-  manually — only for `action === "execute"` — after `guard.finish()`,
-  exactly as shown above.
+- **Strongest — `createAiSdkExecutionLock()`** — wrap your tool definitions
+  with it before passing them to `streamText()`/`generateText()`. It removes
+  every AI SDK-invoked callback capable of running your code before this
+  library's decision — not just `execute`, but also `onInputStart`,
+  `onInputDelta`, and `onInputAvailable` (verified directly against
+  `ai@5`/`ai@6`/`ai@7`'s own real source: all three fire unconditionally,
+  independent of `needsApproval`/approval status — `needsApproval: true`
+  alone does **not** stop them, which is exactly the gap this function
+  closes). It also forces `needsApproval: true`, which still closes the
+  `execute` gap specifically on `ai@6`+ via the SDK's own approval
+  mechanism. It also rejects a **function-valued `description`**
+  (`ai@7`+ invokes it during tool preparation, before the model call even
+  begins — arbitrary caller code on the same pre-decision timeline as the
+  callback trio; a string `description` is unaffected on every major), and
+  any **provider tool shape whose real execution location it cannot
+  verify**: `isProviderExecuted: true` (real operation runs entirely on the
+  model provider's remote infrastructure), `ai@6`'s discriminator-less
+  `{ type: "provider" }`, and `ai@5`'s discriminator-less
+  `{ type: "provider-defined" }` are all rejected rather than silently
+  accepted; `ai@7`'s `{ type: "provider", isProviderExecuted: false }` is
+  accepted (verified to have no `execute` field at all on that shape, so the
+  SDK can never auto-run it). The guarantee is precisely about **this
+  function's own output, unchanged, on a supported local tool definition**:
+  it says nothing about a tool that bypasses this function, one
+  mutated/reconstructed after this function returns it, or a rejected
+  shape. Still dispatch manually from
+  `guard.finish().decisions`, exactly as shown above; this only closes the
+  door on the SDK (or your own callbacks) doing it *for* you. See
+  [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence).
+- **Safe, supported pattern (all majors, including `ai@5`)** — define your
+  tools *without* an AI SDK-native `execute` callback at all. Not even a
+  no-op one: the guard treats any `tool-result`/`tool-error` it observes as
+  proof the SDK's tool loop already invoked that call, and a no-op callback
+  still produces one — omitting `execute` entirely is what keeps the SDK
+  from running the tool itself in the first place. Consume `fullStream`
+  yourself, and dispatch manually — only for `action === "execute"` — after
+  `guard.finish()`, exactly as shown above. `createAiSdkExecutionLock()`
+  above gets you this same shape automatically (it drops `execute` too) plus
+  the SDK-enforced backstop where that backstop exists.
 - **Unprotected / misuse pattern** — attach the real, irreversible operation
-  (or any `execute` implementation at all, no-op included) as the tool's own
-  AI SDK-native callback, *and* separately run the guard on the same
-  stream. The SDK can invoke `execute` as soon as it resolves that call's
-  input, independent of and often before this guard ever reaches a
-  decision. If that happens, the side effect has already run —
-  `prefix-safe-json` cannot retroactively undo it.
+  (or any side-effecting code at all) directly as `execute`, `onInputStart`,
+  `onInputDelta`, or `onInputAvailable` on a tool definition that bypasses
+  `createAiSdkExecutionLock()` entirely, *and* separately run the guard on
+  the same stream. All four are callbacks the SDK invokes on its own
+  schedule, independent of and often before this guard ever reaches a
+  decision — `onInputStart`/`onInputDelta`/`onInputAvailable` in particular
+  run regardless of finish reason, schema validity, or approval status, on
+  every major including `ai@5`. If that happens, the side effect has
+  already run — `prefix-safe-json` cannot retroactively undo it, and on
+  `ai@5` specifically nothing in this library can prevent any of these four
+  callbacks from firing at all (verified directly, not assumed — see
+  `test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts`).
 
-The guard does defend against the second pattern in one specific way: a
-`tool-result` or `tool-error` part on `fullStream` is direct evidence the
-SDK's own loop already invoked *some* call. When it names a specific call
-(a real `toolCallId`), only that call is disqualified; when it doesn't, the
-guard cannot tell which in-flight call was affected and fails closed for
-**every** call in that stream rather than guess. Either way the guard never
-again reports `action: "execute"` for the affected call(s)
+The guard does defend against the second pattern in one specific way, and
+only for `execute` specifically: a `tool-result` or `tool-error` part on
+`fullStream` is direct evidence the SDK's own loop already invoked *some*
+call's `execute`. When it names a specific call (a real `toolCallId`), only
+that call is disqualified; when it doesn't, the guard cannot tell which
+in-flight call was affected and fails closed for **every** call in that
+stream rather than guess. Either way the guard never again reports
+`action: "execute"` for the affected call(s)
 (`reason: "sdk_execution_observed"`, which takes priority over every other
 rejection reason), so a caller who also runs the documented manual-dispatch
-loop will not invoke the tool function a *second* time. It does not undo
+loop will not invoke the tool function a *second* time. There is no
+equivalent detection for a bypassed `onInputStart`/`onInputDelta`/
+`onInputAvailable` — those callbacks produce no observable `fullStream`
+evidence of having run at all, so a misuse of any of the three is invisible
+to the guard entirely; the only defense is calling
+`createAiSdkExecutionLock()` in the first place. It does not undo
 whatever the SDK's own callback already did. See
 [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence)
 for the full behavior and test matrix.
@@ -321,8 +365,10 @@ npm install prefix-safe-json
 ```
 
 ESM only — `import`, not `require`. There is currently no CommonJS build.
-Node `>=18.0.0`. See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for
-the full ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
+Node `>=22.0.0` (Active LTS lines only — Node 18/20 are end-of-life and no
+longer receive security patches). See
+[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the full
+ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
 compatibility matrix.
 
 ## Low-level API: Quick Start

@@ -8,6 +8,159 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Execution ownership
+
+- **`createAiSdkExecutionLock()`** (new, `@public (Experimental)`): wraps AI
+  SDK tool definitions so the SDK's own tool loop cannot invoke real caller
+  code before this library's gate reaches a decision. Removes `execute`
+  and every SDK-invoked pre-decision input-lifecycle callback -
+  `onInputStart`, `onInputDelta`, `onInputAvailable` - not just `execute`
+  alone: verified directly against `ai@5`/`ai@6`/`ai@7`'s own real source
+  that all three fire in a transform stream entirely independent of
+  `needsApproval`/approval status, so forcing `needsApproval: true` alone
+  does **not** stop them. Also forces `needsApproval: true` unconditionally,
+  which still closes the `execute` gap specifically on `ai@6`+ via the
+  SDK's own approval mechanism (a no-op on `ai@5`, which has no such
+  mechanism). Also rejects, rather than silently accepting: a
+  function-valued `description` (`ai@7`+ invokes it during tool
+  preparation, before the model call begins - arbitrary caller code on the
+  same pre-decision timeline as the callback trio); and any provider tool
+  shape whose real execution location cannot be verified from the object
+  alone - `isProviderExecuted: true`, `ai@6`'s discriminator-less
+  `{ type: "provider" }`, and `ai@5`'s discriminator-less `{ type:
+  "provider-defined" }` are all rejected, while `ai@7`'s `{ type:
+  "provider", isProviderExecuted: false }` is accepted (verified to have no
+  `execute` field at all on that shape, so the SDK can never auto-run it).
+  New exported mapped types `LockedAiSdkTool<T>`/`LockedAiSdkTools<TTools>`
+  give the return value a real type - the five affected fields do not exist
+  on a locked tool's type at all, not merely optional-and-absent. A tool
+  that bypasses the wrapper entirely and attaches `execute`/the callback
+  trio directly remains unprotected on every major; the pre-existing
+  `sdk_execution_observed` detection remains the real backstop for a
+  bypassed `execute` specifically, with no equivalent for a bypassed
+  `onInputStart`/`onInputDelta`/`onInputAvailable`. This function is not a
+  sandbox for a tool definition's *other* fields - a schema library's own
+  validation/refinement/transform machinery is caller-provided executable
+  code this library does not run, remove, or guard. Real execution is
+  unchanged: still driven manually from `guard.finish().decisions`. See
+  `docs/EXECUTION_GATE.md#closing-the-first-execution-gap-createaisdkexecutionlock`.
+
+### Real AI SDK lifecycle evidence
+
+- New integration test layer (`test/integration/ai-sdk-lifecycle/`, 27
+  tests) drives actual `streamText()` calls from the real `ai` package
+  (`ai@5.0.244`, `ai@6.0.264`, `ai@7.0.77`, installed side-by-side via pnpm
+  aliases) against each major's own provider-boundary test double — real
+  argument buffering, real tool-call construction, real `needsApproval`
+  resolution, real execute-gating. Not hand-built `fullStream` event
+  objects (the pre-existing `test/guard/ai-sdk-compatibility.test.ts` and
+  friends, which remain and still matter as fast synthetic contract
+  coverage). Proves, with a real irreversible-operation counter: safe
+  calls execute exactly once (manually, post-`finish()`); a
+  finish-reason-length, truncated-with-a-provider-side-"repaired"-input,
+  provider-error, aborted-mid-stream, or schema-invalid call never
+  executes; concurrent safe+unsafe calls are isolated; a reused
+  `toolCallId` across two isolated guard instances does not cross-resolve;
+  and — reported as honestly as the fix — an unlocked native `execute`
+  still fires exactly as unprotected as before, on every major.
+
+### Terminal evidence hardening
+
+- **Coordinator**: a second `provider_stream_end` arriving after the
+  stream already finished with a *genuinely conflicting* reason (e.g.
+  `"complete"` then `"abort"`) now gets its own diagnostic,
+  `E_TERMINAL_REASON_CONFLICT` (`severity: "fatal"`), distinct from the
+  generic `E_EVENT_AFTER_STREAM_END` any other post-finish event gets —
+  forensic signal, not a second chance to change the decision (which was
+  already structurally impossible: the coordinator's `isFinished` gate and
+  every call's `status !== "collecting"` guard already made execution
+  confidence unable to increase after the fact, reconfirmed by tracing the
+  existing code rather than assumed).
+
+### Security
+
+- **`nanoid@3.3.16`** (`GHSA-2v37-7h3g-55p8`, high) — a transitive
+  `devDependency` via `vite`'s own `postcss` dependency, found while
+  installing the real AI SDK majors above, unrelated to the
+  vitest/vite/esbuild/qs remediation already shipped. Forced to `^3.3.18`
+  via the same `pnpm.overrides` mechanism already in use.
+
+### Node support policy
+
+- **`engines.node`**: `>=18.0.0` → `>=22.0.0`. Node 18 and Node 20 both
+  reached end-of-life (2025-03-27 and 2026-03-24 respectively — verified
+  against nodejs.org's release schedule, not assumed) and no longer
+  receive security patches; a fail-closed execution-integrity library does
+  not treat an unpatched runtime as a defensible baseline. CI/publish Node
+  matrices: `[18, 20, 22]` → `[22, 24]` (the current Active LTS lines). A
+  real compatibility narrowing for any consumer still on Node 18/20 —
+  disclosed as SemVer-relevant even though no public API changed. See
+  `docs/COMPATIBILITY.md`.
+
+### CI / release / governance
+
+- **`publish.yml`**: the `publish` job now requires the `npm-publish`
+  GitHub Environment (a real, required-reviewer-protected environment,
+  restricted to `main`, with a repository-admin bypass kept as an
+  emergency escape hatch). Previously, any push to `main` that happened to
+  change `package.json`'s version to an unpublished value — intentional
+  release or accidental — published automatically the moment the existing
+  validation gates passed, with no separate human confirmation beyond
+  whatever review the merge itself got. The four validation jobs
+  (test-matrix, coverage, mutation, fuzz) are unaffected and still run
+  automatically on every version-changing push.
+- **`main` branch protection**: previously entirely unprotected (`gh api
+  repos/.../branches/main` reported `protected: false`, no rulesets).
+  A new ruleset requires PRs (0 required approving reviews — a solo
+  maintainer has no second reviewer; this is deliberately about forcing
+  the PR+CI discipline, not bureaucracy), disables force-push and branch
+  deletion, and requires the current CI check set (the Node 22/24 × OS
+  matrix, Coverage, Dependency Review, CodeQL) before merge, with a
+  repository-admin bypass so a solo maintainer can't be permanently
+  deadlocked by their own rule.
+- **CI**: new `package-smoke` job packs a real tarball and installs it into
+  isolated JS and TS consumer projects on every PR/push — previously this
+  level of clean-room verification only happened in `publish.yml`'s own
+  release path, so a packaging regression was only caught the moment a
+  release was already being attempted.
+- **Trusted Publishing**: still preparation only, unchanged from `0.2.0` —
+  `npm whoami` in this environment still returns `401` (no authenticated
+  npm identity available here at all), so npm-account-side Trusted
+  Publisher registration could not be performed or verified. Not claimed
+  as enabled.
+
+### Documentation
+
+- `RELEASE.md` rewritten to describe the actual automated release process
+  (previously described a stale manual checklist — hand-run tests, `git
+  tag` + `git push --tags`, "publish via CI or manually"). Also resolves a
+  real inconsistency it had: benchmarks were listed as a checklist item
+  indistinguishable from the real blocking gates (mutation/coverage/fuzz)
+  next to them, but no workflow has ever run or gated on `npm run bench`.
+  No benchmark baseline is committed anywhere in this repository to
+  compare a run against, so a pass/fail threshold would have been
+  fabricated rigor; documented explicitly as informational instead.
+- `docs/THREAT_MODEL.md`: explicitly distinguishes *decision integrity*
+  (is the verdict trustworthy) from *execution ownership* (does the
+  verdict actually control whether the real operation runs), now that
+  `ai@6`+ has a configuration where those coincide.
+- `docs/EXECUTION_GATE.md`, `README.md`: document
+  `createAiSdkExecutionLock()` as the strongest available execution-
+  ownership option, ordered ahead of the pre-existing "omit `execute`"
+  pattern per its real guarantee strength — the `ai@5` limitation is
+  stated as plainly as the `ai@6`/`ai@7` guarantee, not buried under it.
+- `docs/COMPATIBILITY.md`: corrected a stale `0.1.1 at the time of
+  writing` version reference (now `0.2.0`); `ProviderStreamAdapter`
+  (previously carrying no `@public` classification comment at all under
+  strict TSDoc parsing) is now explicitly `@public (Experimental)`,
+  matching the adapters that implement it.
+- `.github/workflows/scheduled-checks.yml`: the full dependency-audit
+  step's comment described vite/vitest/esbuild/nanoid/qs as known,
+  unfixed devDependency advisories — all five were remediated (four in
+  the prior dependency-security release, nanoid above); rewritten to
+  describe what the step is actually for going forward rather than a
+  now-stale historical snapshot.
+
 ## [0.2.0] - 2026-08-23
 
 Substantial execution-integrity hardening plus a public API surface

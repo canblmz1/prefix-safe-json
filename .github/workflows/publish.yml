@@ -116,7 +116,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: ["18", "20", "22"]
+        # Active LTS lines only - see ci.yml's matrix for why.
+        node-version: ["22", "24"]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -315,6 +316,20 @@ jobs:
       needs.mutation-test.result == 'success' &&
       needs.release-fuzz.result == 'success'
     runs-on: ubuntu-latest
+    # Separates "a version-changing commit landed on main" (which the four
+    # jobs above already validate fully and automatically, on every push -
+    # useful even for an accidental version bump, since it's free signal
+    # about whether a release would actually be safe) from "a human
+    # authorized THIS specific npm publish". Without this, those two things
+    # were the same event: any push to main that happened to change
+    # package.json's version to something not yet on npm - intentional
+    # release or not - published automatically the moment CI passed.
+    # `environment: npm-publish` requires a manual approval in the Actions
+    # UI before this job (and only this job - release-intent/test-matrix/
+    # coverage/mutation-test/release-fuzz above are unaffected and still run
+    # automatically) is allowed to start, regardless of how many of its
+    # `needs:` already succeeded.
+    environment: npm-publish
     # id-token: write is scoped to this job only (not the top-level block,
     # which the other jobs also would have inherited) - it's the OIDC
     # permission npm's `--provenance` flag needs to obtain a Sigstore-signed
@@ -476,6 +491,7 @@ jobs:
             createToolCallStreamCoordinator,
             createToolCallExecutionGate,
             createAiSdkExecutionGuard,
+            createAiSdkExecutionLock,
           } from 'prefix-safe-json';
 
           const exportsToCheck = {
@@ -483,6 +499,7 @@ jobs:
             createToolCallStreamCoordinator,
             createToolCallExecutionGate,
             createAiSdkExecutionGuard,
+            createAiSdkExecutionLock,
           };
           for (const [name, value] of Object.entries(exportsToCheck)) {
             if (typeof value !== 'function') {
@@ -499,7 +516,47 @@ jobs:
             );
           }
 
-          console.log('OK: installed tarball imports and a real parse round-trips');
+          // createAiSdkExecutionLock (Experimental): exercise the real
+          // packed export, not just check it exists as a function.
+          const locked = createAiSdkExecutionLock({
+            write_file: {
+              description: 'writes a file',
+              inputSchema: {},
+              execute: async () => 'should never run',
+              onInputStart: () => {},
+              onInputDelta: () => {},
+              onInputAvailable: () => {},
+              needsApproval: false,
+            },
+          });
+          for (const field of ['execute', 'onInputStart', 'onInputDelta', 'onInputAvailable']) {
+            if (field in locked.write_file) {
+              throw new Error(`installed createAiSdkExecutionLock did not remove "${field}"`);
+            }
+          }
+          if (locked.write_file.needsApproval !== true) {
+            throw new Error('installed createAiSdkExecutionLock did not force needsApproval: true');
+          }
+          let rejectedFunctionDescription = false;
+          try {
+            createAiSdkExecutionLock({ x: { description: () => 'd', inputSchema: {} } });
+          } catch (error) {
+            rejectedFunctionDescription = /function-valued "description"/.test(error.message);
+          }
+          if (!rejectedFunctionDescription) {
+            throw new Error('installed createAiSdkExecutionLock did not reject a function-valued description');
+          }
+          let rejectedAmbiguousProvider = false;
+          try {
+            createAiSdkExecutionLock({ x: { type: 'provider', id: 'openai.web_search', args: {} } });
+          } catch (error) {
+            rejectedAmbiguousProvider = /no isProviderExecuted flag/.test(error.message);
+          }
+          if (!rejectedAmbiguousProvider) {
+            throw new Error('installed createAiSdkExecutionLock did not reject an ambiguous provider shape');
+          }
+
+          console.log('OK: installed tarball imports and a real parse round-trips, createAiSdkExecutionLock locks and rejects correctly');
           EOF
 
           node smoke.mjs

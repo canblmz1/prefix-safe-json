@@ -65,6 +65,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   private eventsProcessed = 0;
   private globalSequence = 0;
   private isFinished = false;
+  private finishedReason?: StreamEndReason;
 
   /**
    * @param limits Coordinator-level limits (concurrent tool calls, tool name
@@ -100,11 +101,34 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
 
   push(event: NormalizedToolStreamEvent): CoordinatorPushResult {
     if (this.isFinished) {
-      this.addDiagnostic({
-        code: "E_EVENT_AFTER_STREAM_END",
-        severity: "error",
-        message: "Event pushed after stream end",
-      });
+      // A second `provider_stream_end` whose reason contradicts the first
+      // one already decided every call's outcome (e.g. "complete" then
+      // "abort") is a genuine provider-protocol anomaly, not just a late or
+      // duplicate event - it gets its own diagnostic code so a caller can
+      // tell the two apart without comparing payloads themselves. Either
+      // way this call's decision was already made and locked in by the
+      // `isFinished` gate above: nothing here can raise execution
+      // confidence after the fact, only report that the contradiction was
+      // observed. Rejected/unattributed, same as any other post-finish
+      // event - no open call exists left to attribute it to by the time the
+      // stream has already ended.
+      const isConflictingTerminalReason =
+        event.type === "provider_stream_end" &&
+        this.finishedReason !== undefined &&
+        event.reason !== this.finishedReason;
+      this.addDiagnostic(
+        isConflictingTerminalReason
+          ? {
+              code: "E_TERMINAL_REASON_CONFLICT",
+              severity: "fatal",
+              message: `Stream already ended with reason "${this.finishedReason}"; a second, conflicting terminal reason "${(event as NormalizedToolStreamEvent & { type: "provider_stream_end" }).reason}" arrived afterward`,
+            }
+          : {
+              code: "E_EVENT_AFTER_STREAM_END",
+              severity: "error",
+              message: "Event pushed after stream end",
+            },
+      );
       return { accepted: false };
     }
 
@@ -446,7 +470,8 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
 
   private handleStreamEnd(event: NormalizedToolStreamEvent & { type: "provider_stream_end" }) {
     this.isFinished = true;
-    
+    this.finishedReason = event.reason;
+
     // Close all open calls
     for (const call of this.calls.values()) {
       if (call.status === "collecting") {

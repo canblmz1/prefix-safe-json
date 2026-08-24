@@ -1,24 +1,102 @@
-# Release Checklist
+# Release Process
 
-When preparing a release for `prefix-safe-json`, ensure the following steps are taken:
+This describes how a `prefix-safe-json` release actually happens, and the
+quality bar `.github/workflows/publish.yml` enforces automatically. It is a
+description of the real automated process, not a manual checklist to
+perform by hand - the steps below happen in CI, not on a maintainer's
+machine.
 
-## 1. Quality Assurance
-- [ ] Ensure all CI tests pass (`npm test`, `npm run typecheck`, `npm run lint`).
-- [ ] Run benchmark suite (`npm run bench`) and compare against regressions.
-- [ ] Run `npm run test:fuzz` for 10+ minutes.
-- [ ] Run mutation testing (`npm run test:mutate`) and ensure score > 85%.
-- [ ] Verify Code Coverage (`npm run test:coverage`) >= 95%.
+## 1. What triggers a release
 
-## 2. API Stability
-- [ ] Check exported symbols in `src/index.ts` for accidental exposure of internal types.
-- [ ] Verify correct use of `@public`, `@internal`, and `@experimental` tags.
+`publish.yml` runs on every push to `main` that changes `package.json`. A
+cheap `release-intent` job checks whether `package.json`'s `version` is
+already published on npm:
 
-## 3. Version Bumping
-- [ ] Update `package.json` version.
-- [ ] Update `CHANGELOG.md` with features, fixes, and breaking changes.
+- Confirmed unpublished (`npm view` returns a structured `E404`) → the full
+  validation chain below runs.
+- Confirmed already published, or the lookup fails ambiguously (network/auth/
+  timeout - never assumed to mean "unpublished") → nothing further runs.
+  A version-only-unrelated `package.json` edit (a devDependency bump, for
+  example) takes this path and costs nothing.
 
-## 4. Release execution
-- [ ] Generate build: `npm run build`.
-- [ ] Validate package output: `npm run pack:check` (ensure only `/dist`, `package.json`, and `README.md`/`LICENSE*` are packed).
-- [ ] Tag the release on git: `git tag v0.x.y` and `git push --tags`.
-- [ ] Publish to npm via CI or manually `npm publish --access public`.
+So the practical release flow is: open a PR that bumps `package.json`'s
+`version` and adds the corresponding `CHANGELOG.md` entry, get it reviewed,
+merge it to `main`.
+
+## 2. What runs automatically once should_publish is true
+
+- The full Node 22/24 × Linux/Windows/macOS test matrix.
+- A dedicated coverage job: statements/branches/functions/lines all `>=95%`.
+- Mutation testing (`stryker run`): `thresholds.break: 85.01` (Stryker's own
+  semantics: `score < break` fails the job - 85.01 is the smallest value
+  making that equivalent to a strict `>85%` requirement).
+- A release-grade fuzz soak: `test:fuzz` looped until wall-clock time
+  reaches 10+ minutes, not a fixed iteration count.
+
+All four run in parallel and are all required.
+
+## 3. Manual authorization gate
+
+Passing every job above does **not** publish anything by itself. The
+`publish` job requires the `npm-publish` GitHub Environment, which has a
+required reviewer configured - publishing needs an explicit "approve
+deployment" click in the Actions UI after the validation above has already
+passed. This is the actual release-authorization step; merging the
+version-bump PR is not it.
+
+## 4. What the publish job does, in order
+
+1. Re-typechecks/lints/tests/builds fresh (not reused from the matrix jobs
+   above - this job runs in its own clean checkout).
+2. Runs the example scripts end-to-end.
+3. `pnpm pack --dry-run` and a production-dependency audit
+   (`pnpm audit --prod`).
+4. Installs the actual packed tarball into a scratch project and imports it
+   - not source, not a workspace symlink.
+5. A **second**, exact-version npm lookup, immediately before publishing -
+   closes the TOCTOU window the ~30+ minute gate chain above would
+   otherwise leave open between the first check and the actual publish.
+   If this recheck finds the version now published (a race with some other
+   process), publish is skipped rather than retried or forced.
+6. `npm publish --access public --provenance` - Sigstore-signed provenance
+   attached, verifiable via `npm view <pkg>@<version> dist --json` after the
+   fact.
+7. Only after publish succeeds: tags the release (`vX.Y.Z`, pointing at the
+   commit that was actually published) and creates a GitHub Release.
+
+If step 6 fails, nothing after it runs - no tag, no release, matching what
+was actually published (nothing). If step 6 succeeds but step 7 fails, the
+package is already live on npm; that partial state needs manual recovery
+(create the tag/release by hand pointing at the right commit), never a
+second `npm publish` attempt for the same version.
+
+## 5. Benchmarks: informational, not a release gate
+
+`npm run bench` is not run by any workflow and does not gate a release.
+This is a deliberate choice, not an oversight: no benchmark baseline is
+committed anywhere in this repository to compare a run against, and
+inventing a pass/fail threshold without one would be exactly the kind of
+number that looks rigorous but isn't. Run `npm run bench` manually before a
+release if you want a sanity check against the previous release's own
+manual run; treat any large swing as worth investigating, not as a gate
+that blocks the release either way.
+
+## 6. Node / OS / package hygiene, checked but not covered above
+
+- `engines.node` and the CI matrix are Active LTS Node lines only - see
+  `docs/COMPATIBILITY.md`.
+- The packed tarball's contents are checked against the `files` allowlist
+  in `package.json` (`dist`, `LICENSE*`, `README.md`) as part of step 4
+  above - nothing else should ever be in it.
+- Public API surface (`src/index.ts`) and its Stable/Experimental
+  classification should be reviewed for accidental exposure before opening
+  the version-bump PR - see `docs/COMPATIBILITY.md`'s versioning policy.
+
+## 7. Trusted Publishing
+
+`publish.yml` pins the npm CLI to the exact version npm requires for
+OIDC-based Trusted Publishing and requests `id-token: write`, but the
+actual publish auth path today is still `NODE_AUTH_TOKEN`
+(`secrets.NPM_TOKEN`). Registering this package as a Trusted Publisher on
+npm's website - a separate, human, npm-account-side action - has not been
+done. Until it has, do not remove `NPM_TOKEN`.

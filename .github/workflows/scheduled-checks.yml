@@ -103,13 +103,14 @@ jobs:
         run: pnpm audit --prod --audit-level=high
 
       - name: Full dependency audit, including dev-only (informational)
-        # Known to currently report pre-existing devDependency advisories
-        # (vite/vitest/esbuild/nanoid/qs, via stryker-mutator's own
-        # dependency chain) that do not affect the published tarball. This
-        # step intentionally never fails the job - see
-        # DEFERRED_DEV_DEPENDENCY_UPGRADE in this workstream's report for
-        # why those aren't being bumped here. Its purpose is visibility
-        # (readable in the run log) rather than a gate.
+        # vite/vitest/esbuild/qs (2026-08-23) and nanoid (same date, found
+        # while installing real AI SDK majors for lifecycle testing) were
+        # each remediated as they were found - see CHANGELOG.md. This step
+        # intentionally never fails the job: its purpose is ongoing
+        # visibility into devDependency-only advisories (readable in the run
+        # log) as new ones inevitably surface over time, not a hard gate -
+        # none of what it reports ever reaches the published tarball, which
+        # is what `pnpm audit --prod` above actually gates on.
         run: pnpm audit || true
 
   mutation-test:

@@ -366,13 +366,150 @@ library will refuse to *also* authorize execution once it observes the
 evidence - of every call in the stream, if the evidence can't be
 attributed to one - but it never had the chance to stop the first one.
 
+### Closing the first-execution gap: `createAiSdkExecutionLock()`
+
+Everything above is *detection* - it stops a second, library-authorized
+execution, but by definition can only observe the SDK's own first one after
+it already happened. `createAiSdkExecutionLock()`
+(`src/guard/ai-sdk-execution-lock.ts`, `@public (Experimental)`) closes that
+specific gap for **local, user-defined tool definitions, unchanged, passed
+through it**.
+
+**The guarantee, precisely stated:** for a tool object returned by this
+function and passed unmodified to `streamText`/`generateText`, none of
+`execute`, `onInputStart`, `onInputDelta`, or `onInputAvailable` can run
+before this library's gate reaches a decision, because none of them exist
+on the object the SDK receives. This is deliberately not phrased as "the SDK
+cannot execute your handler" in the abstract - it is a claim about this
+function's own output specifically, and it stops applying the moment a tool
+definition bypasses the function, gets mutated/reconstructed afterward, or
+is provider-executed (see below).
+
+**Why all four fields, not just `execute`.** An earlier version of this
+function only removed `execute` and set `needsApproval: true`, reasoning
+that `ai@6`+'s own approval mechanism would keep the SDK from calling
+anything else. That reasoning had a real gap: verified directly against
+`ai@5`/`ai@6`/`ai@7`'s own actual runtime source (not their published
+types), `onInputStart`/`onInputDelta`/`onInputAvailable` are invoked by a
+transform stream (`invokeToolCallbacksFromStream` in `ai@7`; differently
+named internals in `ai@6`/`ai@5`, independently confirmed) with **zero
+reference to `needsApproval` or approval status anywhere in it** -
+`onInputAvailable`'s own doc comment states it "is called when a tool call
+can be started, even if the execute function is not provided." A caller
+could put an irreversible side effect inside any of the three and
+`needsApproval: true` alone would not stop it. This function now removes
+all four fields, confirmed by real `streamText()` calls against all three
+majors that a caller-supplied implementation of each never fires (see the
+test files below) - including an explicit unlocked control proving the SDK
+genuinely would have invoked them under the identical stream.
+
+**On `ai@6`+ specifically**, forcing `needsApproval: true` still closes the
+`execute` gap through the SDK's own tool-approval mechanism
+(`needsApproval`/`tool-approval-request`/`experimental_toolApprovalSecret` -
+shipped in `ai@6`, December 2025): verified directly against `ai@6` and
+`ai@7`'s own real source (`executeToolsFromStream`/`isApprovalNeeded`) that
+a tool call pending approval is never added to the set of calls the SDK
+actually executes. Real execution stays exactly where it already was in the
+safe pattern above: driven manually from `guard.finish().decisions`, using
+the value the gate itself authorized from raw evidence.
+
+**Provider-executed and execution-location-ambiguous tools are rejected, not
+silently wrapped.** A tool's real execution location is only ever verifiable
+when the object shape itself proves it, checked per-major against each
+major's own real source rather than inferred from a package-name/version
+string:
+
+- `isProviderExecuted: true` (any major that sets it, chiefly `ai@7`) runs
+  its real operation entirely on the model provider's own remote
+  infrastructure - there is no local `execute` (or `onInputStart`/etc.) for
+  this function to remove, because the side effect never happens in this
+  process. **Rejected.**
+- `ai@7`'s `{ type: "provider", isProviderExecuted: false }` (a
+  provider-defined-but-locally-executed tool, e.g. a local shell tool with a
+  provider-defined schema): verified against `ai@7.0.77`'s own real source
+  that this shape structurally has no `execute` field at all - the SDK's own
+  `isExecutableTool()` check (`typeof tool.execute === "function"`) can
+  never auto-run it, the same "no `execute` means never auto-executed" rule
+  an ordinary tool follows. **Accepted**, passed through the same
+  strip-and-relock path as any other tool.
+- `ai@6`'s `{ type: "provider" }` has **no `isProviderExecuted`
+  discriminator at all** - `ai@7` added it for exactly this reason. This
+  function cannot safely infer local-vs-remote from the shape alone.
+  **Rejected as ambiguous**, not silently accepted.
+- `ai@5`'s `{ type: "provider-defined" }` also has no execution-location
+  discriminator - some provider-defined tools execute locally, some
+  remotely, and nothing in the object distinguishes them. **Rejected as
+  ambiguous.**
+
+`createAiSdkExecutionLock()` throws for every rejected shape rather than
+returning an object that would falsely imply it had done something to it.
+
+**Function-valued `description` is rejected (`ai@7`+).** `ai@5`/`ai@6` type
+`description` as `string` only. `ai@7` additionally allows a function -
+verified directly against `ai@7.0.77`'s own real source that `prepareTools()`
+calls `resolveToolDescription()`, which invokes that function during tool
+preparation, *before* `streamText`/`generateText`'s model call begins and
+therefore necessarily before this library's gate can reach any decision (real
+`streamText()` calls in `test/integration/ai-sdk-lifecycle/ai-v7.real.test.ts`
+confirm the SDK invokes it at least once per step - twice, in fact, from two
+separate internal call sites - well before any part reaches `fullStream`). A
+function-valued `description` is arbitrary caller code running on that same
+pre-decision timeline as the callback trio above, so this function rejects it
+rather than silently passing it through. A string `description` is
+unaffected and remains supported on every major.
+
+**Not a sandbox for a tool definition's *other* fields.** The guarantees
+above only ever concern the five fields this function removes or requires
+(`execute`, `onInputStart`, `onInputDelta`, `onInputAvailable`,
+`description`-as-function) plus the provider-shape checks. A JSON Schema
+library's own validation/refinement/transform machinery, a getter, or a
+Proxy attached to `inputSchema` (or any other field this function preserves
+unchanged) is caller-provided executable code this library has no visibility
+into and does not run, remove, or guard - a schema used inside this security
+boundary must itself be side-effect free. This is a threat-model boundary,
+not a reason to drop schema support.
+
+**`ai@5` has no `needsApproval` at all** (verified directly against its
+published types: the only match for the string "approval" anywhere in
+`ai@5`'s entire type declaration file is an unrelated JSDoc comment) - the
+forced-`true` half of this function is a harmless no-op there. Its
+callback-removal half still applies on every major, `ai@5` included.
+
+**What this cannot protect against, on any major:** a tool definition that
+bypasses this function entirely and attaches `execute`/`onInputStart`/
+`onInputDelta`/`onInputAvailable` directly. That bypass case is exactly the
+"Unprotected / misuse pattern" above. The `sdk_execution_observed` detection
+this whole section describes remains a backstop for a bypassed `execute`
+specifically (via `tool-result`/`tool-error` evidence on `fullStream`) - it
+has **no equivalent** for a bypassed `onInputStart`/`onInputDelta`/
+`onInputAvailable`, since those callbacks leave no observable trace on
+`fullStream` at all. Calling `createAiSdkExecutionLock()` is the only
+defense for that trio; there is nothing to detect after the fact.
+
 See `test/guard/ai-sdk-execution-observed.test.ts`,
-`test/unit/coordinator-sdk-execution-observed.test.ts`, and
-`test/unit/execution-gate-decision-table.test.ts` for the full evidence and
+`test/unit/coordinator-sdk-execution-observed.test.ts`,
+`test/unit/execution-gate-decision-table.test.ts`,
+`test/guard/ai-sdk-execution-lock.test.ts` (including its type-level
+regression tests proving `execute`/`onInputStart`/`onInputDelta`/
+`onInputAvailable` do not exist on the locked type at all, not merely
+optional-and-absent), and
+`test/integration/ai-sdk-lifecycle/ai-v5.real.test.ts` /
+`ai-v6.real.test.ts` / `ai-v7.real.test.ts` (each with a dedicated "P1:
+input-lifecycle callback neutralization" suite; `ai-v7.real.test.ts` also
+has "P1-A: function-valued description neutralization" and "P1-B:
+provider-execution shape policy" suites, both with real unlocked-control
+proof alongside the locked-rejection proof) for the full evidence and
 test matrix: concurrent-call isolation, duplicate/reordered evidence,
 cross-guard-instance isolation, unattributable evidence disqualifying an
 entire stream (including a call that starts after the evidence arrives),
-and rejection-reason priority against every other disqualifier.
+rejection-reason priority against every other disqualifier, and - the
+`ai-v*.real.test.ts` files specifically - real `streamText()` calls against
+each major's own official (`ai@6`/`ai@7`) or hand-built-to-spec (`ai@5`,
+avoiding an unrelated `msw` dependency the official test double
+transitively requires) provider test double, not hand-constructed
+`fullStream` event objects, proving both the lock's real guarantee on every
+major and its real limits with actual SDK behavior rather
+than an assumption about it.
 
 ## Fail-closed guarantees
 
@@ -398,6 +535,16 @@ and rejection-reason priority against every other disqualifier.
   once every check above has passed, and only if that value is genuinely
   present (a defensive `!== undefined` check - an `executable: true` call
   with no actual value still fails closed instead of executing `undefined`).
+- A second `provider_stream_end` arriving after the stream already finished
+  can never change any call's already-decided outcome - the coordinator's
+  `isFinished` gate rejects it before it reaches any call at all. When that
+  second event's reason genuinely *contradicts* the first (e.g. `"complete"`
+  then `"abort"` - a real provider-protocol anomaly, not just a harmless
+  late duplicate of the same reason), it gets its own diagnostic code,
+  `E_TERMINAL_REASON_CONFLICT` (`severity: "fatal"`), distinct from the
+  generic `E_EVENT_AFTER_STREAM_END` every other post-finish event gets -
+  forensic signal that something worth investigating happened, not a second
+  chance to change the decision.
 
 ## Limitations - what this does NOT protect against
 

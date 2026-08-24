@@ -105,6 +105,27 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   count, concurrent call count, tool name length) never reach `execute` —
   a limit breach is `reject`/`resource_limit`, checked before every other
   status-based outcome.
+- On the Vercel AI SDK, across `ai@5`/`ai@6`/`ai@7`: a **supported** local,
+  user-defined tool wrapped with `createAiSdkExecutionLock()` and passed
+  through unchanged cannot have `execute`, `onInputStart`, `onInputDelta`,
+  or `onInputAvailable` invoked by the SDK's own tool loop at all — not
+  detected afterward, structurally excluded because none of the four exist
+  on the object the SDK receives (verified directly against each major's
+  own real source, not their published types; on `ai@6`+ the SDK's own
+  `needsApproval` mechanism additionally backstops `execute` specifically).
+  Rejects (throws) rather than silently accepting two other classes of
+  pre-decision caller code it cannot neutralize by stripping fields: a
+  function-valued `description` (`ai@7`+ invokes it during tool
+  preparation, before the model call begins), and any provider tool shape
+  whose real execution location cannot be verified from the object alone
+  (`isProviderExecuted: true`; `ai@6`'s discriminator-less
+  `{ type: "provider" }`; `ai@5`'s discriminator-less
+  `{ type: "provider-defined" }`) — `ai@7`'s `{ type: "provider",
+  isProviderExecuted: false }` is accepted, verified to have no `execute`
+  field at all on that shape. This is the one guarantee in this list that
+  constrains something *upstream* of this library's own trust boundary —
+  see "Non-guarantees" below for exactly how far it reaches and where it
+  stops.
 
 ## Non-guarantees
 
@@ -118,7 +139,14 @@ general AI security platform. It is explicitly **not**:
 - **A sandbox.** It never runs, inspects, or constrains the tool
   implementation itself. `action: "execute"` means "safe to treat as the
   real, complete value the model produced," not "safe to run without your
-  own validation, permissions, or side-effect review."
+  own validation, permissions, or side-effect review." This extends to
+  `createAiSdkExecutionLock()` specifically: it is not a general sandbox for
+  arbitrary side effects hidden inside a tool definition's *other* fields.
+  A JSON Schema library's own validation/refinement/transform machinery, a
+  getter, or a Proxy attached to `inputSchema` (or any field the lock
+  preserves unchanged) is caller-provided executable code this library has
+  no visibility into and does not run, remove, or guard — a schema used
+  inside this security boundary must itself be side-effect free.
 - **Prompt-injection prevention.** It says nothing about whether the
   arguments a model *chose* to send are the arguments it *should* have
   sent — only whether they are complete and unfabricated. A model that was
@@ -151,13 +179,43 @@ general AI security platform. It is explicitly **not**:
   or scopes a given tool implementation runs with is entirely outside this
   library's model.
 
-**Most importantly:** if an SDK or caller already executed an irreversible
-action before this library's decision was consulted — most concretely, a
-native AI SDK `execute` callback wired directly onto the same tool
-definition this library is meant to gate — **this library cannot undo that
-first execution.** What it can and does do, once it observes direct
-evidence that this happened (see the `sdk_execution_observed` guarantee
-above), is refuse to *also* authorize a second, caller-driven execution of
-the same call. The precondition for this library's guarantees to mean
-anything at all is that it is consulted *before* the irreversible operation
-runs — see "Safe, supported integration" in `docs/EXECUTION_GATE.md`.
+**Most importantly:** everything above this point in the document describes
+*decision integrity* — whether the `execute`/`retry`/`reject` verdict this
+library produces is trustworthy. It says nothing, by itself, about
+*execution ownership* — whether this library's decision is actually the
+thing controlling whether the real operation runs at all. Those are
+different problems with different guarantees:
+
+- If an SDK or caller already executed an irreversible action before this
+  library's decision was consulted — most concretely, a native AI SDK
+  `execute`/`onInputStart`/`onInputDelta`/`onInputAvailable` callback wired
+  directly onto the same tool definition this library is meant to gate, on
+  any major bypassing `createAiSdkExecutionLock()`, or a
+  **provider-executed** tool (`isProviderExecuted: true` — its operation
+  runs entirely on the model provider's own remote infrastructure, outside
+  this library's process and reach regardless of what wraps it) —
+  **this library cannot undo that first execution.** What it can and does
+  do, for a bypassed `execute` specifically, once it observes direct
+  evidence that this happened (the `sdk_execution_observed` guarantee
+  above), is refuse to *also* authorize a second, caller-driven execution
+  of the same call. There is no equivalent detection for a bypassed
+  `onInputStart`/`onInputDelta`/`onInputAvailable` — those callbacks leave
+  no observable trace on `fullStream` at all.
+- Using `createAiSdkExecutionLock()`, on a **supported** local, user-defined
+  tool definition passed through it unchanged: this library's decision *is*
+  the thing controlling execution, because none of `execute`,
+  `onInputStart`, `onInputDelta`, or `onInputAvailable` exist on the object
+  the SDK receives, on any of `ai@5`/`ai@6`/`ai@7` (verified directly
+  against each major's own real source, not their published types). This is
+  the one case in this document where decision integrity and execution
+  ownership coincide — and it is scoped precisely to this function's own
+  output, unchanged: it does not extend to a tool that bypasses the
+  function, one mutated/reconstructed afterward, or a rejected shape (a
+  function-valued `description`, or a provider tool shape whose execution
+  location this function cannot verify — see the guarantee above for the
+  exact per-major decision table).
+
+The precondition for every *other* guarantee in this document to mean
+anything at all is that this library is consulted *before* the irreversible
+operation runs — see "Execution ownership" in `docs/EXECUTION_GATE.md` for
+the full breakdown of which pattern gets which guarantee.
