@@ -6,7 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
 coverage) a version bump requires.
 
-## [Unreleased]
+## [0.3.0] - 2026-08-24
+
+Closes the execution-ownership gap `0.2.0`'s `sdk_execution_observed`
+detection could only ever catch after the fact: `createAiSdkExecutionLock()`
+now stops the *first* execution across `ai@5`/`ai@6`/`ai@7`, verified
+against each major's own real source rather than published types or
+analogy. Also includes terminal-evidence forensic hardening, a real
+dependency-security fix, a Node support-policy correction, and a real
+release-authorization gap closed (any version-changing merge to `main`
+could previously auto-publish with no separate human confirmation).
+0.3.0 rather than a patch, for two independent reasons, either alone
+sufficient under this project's own pre-1.0 precedent (see
+`docs/COMPATIBILITY.md`'s versioning policy): a new public export
+(`createAiSdkExecutionLock` plus `LockedAiSdkTool`/`LockedAiSdkTools`,
+additive but real new Experimental surface), and a real Node-version
+compatibility narrowing (`>=18.0.0` → `>=22.0.0` — some consumers can no
+longer install this cleanly).
 
 ### Execution ownership
 
