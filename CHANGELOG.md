@@ -8,6 +8,26 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-25
+
+Publishes the execution-authority hardening and adoption-readiness work
+merged since `0.3.0`. The documented AI SDK golden path now keeps local
+execution in caller-owned manual dispatch, backed by exact runnable lifecycle
+proofs and required corpus validation. The release does not extend its claims
+beyond the explicitly tested boundaries below.
+
+### AI SDK adoption
+
+- Documented the safe ownership boundary as the golden path: lock tool
+  definitions with `createAiSdkExecutionLock()`, feed the real `fullStream`
+  into `createAiSdkExecutionGuard()`, and dispatch only authority consumed
+  through `takeDecision()`.
+- Added a deterministic, runnable lifecycle proof against the exact pins
+  `ai@5.0.244`, `ai@6.0.264`, and `ai@7.0.77`. This verifies those versions
+  only; it is not a claim of universal compatibility across the three majors.
+- Made canonical provider-corpus validation a required gate in both CI and
+  release workflows.
+
 ### Security
 
 - Gemini structured argument projections are now inspection-only and reject
@@ -20,6 +40,13 @@ coverage) a version bump requires.
 - Added call-scoped `takeDecision(internalId)`, a one-shot execution-authority
   path. `finish()` remains replayable for diagnostics; application
   authorization and durable idempotency remain caller-owned.
+
+### Guarantee boundary
+
+- Application authorization and durable or distributed idempotency remain
+  caller-owned; one-shot authority is scoped to a guard instance and is not a
+  distributed exactly-once guarantee.
+- Provider-executed tools remain outside the local execution guarantee.
 
 ## [0.3.0] - 2026-08-24
 

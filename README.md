@@ -1,6 +1,6 @@
 # prefix-safe-json
 
-> **v0.3.0** — Core APIs are stable; raw provider adapters remain
+> **v0.4.0** — Core APIs are stable; raw provider adapters remain
 > experimental. See [Current Status](#current-status) and
 > [CHANGELOG.md](CHANGELOG.md).
 
