@@ -192,6 +192,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate corpus metadata and structure
+        run: pnpm run validate-corpus
+
       - name: Run Tests (with coverage)
         run: pnpm run test:coverage
 

@@ -61,7 +61,7 @@ let passedFiles = 0;
         const errors = validateFixture(validate, data);
 
       if (errors.length > 0) {
-        console.error(`❌ ${file}:`);
+        console.error(`❌ ${dir}/${file} (category: ${JSON.stringify(data.category)}):`);
         errors.forEach((e) => console.error(`   - ${e}`));
         hasErrors = true;
       } else {
@@ -69,7 +69,7 @@ let passedFiles = 0;
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`❌ Failed to parse ${file}: ${msg}`);
+      console.error(`❌ Failed to parse ${dir}/${file}: ${msg}`);
       hasErrors = true;
     }
   }
