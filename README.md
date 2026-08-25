@@ -20,7 +20,10 @@ pnpm add prefix-safe-json ai
 # or: npm install prefix-safe-json ai
 ```
 
-The package is ESM-only and requires Node `>=22.0.0`.
+The published package is ESM-only and supports Node `>=18.0.0`. Repository
+development and release jobs remain on Node 22/24 because the development
+toolchain and the exact `ai@7.0.77` lifecycle proof require newer Node; those
+requirements do not apply to the package's runtime dependency graph.
 
 ## Recommended AI SDK boundary
 
@@ -395,11 +398,12 @@ A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATIO
 ## Package requirements
 
 ESM only — `import`, not `require`. There is currently no CommonJS build.
-Node `>=22.0.0` (Active LTS lines only — Node 18/20 are end-of-life and no
-longer receive security patches). See
+Node `>=18.0.0`. Node 18/20 are end-of-life and no longer receive security
+patches; compatibility here describes the package runtime, not a recommendation
+to operate an unpatched Node release. See
 [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the full
-ESM/Node/SemVer/Stable-vs-Experimental policy and the per-provider
-compatibility matrix.
+runtime-versus-toolchain distinction, exact AI SDK pin requirements, and the
+per-provider compatibility matrix.
 
 ## Low-level API: Quick Start
 

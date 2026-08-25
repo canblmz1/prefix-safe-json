@@ -116,9 +116,9 @@ jobs:
   # gets - not source, not a workspace symlink. Previously this only
   # happened in publish.yml's own release path (so a packaging regression
   # was only caught the moment a release was already being attempted);
-  # every PR now gets the same signal. One Node version only (this tests
-  # packaging mechanics, not per-platform runtime behavior, which the
-  # 2x3 matrix above already covers) - kept fast on purpose.
+  # every PR now gets the same signal. This Node 22 job owns build/pack and
+  # the declaration smoke because those are development-toolchain concerns;
+  # runtime compatibility of the resulting bytes is tested separately below.
   package-smoke:
     name: Package smoke (clean-room tarball install)
     runs-on: ubuntu-latest
@@ -146,6 +146,13 @@ jobs:
 
       - name: Pack the real tarball
         run: pnpm pack --out prefix-safe-json-smoke.tgz
+
+      - name: Upload the exact packed tarball for the runtime matrix
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: prefix-safe-json-smoke-tarball
+          path: prefix-safe-json-smoke.tgz
+          retention-days: 1
 
       - name: Set up an isolated JS consumer project
         run: |
@@ -299,6 +306,51 @@ jobs:
           { "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true }, "include": ["smoke.ts", "smoke-lock.ts"] }
           EOF
           cd /tmp/consumer-ts && ./node_modules/.bin/tsc --noEmit -p tsconfig.json && echo "TS package smoke: OK"
+
+  # The package's runtime floor is intentionally independent from the Node
+  # version needed to install/build this repository's devDependencies. The
+  # Node 22 package-smoke job above builds one tarball; every matrix leg below
+  # downloads and executes those identical bytes in an isolated npm project.
+  runtime-package-smoke:
+    name: Packed runtime smoke (Node ${{ matrix.node-version }})
+    needs: package-smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22", "24"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download the exact Node 22-built tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: prefix-safe-json-smoke-tarball
+          path: package-artifact
+
+      - name: Install into an isolated engine-strict consumer
+        run: |
+          set -euo pipefail
+          CONSUMER_DIR="$RUNNER_TEMP/prefix-safe-json-node-${{ matrix.node-version }}"
+          mkdir -p "$CONSUMER_DIR"
+          cp package-artifact/prefix-safe-json-smoke.tgz "$CONSUMER_DIR/"
+          cp scripts/runtime-package-smoke.mjs "$CONSUMER_DIR/"
+          cd "$CONSUMER_DIR"
+          npm init -y >/dev/null
+          npm install --engine-strict --no-audit --no-fund ./prefix-safe-json-smoke.tgz
+          npm ls prefix-safe-json ajv fast-deep-equal fast-uri json-schema-traverse require-from-string
+
+      - name: Exercise the installed runtime package
+        run: |
+          CONSUMER_DIR="$RUNNER_TEMP/prefix-safe-json-node-${{ matrix.node-version }}"
+          node "$CONSUMER_DIR/runtime-package-smoke.mjs"
 
   dependency-review:
     name: Dependency Review
