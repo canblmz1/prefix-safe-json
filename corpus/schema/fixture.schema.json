@@ -5,7 +5,7 @@
     "version": { "type": "integer", "const": 1 },
     "id": { "type": "string" },
     "title": { "type": "string" },
-    "category": { "type": "string", "enum": ["canonical", "malformed", "unicode", "truncation", "fuzz", "provider-envelope", "anthropic", "gemini", "openai-compatible", "openai-responses", "openrouter", "cross-provider"] },
+    "category": { "type": "string", "enum": ["canonical", "malformed", "unicode", "truncation", "fuzz", "provider-envelope", "anthropic", "gemini", "openai-compatible", "openai-responses", "openrouter", "ai-sdk", "cross-provider"] },
     "provider": { "type": "string" },
     "input": {
       "type": "object",
