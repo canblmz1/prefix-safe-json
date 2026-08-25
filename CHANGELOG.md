@@ -8,15 +8,21 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-25
+
+Publishes the already-merged package-runtime compatibility widening. This is
+a mechanical patch release: runtime behavior, public API, dependencies, and
+security guarantees are unchanged.
+
 ### Compatibility
 
-- Widen the published package's Node runtime declaration from `>=22.0.0`
-  to `>=18.0.0`. Clean-room tests of the real `prefix-safe-json@0.4.0`
-  npm tarball passed on Node 18, 20, 22, and 24 across parser, execution
-  gate, AI SDK guard, AJV schema validation, provider identity, protocol
-  poisoning, and one-shot authority paths. The development and release
-  toolchain remains on supported Node 22/24 lines; exact AI SDK lifecycle
-  compatibility remains version-scoped and has its own Node requirements.
+- Package runtime support is widened from Node `>=22.0.0` to `>=18.0.0`,
+  verified by executing the packed package on Node 18, 20, 22, and 24.
+- Development and release tooling remains on newer Node versions where
+  required. AI SDK lifecycle compatibility remains scoped to the exact tested
+  versions rather than implying universal SDK compatibility.
+- Node 18 and Node 20 are end-of-life and are not recommended production
+  runtimes; compatibility does not imply that they receive security fixes.
 
 ## [0.4.0] - 2026-08-25
 
