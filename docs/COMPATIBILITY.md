@@ -5,6 +5,30 @@ evidenced by this repository's source, tests, or commit history — not to
 what is expected to work by extrapolation. Where no specific SDK package
 version has been tested, that is stated explicitly rather than implied.
 
+## Node runtime matrix
+
+Runtime compatibility is tested independently from the repository's
+development toolchain. The published package does not import any AI SDK at
+runtime; AJV is its only direct runtime dependency.
+
+| Surface | Node 18 | Node 20 | Node 22 | Node 24 | Evidence / minimum |
+|---|---|---|---|---|---|
+| `prefix-safe-json` package runtime | Yes | Yes | Yes | Yes | The real `prefix-safe-json@0.4.0` npm tarball was installed in four isolated projects and exercised through parser, gate, guard, AJV, provider-identity, protocol-poisoning, and one-shot-authority paths. Declared minimum: `>=18.0.0`. |
+| Exact `ai@5.0.244` dependency graph | Yes | Yes | Yes | Yes | `ai@5.0.244` and its AI SDK runtime dependencies declare Node `>=18`. |
+| Exact `ai@6.0.264` dependency graph | `>=18.17` only | Yes | Yes | Yes | `ai@6.0.264` declares `>=18`; its exact `@ai-sdk/provider-utils@4.0.46` dependency declares `>=18.17`. |
+| Exact `ai@7.0.77` dependency graph | No | No | Yes | Yes | `ai@7.0.77` and its AI SDK runtime dependencies declare Node `>=22`. |
+| Repository development/release toolchain | No | Not a required CI target | Yes | Yes | Current dev dependencies include Node 20+ tools and the Node 22+ AI SDK v7 proof. Full CI/release validation remains on supported Node 22/24 lines. |
+
+Node 18 and Node 20 are end-of-life and no longer receive security fixes.
+Listing them as runtime-compatible is a statement about what the distributed
+package can execute, not a recommendation to operate an unpatched runtime.
+Consumers should prefer a supported Node line whenever possible.
+
+The exact AI SDK lifecycle suites remain scoped to the three pins above and
+run on the repository's supported development Node line. The AI SDK rows in
+this table report the exact pins' declared runtime-engine compatibility; they
+do not claim that every lifecycle suite was rerun on every Node matrix entry.
+
 ## Integration matrix
 
 | Integration | Tested version(s) | Target API surface | Status | Raw evidence | Terminal evidence | Caveat |
@@ -100,17 +124,19 @@ than treating `0.x` as a formality:
   condition and no CommonJS build. `import { createParser } from
   "prefix-safe-json"` (or dynamic `import()` from CommonJS) is the only
   supported consumption path.
-- **Node `>=22.0.0`** (`package.json` `engines.node`) — Active LTS lines
-  only. Previously `>=18.0.0`; raised because Node 18 and Node 20 both
-  reached end-of-life (2025-03-27 and 2026-03-24 respectively — verified
-  against nodejs.org's release schedule, not assumed) and no longer receive
-  security patches at all. A security-integrity library treating an
-  unpatched runtime as a supported baseline was judged indefensible, not a
-  cosmetic preference for newer tooling. This is a real compatibility
-  narrowing for any consumer still on Node 18/20 — SemVer-relevant even
-  though no public API changed (see the versioning policy above: pre-1.0,
-  shipped as a normal minor). CI matches this exactly (Node 22, 24 ×
-  Linux/Windows/macOS). Not tested against earlier Node major versions.
+- **Node `>=18.0.0` package runtime** (`package.json` `engines.node`). The
+  distributed ESM/ES2022 output and complete AJV runtime graph were exercised
+  from the real `0.4.0` npm tarball on Node 18.20.8, 20.11.1, 22.23.2, and
+  24.14.0. Node 18/20 emitted only the expected warning from `0.4.0`'s former
+  `>=22` metadata; imports and every smoke path passed without altering the
+  tarball. Packed-tarball CI now keeps this runtime claim live across Node
+  18/20/22/24.
+- **Development/release Node remains 22/24.** Lint, test, mutation, build,
+  and exact AI SDK lifecycle jobs are intentionally not forced onto the
+  runtime floor. Dev-only packages such as Stryker/Rimraf and the exact
+  `ai@7.0.77` proof require newer Node. This does not raise the engine floor
+  of the installed `prefix-safe-json` package, which has no runtime dependency
+  on `ai`.
 - No browser-specific build or bundler-target guarantee is made; the
   package is plain ESM TypeScript output (`dist/*.js` + `.d.ts`) with no
   Node-specific built-ins used in the parser/coordinator/gate/guard core

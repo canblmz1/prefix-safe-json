@@ -8,6 +8,16 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Compatibility
+
+- Widen the published package's Node runtime declaration from `>=22.0.0`
+  to `>=18.0.0`. Clean-room tests of the real `prefix-safe-json@0.4.0`
+  npm tarball passed on Node 18, 20, 22, and 24 across parser, execution
+  gate, AI SDK guard, AJV schema validation, provider identity, protocol
+  poisoning, and one-shot authority paths. The development and release
+  toolchain remains on supported Node 22/24 lines; exact AI SDK lifecycle
+  compatibility remains version-scoped and has its own Node requirements.
+
 ## [0.4.0] - 2026-08-25
 
 Publishes the execution-authority hardening and adoption-readiness work
