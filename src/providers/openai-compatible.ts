@@ -1,5 +1,9 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
+import {
+  DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
+} from "../coordinator/diagnostic-codes.js";
 
 interface OpenAIChoiceDelta {
   tool_calls?: Array<{
@@ -13,6 +17,7 @@ interface OpenAIChoiceDelta {
 }
 
 interface OpenAIChoice {
+  index?: number;
   delta?: OpenAIChoiceDelta;
   finish_reason?: string | null;
 }
@@ -25,8 +30,8 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
   readonly provider: ProviderName = "openai-compatible";
   private sequence = 0;
   
-  // Track known indices to emit start events correctly
-  private knownIndices: Set<number> = new Set();
+  // Track full provider coordinates, never the tool index alone.
+  private startedSourceKeys: Set<string> = new Set();
   // Keep track of sourceKeys to emit tool_call_end
   private knownSourceKeys: Set<string> = new Set();
   
@@ -62,10 +67,58 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
     const chunk = rawEvent as OpenAICompatibleEvent;
     
     if (Array.isArray(chunk.choices)) {
+      const choiceCounts = new Map<number, number>();
       for (const choice of chunk.choices) {
+        if (Number.isInteger(choice.index) && (choice.index as number) >= 0) {
+          const choiceIndex = choice.index as number;
+          choiceCounts.set(choiceIndex, (choiceCounts.get(choiceIndex) ?? 0) + 1);
+        }
+      }
+
+      for (const choice of chunk.choices) {
+        if (!Number.isInteger(choice.index) || (choice.index as number) < 0) {
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            code: INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: "choice.index is missing, non-integer, or negative; tool-call identity is ambiguous",
+          });
+          continue;
+        }
+        const choiceIndex = choice.index as number;
+        if ((choiceCounts.get(choiceIndex) ?? 0) > 1) {
+          const toolCalls = choice.delta?.tool_calls ?? [];
+          if (toolCalls.length === 0) {
+            events.push({
+              type: "provider_diagnostic",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              code: DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: `choice.index ${choiceIndex} is duplicated in one provider event`,
+            });
+          }
+          for (const tc of toolCalls) {
+            const hasToolIndex = Number.isInteger(tc.index) && tc.index >= 0;
+            events.push({
+              type: "provider_diagnostic",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              code: DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: `choice.index ${choiceIndex} is duplicated in one provider event`,
+              ...(hasToolIndex
+                ? { callRef: { sourceKey: `choice:${choiceIndex}/tool-index:${tc.index}` } }
+                : {}),
+            });
+          }
+          continue;
+        }
         if (choice.delta && Array.isArray(choice.delta.tool_calls)) {
           for (const tc of choice.delta.tool_calls) {
-             if (typeof tc.index !== "number") {
+             if (!Number.isInteger(tc.index) || tc.index < 0) {
                 events.push({
                   type: "provider_diagnostic",
                   sequence: ++this.sequence,
@@ -77,11 +130,11 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
                 continue;
              }
              
-             const sourceKey = `choice:0/tool-index:${tc.index}`;
+             const sourceKey = `choice:${choiceIndex}/tool-index:${tc.index}`;
              this.knownSourceKeys.add(sourceKey);
              
-             if (!this.knownIndices.has(tc.index)) {
-                this.knownIndices.add(tc.index);
+             if (!this.startedSourceKeys.has(sourceKey)) {
+                this.startedSourceKeys.add(sourceKey);
                 
                 events.push({
                   type: "tool_call_start",

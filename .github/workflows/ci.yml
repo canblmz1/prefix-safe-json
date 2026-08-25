@@ -164,6 +164,8 @@ jobs:
           if (result.syntax !== "root_complete") throw new Error("parser smoke failed: " + JSON.stringify(result));
           const gate = createToolCallExecutionGate();
           if (typeof gate.finish !== "function") throw new Error("gate smoke failed: missing finish()");
+          if (typeof gate.takeDecision !== "function") throw new Error("gate smoke failed: missing takeDecision()");
+          if (gate.takeDecision("missing") !== undefined) throw new Error("gate smoke failed: pre-finish authority");
           console.log("JS package smoke: OK");
           EOF
           node /tmp/consumer-js/smoke.mjs
@@ -238,11 +240,12 @@ jobs:
               case "complete": case "truncated": case "malformed": case "resource_limit":
               case "provider_error": case "content_filtered": case "sdk_execution_observed":
               case "schema_invalid": case "unknown": case "stream_incomplete":
+              case "projection_only": case "protocol_violation":
                 return reason;
             }
           }
           const gate = createToolCallExecutionGate();
-          console.log(describe("sdk_execution_observed"), gate.finish().decisions.length);
+          console.log(describe("sdk_execution_observed"), gate.finish().decisions.length, gate.takeDecision("missing"));
           EOF
           cat > /tmp/consumer-ts/smoke-lock.ts <<'EOF'
           import { createAiSdkExecutionLock, type LockedAiSdkTool, type LockedAiSdkTools } from "prefix-safe-json";

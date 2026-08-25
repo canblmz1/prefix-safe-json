@@ -44,8 +44,10 @@ function generateFixture(category: string, provider: string, namePrefix: string,
     expected: {
       syntax: "root_complete", // arbitrary for provider tests
       outcome: endReason === "complete" ? "valid" : "truncated",
-      executable: endReason === "complete",
-      diagnostics: [],
+      executable: endReason === "complete" && provider !== "gemini",
+      diagnostics: provider === "gemini"
+        ? [{ code: "E_ARGUMENT_EVIDENCE_PROJECTION_ONLY", severity: "warning", recoverable: false }]
+        : [],
       repairs: [],
       events
     },
@@ -82,9 +84,9 @@ for (let i = 0; i < 12; i++) {
 // Generate OpenAI Compatible
 for (let i = 0; i < 12; i++) {
   generateFixture("openai-compatible", "openai-compatible", "openai-compatible", [
-    { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_" + i, type: "function", function: { name: "foo" } }] } }] },
-    { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"b":' + i + '}' } }] } }] },
-    { choices: [{ finish_reason: "tool_calls" }] }
+    { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_" + i, type: "function", function: { name: "foo" } }] } }] },
+    { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '{"b":' + i + '}' } }] } }] },
+    { choices: [{ index: 0, finish_reason: "tool_calls" }] }
   ]);
 }
 
@@ -109,9 +111,9 @@ for (let i = 0; i < 12; i++) {
 // Generate OpenRouter
 for (let i = 0; i < 12; i++) {
   generateFixture("openrouter", "openrouter", "openrouter", [
-    { choices: [{ delta: { tool_calls: [{ index: 0, id: "call_" + i, type: "function", function: { name: "foo" } }] } }] },
-    { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"e":' + i + '}' } }] } }] },
-    { choices: [{ finish_reason: "tool_calls" }] }
+    { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_" + i, type: "function", function: { name: "foo" } }] } }] },
+    { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '{"e":' + i + '}' } }] } }] },
+    { choices: [{ index: 0, finish_reason: "tool_calls" }] }
   ]);
 }
 

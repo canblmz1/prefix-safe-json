@@ -33,7 +33,7 @@ describe("Provider Safety Regressions", () => {
   it("OpenAI-compatible normal tool_calls finish", () => {
     const adapter = new OpenAICompatibleStreamAdapter();
     const events: NormalizedToolStreamEvent[] = [];
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, id: "t1", type: "function", function: { name: "f", arguments: "{}" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "t1", type: "function", function: { name: "f", arguments: "{}" } }] } }] }));
     events.push(...adapter.finish({ reason: "complete", providerReason: "stop" }));
     expect(events.some(e => e.type === "tool_call_end")).toBe(true);
   });
@@ -41,7 +41,7 @@ describe("Provider Safety Regressions", () => {
   it("OpenAI Responses response.function_call_arguments.delta", () => {
     const adapter = new OpenAIStreamAdapter();
     const events: NormalizedToolStreamEvent[] = [];
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] }));
     events.push(...adapter.finish({ reason: "complete" }));
     expect(events.some(e => e.type === "tool_call_end")).toBe(true);
   });
@@ -49,8 +49,8 @@ describe("Provider Safety Regressions", () => {
   it("OpenAI Responses final arguments conflict", () => {
     const adapter = new OpenAIStreamAdapter();
     const events: NormalizedToolStreamEvent[] = [];
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] }));
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "[]" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "[]" } }] } }] }));
     events.push(...adapter.finish({ reason: "complete" }));
     expect(events.some(e => e.type === "tool_call_end")).toBe(true);
   });
@@ -87,9 +87,9 @@ describe("Provider Safety Regressions", () => {
   it("OpenRouter reasoning between argument deltas", () => {
     const adapter = new OpenRouterStreamAdapter();
     const events: NormalizedToolStreamEvent[] = [];
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{" } }] } }] }));
-    events.push(...adapter.push({ choices: [{ delta: { reasoning: "thinking..." } }] }));
-    events.push(...adapter.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "}" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{" } }] } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { reasoning: "thinking..." } }] }));
+    events.push(...adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "}" } }] } }] }));
     events.push(...adapter.finish({ reason: "complete" }));
     expect(events.some(e => e.type === "tool_call_end")).toBe(true);
   });

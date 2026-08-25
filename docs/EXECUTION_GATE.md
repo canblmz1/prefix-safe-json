@@ -64,6 +64,9 @@ type ExecutionReason =
   | "resource_limit"      // reject - a parser or coordinator limit was hit
   | "provider_error"      // reject - the upstream provider call itself failed
   | "content_filtered"    // reject - stopped by a content-safety/policy filter, not truncation
+  | "sdk_execution_observed" // reject - the SDK already invoked the call
+  | "projection_only"     // reject - structured projection, not raw argument proof
+  | "protocol_violation"  // reject - sticky ordering/identity violation
   | "unknown";            // reject - unreachable fallback; fail closed, never guess
 ```
 
@@ -80,11 +83,13 @@ later conditions could otherwise slip past:
 | 2 | A resource-limit diagnostic was recorded (`E_LIMIT_*` on the parser, or `E_COORDINATOR_LIMIT_*` / `E_TOOL_NAME_LIMIT` on the coordinator) | reject | `resource_limit` |
 | 3 | The stream-level end reason was `"provider_error"` | reject | `provider_error` |
 | 4 | A content-policy termination was recorded (`E_CONTENT_FILTERED`) | reject | `content_filtered` |
-| 5 | `status === "complete"` and the registered schema failed | reject | `schema_invalid` |
-| 6 | `status === "invalid"` (duplicate key, bad token, broken tool identity) | reject | `malformed` |
-| 7 | `status === "truncated"` (a real, raw mid-value/mid-container cut) | retry | `truncated` |
-| 8 | `status === "complete"` **and** `parser.executable` **and** schema passes (or no schema registered) | **execute** | `complete` |
-| 9 | Everything else non-executable - `"salvaged"` (repaired-closed, unconfirmed), `"complete"`-but-not-`executable` (stream-reason mismatch or trailing data), `"cancelled"`, `"collecting"` | retry | `stream_incomplete` |
+| 5 | Call evidence is a structured projection rather than raw argument text | reject | `projection_only` |
+| 6 | A call-scoped or genuinely stream-wide authority protocol violation was recorded | reject | `protocol_violation` |
+| 7 | `status === "complete"` and the registered schema failed | reject | `schema_invalid` |
+| 8 | `status === "invalid"` (duplicate key, bad token, broken tool identity) | reject | `malformed` |
+| 9 | `status === "truncated"` (a real, raw mid-value/mid-container cut) | retry | `truncated` |
+| 10 | `status === "complete"` **and** `parser.executable` **and** schema passes (or no schema registered) | **execute** | `complete` |
+| 11 | Everything else non-executable - `"salvaged"` (repaired-closed, unconfirmed), `"complete"`-but-not-`executable` (stream-reason mismatch or trailing data), `"cancelled"`, `"collecting"` | retry | `stream_incomplete` |
 
 Row 1 is checked before every other row, including the resource/provider/
 content-policy checks in rows 2-4: it is a statement that execution
@@ -95,7 +100,7 @@ whole tool call on a resource limit; never safe to once SDK execution was
 observed, since a fresh generation could trigger the SDK's own `execute()`
 again for whatever already ran).
 
-Row 8 is the important one for container-level truncation: a value like
+Row 10 is the important one for container-level truncation: a value like
 `["npm install","npm test"` has no unterminated string - the parser *can*
 structurally close the array - but if the stream ended for reason `"length"`
 rather than `"complete"`, the result is still `retry` / `stream_incomplete`,
@@ -196,11 +201,13 @@ for (const rawEvent of anthropicSseEvents) {
   for (const normalized of adapter.push(rawEvent)) gate.push(normalized);
 }
 
-for (const decision of gate.finish().decisions) {
-  if (decision.action === "execute") {
-    await tools[decision.name](decision.value);
+const final = gate.finish();
+for (const observed of final.decisions) {
+  const authority = gate.takeDecision(observed.internalId);
+  if (authority) {
+    await tools[authority.name](authority.value);
   } else {
-    console.warn(`${decision.name}: ${decision.action} (${decision.reason})`);
+    console.warn(`${observed.name}: ${observed.action} (${observed.reason})`);
   }
 }
 ```
@@ -215,8 +222,8 @@ AI SDK ownership boundary driven by the real `streamText()` lifecycle, use
 
 For the common case - one provider, no need to hold the adapter or gate
 instance yourself - `createAiSdkExecutionGuard()` composes
-`AiSdkStreamAdapter` and `createToolCallExecutionGate()` behind three
-methods: `push()`, `snapshot()`, `finish()`. Same decision logic, same
+`AiSdkStreamAdapter` and `createToolCallExecutionGate()` behind four
+methods: `push()`, `snapshot()`, `finish()`, `takeDecision()`. Same decision logic, same
 fail-closed guarantees, no new parser or coordinator.
 
 The canonical, complete integration is
@@ -240,6 +247,20 @@ and is what the high-level guard is built from - use it directly if you need
 the adapter or gate instance for something the guard doesn't expose (e.g.
 `drainEvents()` for a UI feed). The two produce identical decisions for
 identical input - `test/guard/ai-sdk-guard.test.ts` asserts this directly.
+
+### One-shot execution authority
+
+`finish()` is deliberately replayable diagnostic state: callers can inspect
+the complete decision and diagnostics more than once. It is not the recommended
+dispatch token. After finishing, call `takeDecision(internalId)`. It returns an
+`ExecuteDecision` once for that call, then `undefined`; taking one call never
+consumes another. Unsafe, malformed, schema-invalid, projection-only, or
+protocol-poisoned calls always return `undefined`.
+
+This is local authority consumption, not application idempotency. A caller can
+still reuse a value it already received, another process can repeat a side
+effect, and a crash can happen between dispatch and persistence. Authorization,
+durable idempotency keys, retries, and transactions remain caller-owned.
 
 ### Decision evidence
 
@@ -338,8 +359,8 @@ already ran.
 callback - not even a no-op one - to a tool definition whose actual
 execution will be manually dispatched from this library's decisions.
 Consume `fullStream`, feed every part to the guard/adapter, and dispatch
-manually only for `action === "execute"` after `finish()` (see "From stream
-to safe execution" in the root README). Under this pattern
+manually only from `takeDecision(internalId)` after `finish()` (see the
+recommended boundary in the root README). Under this pattern
 `tool-result`/`tool-error` never arrive, because the SDK never runs
 `execute` itself.
 
@@ -393,7 +414,7 @@ shipped in `ai@6`, December 2025): verified directly against `ai@6` and
 `ai@7`'s own real source (`executeToolsFromStream`/`isApprovalNeeded`) that
 a tool call pending approval is never added to the set of calls the SDK
 actually executes. Real execution stays exactly where it already was in the
-safe pattern above: driven manually from `guard.finish().decisions`, using
+safe pattern above: driven manually from `guard.takeDecision()`, using
 the value the gate itself authorized from raw evidence.
 
 **Provider-executed and execution-location-ambiguous tools are rejected, not

@@ -62,22 +62,26 @@ export async function runToolCall(model, prompt, callerOwnedSideEffect) {
     guard.push(part);
   }
 
-  for (const decision of guard.finish().decisions) {
-    if (decision.action === "execute") {
-      await callerOwnedSideEffect(decision.value);
-    }
+  const final = guard.finish(); // replayable diagnostic state
+  for (const observed of final.decisions) {
+    const authority = guard.takeDecision(observed.internalId);
+    if (authority) await callerOwnedSideEffect(authority.value);
   }
 }
 ```
 
 In this pattern:
 
-- Never execute `chunk.input` or an SDK-projected/repaired value. Execute only
-  `decision.value` after `decision.action === "execute"`.
+- Never execute `chunk.input` or an SDK-projected/repaired value. Dispatch only
+  the `value` returned once by `takeDecision(internalId)`.
+- `finish()` remains replayable diagnostic state. `takeDecision()` returns a
+  call's executable authority at most once and never consumes another call.
 - Provider-executed tools are outside the local guarantee.
 - Mutating or reconstructing a locked definition after locking voids the
   guarantee; pass `lockedTools` through unchanged.
-- Application-level authorization and idempotency remain caller-owned.
+- Application-level authorization and idempotency remain caller-owned. The
+  one-shot method prevents accidental replay through this guard instance; it
+  is not a distributed transaction or idempotency system.
 - `prefix-safe-json` returns decisions; it never hides or performs execution.
 
 [`examples/ai-sdk-lifecycle-proof.mjs`](examples/ai-sdk-lifecycle-proof.mjs)
@@ -150,7 +154,7 @@ in order from strongest guarantee to weakest:
   it says nothing about a tool that bypasses this function, one
   mutated/reconstructed after this function returns it, or a rejected
   shape. Still dispatch manually from
-  `guard.finish().decisions`, exactly as shown above; this only closes the
+  `guard.takeDecision(observed.internalId)`, exactly as shown above; this only closes the
   door on the SDK (or your own callbacks) doing it *for* you. See
   [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence).
 - **Safe, supported pattern (all majors, including `ai@5`)** — define your
@@ -159,8 +163,8 @@ in order from strongest guarantee to weakest:
   proof the SDK's tool loop already invoked that call, and a no-op callback
   still produces one — omitting `execute` entirely is what keeps the SDK
   from running the tool itself in the first place. Consume `fullStream`
-  yourself, and dispatch manually — only for `action === "execute"` — after
-  `guard.finish()`, exactly as shown above. `createAiSdkExecutionLock()`
+  yourself, call `guard.finish()` for diagnostic state, and dispatch manually
+  only from `guard.takeDecision(observed.internalId)`, exactly as shown above. `createAiSdkExecutionLock()`
   above gets you this same shape automatically (it drops `execute` too) plus
   the SDK-enforced backstop where that backstop exists.
 - **Unprotected / misuse pattern** — attach the real, irreversible operation
@@ -202,6 +206,12 @@ Anthropic, Gemini, OpenRouter, generic OpenAI-compatible endpoints, and the
 Vercel AI SDK. High-level guards currently ship for the AI SDK; every
 provider has a public low-level adapter (see below) that composes with
 `createToolCallExecutionGate()` the same way.
+
+Gemini's adapter exposes its structured argument projection for inspection
+and validation, but it never grants strict execute authority because Gemini
+does not provide raw argument text at this seam. OpenAI-compatible and
+OpenRouter events require a non-negative integer `choice.index`; missing,
+invalid, or duplicate choice identity fails closed instead of guessing zero.
 
 `AiSdkStreamAdapter`/`createAiSdkExecutionGuard()` target the public
 `streamText()`/`generateText()` `fullStream` surface, whose `finishReason`
@@ -344,6 +354,7 @@ objective, trust boundaries, and guarantee/non-guarantee list.
 - Optional per-tool JSON Schema validation on the coordinator (see below) — a value can be structurally complete and still not match what a tool declared it needs
 - `createToolCallExecutionGate()` — a fail-closed `execute` / `retry` / `reject` decision per tool call, built on top of the coordinator (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md))
 - `createAiSdkExecutionGuard()` — a drop-in high-level guard for the Vercel AI SDK's `fullStream`, composing a provider adapter with the execution gate; every `ExecutionDecision` also carries an `evidence` object explaining why (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#high-level-guards))
+- Call-scoped one-shot authority via `takeDecision(internalId)`; replayable `finish()` results remain available for diagnostics, while the recommended dispatch path cannot take the same execute authority twice
 - SDK execution-ownership detection — direct evidence that the AI SDK's own tool loop already invoked a call (attributed or, when it can't be, stream-wide) permanently blocks this library from also authorizing it, with the highest rejection-reason priority of any disqualifier (see [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence))
 
 ### Not Yet Implemented

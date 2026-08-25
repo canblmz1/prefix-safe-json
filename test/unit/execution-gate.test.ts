@@ -373,7 +373,7 @@ describe("execution gate — concurrency and protocol edge cases", () => {
     // even when the underlying arguments themselves are fine.
     const decision = expectDefined(decisions[0]);
     expect(decision.action).toBe("reject");
-    expect(decision.reason).toBe("malformed");
+    expect(decision.reason).toBe("protocol_violation");
     expect(diagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(true);
   });
 

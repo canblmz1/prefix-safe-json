@@ -48,3 +48,41 @@ export const SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE = "E_SDK_EXECUTION_OBSERVED"
  * distinguished into safe/unsafe here, both must fail closed.
  */
 export const SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE = "E_PROVIDER_TOOL_ERROR";
+
+/** Gemini supplied an already-parsed argument object, not raw argument text. */
+export const PROJECTION_ONLY_ARGUMENTS_DIAGNOSTIC_CODE =
+  "E_ARGUMENT_EVIDENCE_PROJECTION_ONLY";
+
+/** AI SDK `tool-input-delta` arrived before its required start part. */
+export const TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE =
+  "E_TOOL_ARGUMENTS_BEFORE_START";
+
+/** AI SDK `tool-input-end` arrived before its required start part. */
+export const TOOL_END_BEFORE_START_DIAGNOSTIC_CODE = "E_TOOL_END_BEFORE_START";
+
+/** AI SDK argument evidence arrived after the call's end part. */
+export const TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE = "E_TOOL_ARGUMENTS_AFTER_END";
+
+/** AI SDK emitted more than one end part for the same call. */
+export const DUPLICATE_TOOL_END_DIAGNOSTIC_CODE = "E_DUPLICATE_TOOL_END";
+
+/** The coordinator observed more than one start for the same source identity. */
+export const DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE =
+  "E_DUPLICATE_TOOL_CALL_START";
+
+/** An OpenAI-compatible choice omitted a trustworthy explicit index. */
+export const INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_INVALID";
+
+/** An OpenAI-compatible event repeated the same explicit choice index. */
+export const DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_DUPLICATE";
+
+/** Diagnostics that permanently disqualify their affected authority scope. */
+export const AUTHORITY_PROTOCOL_VIOLATION_CODES: ReadonlySet<string> = new Set([
+  TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE,
+  TOOL_END_BEFORE_START_DIAGNOSTIC_CODE,
+  TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
+  INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+]);

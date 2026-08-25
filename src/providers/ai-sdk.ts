@@ -4,6 +4,10 @@ import {
   CONTENT_FILTERED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+  TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+  TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE,
+  TOOL_END_BEFORE_START_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 // ---------------------------------------------------------------------------
@@ -121,6 +125,8 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
   readonly provider: ProviderName = "ai-sdk";
   private sequence = 0;
   private finished = false;
+  private readonly startedCallKeys = new Set<string>();
+  private readonly endedCallKeys = new Set<string>();
 
   push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
     if (this.finished) return [];
@@ -160,6 +166,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
       case "tool-input-start": {
         const id = toolPartId(part);
         if (id === undefined) break;
+        this.startedCallKeys.add(`tool-input:${id}`);
         events.push({
           type: "tool_call_start",
           sequence: ++this.sequence,
@@ -173,11 +180,36 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
       case "tool-input-delta": {
         const id = toolPartId(part);
         if (id === undefined || typeof part.delta !== "string") break;
+        const sourceKey = `tool-input:${id}`;
+        if (!this.startedCallKeys.has(sourceKey)) {
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey },
+            code: TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: "AI SDK tool-input-delta arrived before tool-input-start",
+          });
+          break;
+        }
+        if (this.endedCallKeys.has(sourceKey)) {
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey },
+            code: TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: "AI SDK tool-input-delta arrived after tool-input-end",
+          });
+          break;
+        }
         events.push({
           type: "tool_call_arguments_delta",
           sequence: ++this.sequence,
           provider: this.provider,
-          callRef: { sourceKey: `tool-input:${id}` },
+          callRef: { sourceKey },
           delta: part.delta,
         });
         break;
@@ -185,11 +217,37 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
       case "tool-input-end": {
         const id = toolPartId(part);
         if (id === undefined) break;
+        const sourceKey = `tool-input:${id}`;
+        if (!this.startedCallKeys.has(sourceKey)) {
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey },
+            code: TOOL_END_BEFORE_START_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: "AI SDK tool-input-end arrived before tool-input-start",
+          });
+          break;
+        }
+        if (this.endedCallKeys.has(sourceKey)) {
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey },
+            code: DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: "AI SDK emitted duplicate tool-input-end parts for one call",
+          });
+          break;
+        }
+        this.endedCallKeys.add(sourceKey);
         events.push({
           type: "tool_call_end",
           sequence: ++this.sequence,
           provider: this.provider,
-          callRef: { sourceKey: `tool-input:${id}` },
+          callRef: { sourceKey },
           reason: "complete", // corrected by the stream-level "finish" part below
         });
         break;

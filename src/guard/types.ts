@@ -1,6 +1,10 @@
 import { StreamEndReason } from "../coordinator/protocol.js";
 import { CoordinatorLimits, JsonSchemaLike } from "../coordinator/types.js";
-import { ToolCallExecutionGateFinalResult, ExecutionDecision } from "../gate/types.js";
+import {
+  ToolCallExecutionGateFinalResult,
+  ExecutionDecision,
+  ExecuteDecision,
+} from "../gate/types.js";
 import { ParserOptions } from "../types.js";
 
 /**
@@ -20,6 +24,9 @@ export interface ExecutionGuard<TRawEvent = unknown> {
    * only ever returned from `finish()`.
    */
   snapshot(): readonly ExecutionDecision[];
+
+  /** Takes one call's executable decision once, without consuming any other call. */
+  takeDecision(internalId: string): ExecuteDecision | undefined;
 
   /**
    * Signals stream completion and returns the final decision for every tool

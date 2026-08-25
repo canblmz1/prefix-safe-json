@@ -125,7 +125,7 @@ export type { ExecutionGuard, AiSdkExecutionGuard, ExecutionGuardOptions } from 
  * }` are all rejected; `ai@7`'s `{ type: "provider", isProviderExecuted:
  * false }` (verified to have no `execute` field at all, so the SDK can never
  * auto-run it) is accepted. Real execution stays exactly where it already
- * was: driven manually from `guard.finish().decisions`. See the function's
+ * was: driven manually from one-shot `guard.takeDecision()`. See the function's
  * own doc comment for the exact, precisely-scoped guarantee, its real
  * limits, and the explicit non-sandbox threat-model boundary around
  * caller-provided schema/validation code, and
@@ -160,6 +160,7 @@ export { OpenAIStreamAdapter } from "./providers/openai.js";
  * @public (Experimental)
  * Generic OpenAI-compatible `choices[].delta.tool_calls[]` streaming
  * shape, shared by OpenAI's current API and most compatible endpoints.
+ * Requires an explicit non-negative integer `choice.index` for identity.
  */
 export { OpenAICompatibleStreamAdapter } from "./providers/openai-compatible.js";
 
@@ -175,7 +176,7 @@ export { AnthropicStreamAdapter } from "./providers/anthropic.js";
  * Gemini's structured `functionCall` shape. Unlike the other adapters,
  * Gemini delivers function-call arguments as an already-parsed object, not
  * incremental raw JSON text - see docs/COMPATIBILITY.md for what that
- * means for this adapter's guarantees.
+ * means for this adapter's inspection-only, non-executable projection.
  */
 export { GeminiStreamAdapter } from "./providers/gemini.js";
 

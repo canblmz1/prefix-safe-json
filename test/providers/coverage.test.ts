@@ -326,15 +326,15 @@ describe("OpenAIStreamAdapter — Responses API", () => {
   it("handles legacy function_call format name delta", () => {
     const a = new OpenAIStreamAdapter();
     // first push creates the call
-    a.push({ choices: [{ delta: { function_call: { name: "search" } } }] });
+    a.push({ choices: [{ index: 0, delta: { function_call: { name: "search" } } }] });
     // second push with name delta (rare but valid)
-    const events = a.push({ choices: [{ delta: { function_call: { name: "_v2" } } }] });
+    const events = a.push({ choices: [{ index: 0, delta: { function_call: { name: "_v2" } } }] });
     expect(events[0]?.type).toBe("tool_call_name_delta");
   });
 
   it("handles legacy function_call finish_reason cancelled", () => {
     const a = new OpenAIStreamAdapter();
-    const events = a.push({ choices: [{ finish_reason: "cancelled" }] });
+    const events = a.push({ choices: [{ index: 0, finish_reason: "cancelled" }] });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("cancelled");
   });
@@ -352,15 +352,15 @@ describe("OpenAIStreamAdapter — Responses API", () => {
 describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
   it("emits diagnostic on event after stream end", () => {
     const a = new OpenAICompatibleStreamAdapter();
-    a.push({ choices: [{ finish_reason: "tool_calls" }] });
-    const events = a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] });
+    a.push({ choices: [{ index: 0, finish_reason: "tool_calls" }] });
+    const events = a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] });
     expect(events[0]?.type).toBe("provider_diagnostic");
     expect((events[0] as { code?: string })?.code).toBe("W_EVENT_AFTER_STREAM_END");
   });
 
   it("handles tool_call with missing index", () => {
     const a = new OpenAICompatibleStreamAdapter();
-    const events = a.push({ choices: [{ delta: { tool_calls: [{ function: { name: "test" } }] } }] });
+    const events = a.push({ choices: [{ index: 0, delta: { tool_calls: [{ function: { name: "test" } }] } }] });
     const diag = events.find((e) => e.type === "provider_diagnostic");
     expect(diag).toBeDefined();
   });
@@ -368,23 +368,23 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
   it("handles late identity update (toolCallId on existing index)", () => {
     const a = new OpenAICompatibleStreamAdapter();
     // First: start with no id
-    a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "test" } }] } }] });
+    a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { name: "test" } }] } }] });
     // Then: send id separately
-    const events = a.push({ choices: [{ delta: { tool_calls: [{ index: 0, id: "call-xyz" }] } }] });
+    const events = a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call-xyz" }] } }] });
     expect(events[0]?.type).toBe("tool_call_identity");
   });
 
   it("handles name delta on known index", () => {
     const a = new OpenAICompatibleStreamAdapter();
-    a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "search" } }] } }] });
-    const events = a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "_v2" } }] } }] });
+    a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { name: "search" } }] } }] });
+    const events = a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { name: "_v2" } }] } }] });
     const nameDelta = events.find((e) => e.type === "tool_call_name_delta");
     expect(nameDelta).toBeDefined();
   });
 
   it("finish() emits end events for known source keys", () => {
     const a = new OpenAICompatibleStreamAdapter();
-    a.push({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "search", arguments: '{"' } }] } }] });
+    a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { name: "search", arguments: '{"' } }] } }] });
     const events = a.finish({ reason: "network_error" });
     expect(events.some((e) => e.type === "tool_call_end")).toBe(true);
     expect(events.some((e) => e.type === "provider_stream_end")).toBe(true);
@@ -392,7 +392,7 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
 
   it("finish() is idempotent", () => {
     const a = new OpenAICompatibleStreamAdapter();
-    a.push({ choices: [{ finish_reason: "tool_calls" }] });
+    a.push({ choices: [{ index: 0, finish_reason: "tool_calls" }] });
     const events = a.finish();
     expect(events).toHaveLength(0);
   });
@@ -432,7 +432,7 @@ describe("OpenRouterStreamAdapter — uncovered branches", () => {
   it("ignores events after finished", () => {
     const r = new OpenRouterStreamAdapter();
     r.push({ error: "rate_limit" });
-    const events = r.push({ choices: [{ delta: { tool_calls: [] } }] });
+    const events = r.push({ choices: [{ index: 0, delta: { tool_calls: [] } }] });
     expect(events).toHaveLength(0);
   });
 

@@ -31,7 +31,9 @@ import { DiagnosticCode } from "../diagnostics/codes.js";
 import { CoordinatorDiagnostic, ToolCallState } from "../coordinator/types.js";
 import { StreamEndReason } from "../coordinator/protocol.js";
 import {
+  AUTHORITY_PROTOCOL_VIOLATION_CODES,
   CONTENT_FILTERED_DIAGNOSTIC_CODE,
+  PROJECTION_ONLY_ARGUMENTS_DIAGNOSTIC_CODE,
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
@@ -89,7 +91,7 @@ export function decideExecution(
     (d) => d.internalId === call.internalId,
   );
   const globalCoordinatorDiagnostics = ctx.diagnostics.filter(
-    (d) => d.internalId === undefined,
+    (d) => d.internalId === undefined && d.sourceKey === undefined,
   );
   const coordinatorDiagnostics = [
     ...globalCoordinatorDiagnostics,
@@ -171,6 +173,21 @@ export function decideExecution(
   );
   if (isContentFiltered) {
     return reject("content_filtered");
+  }
+
+  if (
+    callCoordinatorDiagnostics.some(
+      (d) => d.code === PROJECTION_ONLY_ARGUMENTS_DIAGNOSTIC_CODE,
+    )
+  ) {
+    return reject("projection_only");
+  }
+
+  if (
+    callCoordinatorDiagnostics.some((d) => AUTHORITY_PROTOCOL_VIOLATION_CODES.has(d.code)) ||
+    globalCoordinatorDiagnostics.some((d) => AUTHORITY_PROTOCOL_VIOLATION_CODES.has(d.code))
+  ) {
+    return reject("protocol_violation");
   }
 
   // --- Status-specific handling --------------------------------------------

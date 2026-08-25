@@ -55,7 +55,7 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  * definition that never went through this function, one reconstructed or
  * mutated after this function returns it, or a rejected shape. Real
  * execution stays exactly where it already was: driven manually from
- * `guard.finish().decisions`, using the value the gate itself authorized
+ * one-shot `guard.takeDecision()`, using the value the gate itself authorized
  * from raw evidence - not `chunk.input`, not anything the SDK derived. This
  * function does not execute anything, queue anything, or introduce a
  * placeholder result.
@@ -151,8 +151,10 @@ export type LockedAiSdkTools<TTools extends Record<string, object>> = {
  *
  * const guard = createAiSdkExecutionGuard({ schemas: { write_file: jsonSchema } });
  * for await (const part of result.fullStream) guard.push(part);
- * for (const decision of guard.finish().decisions) {
- *   if (decision.action === "execute") await realWriteFile(decision.value);
+ * const final = guard.finish();
+ * for (const observed of final.decisions) {
+ *   const authority = guard.takeDecision(observed.internalId);
+ *   if (authority) await realWriteFile(authority.value);
  * }
  * ```
  */
