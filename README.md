@@ -1,68 +1,92 @@
 # prefix-safe-json
 
-> **v0.1** — No longer alpha. Core API (`createParser`, `createToolCallStreamCoordinator`, `createToolCallExecutionGate`, `createAiSdkExecutionGuard`) is considered stable; any breaking change will be called out in [CHANGELOG.md](CHANGELOG.md). Raw provider adapters (`OpenAIStreamAdapter` and friends) remain experimental — see [Current Status](#current-status) for what's covered.
+> **v0.3.0** — Core APIs are stable; raw provider adapters remain
+> experimental. See [Current Status](#current-status) and
+> [CHANGELOG.md](CHANGELOG.md).
 
-**Don't execute incomplete AI tool calls.**
+**Execution integrity for streamed LLM tool calls: prove raw arguments and
+terminal state before caller-owned side effects.**
 
-`prefix-safe-json` is a fail-closed execution-integrity layer for streamed
-LLM tool calls. It distinguishes complete, unfabricated arguments from truncated
-ones — including ones a syntax-level JSON repairer can make *look* complete
-— before they reach a tool with real side effects (writing a file, running a
-command, sending a request).
+Use `prefix-safe-json` when an LLM streams arguments for a tool that can write
+files, run commands, send requests, or perform another irreversible operation.
+It distinguishes complete, unfabricated raw arguments from truncated or
+unconfirmed input, including SDK-projected or repaired values that merely look
+complete. JSON validity is not execution authority.
 
-```
-model output truncated
-        ↓
-    json repair
-        ↓
-    looks valid
-        ↓
-❌ dangerous execution
-```
+## Install
 
-```
-   prefix-safe-json
-        ↓
-      truncated
-        ↓
-  executable: false
-        ↓
-        retry
+```bash
+pnpm add prefix-safe-json ai
+# or: npm install prefix-safe-json ai
 ```
 
-![Demo: a tool call truncated mid-argument is correctly reported non-executable, while the same call delivered in full is reported executable](examples/demo.gif)
+The package is ESM-only and requires Node `>=22.0.0`.
 
-*(Real terminal output from [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs) — not staged. Same script CI runs on every push.)*
+## Recommended AI SDK boundary
 
-## From stream to safe execution, in about 10 lines
+Lock the local tool definitions before the AI SDK sees them, feed the real
+`fullStream` into the guard, and keep the irreversible operation in caller-owned
+manual dispatch:
 
-```typescript
-import { createAiSdkExecutionGuard } from "prefix-safe-json";
+```javascript
+import { jsonSchema, streamText } from "ai";
+import {
+  createAiSdkExecutionGuard,
+  createAiSdkExecutionLock,
+} from "prefix-safe-json";
 
-const guard = createAiSdkExecutionGuard({
-  schemas: {
-    write_file: {
-      type: "object",
-      properties: { path: { type: "string" }, content: { type: "string" } },
-      required: ["path", "content"],
-    },
+const writeFileSchema = {
+  type: "object",
+  properties: {
+    path: { type: "string" },
+    content: { type: "string" },
   },
-});
+  required: ["path", "content"],
+  additionalProperties: false,
+};
 
-for await (const part of result.fullStream) guard.push(part);
+export async function runToolCall(model, prompt, callerOwnedSideEffect) {
+  const lockedTools = createAiSdkExecutionLock({
+    write_file: {
+      description: "Write a UTF-8 text file",
+      inputSchema: jsonSchema(writeFileSchema),
+    },
+  });
 
-for (const decision of guard.finish().decisions) {
-  if (decision.action === "execute") await tools[decision.name](decision.value);
+  const result = streamText({ model, prompt, tools: lockedTools });
+  const guard = createAiSdkExecutionGuard({
+    schemas: { write_file: writeFileSchema },
+  });
+
+  for await (const part of result.fullStream) {
+    guard.push(part);
+  }
+
+  for (const decision of guard.finish().decisions) {
+    if (decision.action === "execute") {
+      await callerOwnedSideEffect(decision.value);
+    }
+  }
 }
 ```
 
-`createAiSdkExecutionGuard()` is a drop-in guard for the [Vercel AI
-SDK](https://ai-sdk.dev)'s `fullStream` — not a dependency of this library
-(no `ai` import, no runtime version lock; see
-[`examples/ai-sdk-guard.mjs`](examples/ai-sdk-guard.mjs)). It's a thin
-composition over the same lower-level adapter + gate API this library has
-always exposed — nothing about the decision logic changes based on which one
-you call.
+In this pattern:
+
+- Never execute `chunk.input` or an SDK-projected/repaired value. Execute only
+  `decision.value` after `decision.action === "execute"`.
+- Provider-executed tools are outside the local guarantee.
+- Mutating or reconstructing a locked definition after locking voids the
+  guarantee; pass `lockedTools` through unchanged.
+- Application-level authorization and idempotency remain caller-owned.
+- `prefix-safe-json` returns decisions; it never hides or performs execution.
+
+[`examples/ai-sdk-v7-safe-boundary.mjs`](examples/ai-sdk-v7-safe-boundary.mjs)
+is the deterministic, executable proof of this exact ownership chain. It uses
+the real `ai@7.0.77` `streamText()` lifecycle and the AI SDK's own mock model,
+with no API key, network request, or paid model call. Lifecycle contracts are
+also verified against the exact pinned versions `ai@5.0.244`, `ai@6.0.264`,
+and `ai@7.0.77`; this is not a claim that every version in those majors is
+tested. See [Compatibility](docs/COMPATIBILITY.md).
 
 **What the decisions mean**
 
@@ -86,7 +110,7 @@ nobody, including the model, confirmed as final. This is exactly the failure
 mode independently reported and reproduced in
 [vercel/ai#19063](https://github.com/vercel/ai/issues/19063): tool calls
 executing regardless of an unsafe finish reason, across AI SDK v5, v6, and
-v7, with fixes landing across all three release lines (v7's in `ai@7.0.70`).
+v7, with fixes landing across all three release lines.
 `prefix-safe-json` does not patch or depend on that fix — it's a
 provider-independent guard that requires positive proof a stream ended
 safely before treating any tool call as final, regardless of which SDK,
@@ -96,9 +120,9 @@ evidence.
 
 **Execution ownership: what must never also happen**
 
-The guard's decisions only mean something if it's the sole thing deciding
-whether your tool function runs. The pattern above works because it never
-gives the AI SDK's own tool-calling loop a chance to run your tool itself —
+The guard's decisions only mean something if they're the sole thing deciding
+whether your tool function runs. The recommended pattern above prevents the
+AI SDK's own tool-calling loop from running caller callbacks first —
 in order from strongest guarantee to weakest:
 
 - **Strongest — `createAiSdkExecutionLock()`** — wrap your tool definitions
@@ -358,11 +382,7 @@ call.schemaValid; // true | false | undefined (undefined = no schema registered 
 
 A schema mismatch also surfaces as a coordinator diagnostic (`E_SCHEMA_VALIDATION_FAILED`) with ajv's own error detail. Malformed schemas are compiled eagerly at construction time, so a bad schema fails fast rather than mid-stream.
 
-## Installation
-
-```bash
-npm install prefix-safe-json
-```
+## Package requirements
 
 ESM only — `import`, not `require`. There is currently no CommonJS build.
 Node `>=22.0.0` (Active LTS lines only — Node 18/20 are end-of-life and no
@@ -415,15 +435,21 @@ and asserts the truncated call is never reported executable while a
 genuinely complete one is. This example runs in CI on every push, so it
 can't silently rot into a stale claim.
 
-For the same demonstration through the low-level execution gate and the
+For the canonical AI SDK ownership-boundary demonstration using the real
+`ai@7.0.77` `streamText()` lifecycle and official mock model, see
+[`examples/ai-sdk-v7-safe-boundary.mjs`](examples/ai-sdk-v7-safe-boundary.mjs)
+(`pnpm run example:ai-sdk-safe-boundary` after `pnpm run build`). It asserts
+that locked callbacks remain at zero, a safe call is manually dispatched
+exactly once, and an unsafe terminal state performs no operation. CI and the
+release workflow run this same file.
+
+For the same raw-evidence demonstration through the low-level execution gate and the
 [Vercel AI SDK](https://ai-sdk.dev)'s `fullStream` shape instead, see
 [`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)
 (`node examples/ai-sdk-execution-gate.mjs` after `pnpm run build`) — also
-run in CI on every push. For the drop-in `createAiSdkExecutionGuard()` shown
-at the top of this README, see
-[`examples/ai-sdk-guard.mjs`](examples/ai-sdk-guard.mjs)
-(`node examples/ai-sdk-guard.mjs`) — same scenarios, same guarantees, also
-run in CI on every push.
+run in CI on every push. [`examples/ai-sdk-guard.mjs`](examples/ai-sdk-guard.mjs)
+is a lower-level wire-shape guard demonstration; it is not the canonical
+execution-ownership example. Both remain CI-checked.
 
 ## License
 

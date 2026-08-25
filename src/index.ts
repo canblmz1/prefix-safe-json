@@ -190,8 +190,8 @@ export { OpenRouterStreamAdapter } from "./providers/openrouter.js";
  * @public (Experimental)
  * Vercel AI SDK's `fullStream` tool-call part shape
  * (`tool-input-start`/`-delta`/`-end`, `tool-call`, `tool-result`,
- * `tool-error`, `finish`, `error`, `abort`). Verified against `ai@5.0.240`,
- * `ai@6.0.259`, `ai@7.0.70` - see docs/COMPATIBILITY.md. Prefer
+ * `tool-error`, `finish`, `error`, `abort`). Verified against `ai@5.0.244`,
+ * `ai@6.0.264`, `ai@7.0.77` - see docs/COMPATIBILITY.md. Prefer
  * `createAiSdkExecutionGuard()` (Stable, above) for the common case; use
  * this directly only if you need the adapter instance itself.
  */

@@ -4,8 +4,8 @@
 // reimplementation).
 //
 // The event shapes below match the Vercel AI SDK's actual `fullStream` part
-// shapes for tool-call argument streaming (verified against the published
-// `ai@7.0.66` type declarations while building AiSdkStreamAdapter):
+// shapes for tool-call argument streaming (verified against the exact pinned
+// `ai@7.0.77` lifecycle dependency):
 // tool-input-start -> repeated tool-input-delta -> tool-input-end -> finish
 // (which carries `finishReason`). A real integration looks like:
 //
