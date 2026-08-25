@@ -1,11 +1,11 @@
-// Exact ai@7 lifecycle proof using its official MockLanguageModelV4 boundary.
+// Exact ai@6 lifecycle proof using its official MockLanguageModelV3 boundary.
 
-import { jsonSchema, streamText } from "ai-v7";
-import { MockLanguageModelV4 } from "ai-v7/test";
+import { jsonSchema, streamText } from "ai-v6";
+import { MockLanguageModelV3 } from "ai-v6/test";
 import { runLifecycleProof } from "./ai-sdk-lifecycle-proof.shared.mjs";
 
 function createModel(parts) {
-  return new MockLanguageModelV4({
+  return new MockLanguageModelV3({
     doStream: async () => ({
       stream: new ReadableStream({
         start(controller) {
@@ -18,7 +18,7 @@ function createModel(parts) {
 }
 
 export default await runLifecycleProof({
-  exactVersion: "ai@7.0.77",
+  exactVersion: "ai@6.0.264",
   approvalTruth: "lock removes callbacks and needsApproval backstops execute",
   streamText,
   jsonSchema,
