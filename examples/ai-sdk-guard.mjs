@@ -12,10 +12,12 @@
 //   }
 //
 // Same fullStream part shapes as examples/ai-sdk-execution-gate.mjs (verified
-// identical across ai@5.0.240, ai@6.0.259, ai@7.0.70 - see
-// test/guard/ai-sdk-compatibility.test.ts). This example never calls a real
+// against the exact pinned ai@5.0.244, ai@6.0.264, and ai@7.0.77 lifecycle
+// dependencies). This example never calls a real
 // model - literal, correctly-shaped fullStream parts, no network, no API
-// key, deterministic, safe to run in CI on every push.
+// key, deterministic, safe to run in CI on every push. This is a wire-shape
+// adapter demo, not the canonical ownership path; see
+// examples/ai-sdk-v7-safe-boundary.mjs for the lock + guard path.
 //
 // Run: node examples/ai-sdk-guard.mjs
 

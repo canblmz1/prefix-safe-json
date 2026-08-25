@@ -206,9 +206,10 @@ for (const decision of gate.finish().decisions) {
 ```
 
 See `examples/anthropic-truncation-safety.mjs` and
-`examples/ai-sdk-execution-gate.mjs` for full runnable versions (no network
-calls, no API key - literal, correctly-shaped provider events, run by CI on
-every push).
+`examples/ai-sdk-execution-gate.mjs` for full runnable wire-shape versions
+(no network calls, no API key, run by CI on every push). For the canonical
+AI SDK ownership boundary driven by the real `streamText()` lifecycle, use
+`examples/ai-sdk-v7-safe-boundary.mjs`.
 
 ## High-level guards
 
@@ -216,41 +217,23 @@ For the common case - one provider, no need to hold the adapter or gate
 instance yourself - `createAiSdkExecutionGuard()` composes
 `AiSdkStreamAdapter` and `createToolCallExecutionGate()` behind three
 methods: `push()`, `snapshot()`, `finish()`. Same decision logic, same
-fail-closed guarantees, no new parser or coordinator - it is the example
-above with the adapter/gate wiring already done for you:
+fail-closed guarantees, no new parser or coordinator.
 
-```ts
-import { createAiSdkExecutionGuard } from "prefix-safe-json";
-
-const guard = createAiSdkExecutionGuard({
-  schemas: {
-    write_file: {
-      type: "object",
-      properties: { path: { type: "string" }, content: { type: "string" } },
-      required: ["path", "content"],
-    },
-  },
-});
-
-for await (const part of result.fullStream) {
-  guard.push(part);
-}
-
-const final = guard.finish();
-for (const decision of final.decisions) {
-  if (decision.action === "execute") {
-    await tools[decision.name](decision.value);
-  }
-}
-```
+The canonical, complete integration is
+[the README's recommended AI SDK boundary](../README.md#recommended-ai-sdk-boundary):
+it applies `createAiSdkExecutionLock()` before `streamText()`, feeds the real
+`fullStream` into `createAiSdkExecutionGuard()`, and manually dispatches only
+`decision.value`. The same path is executable and assertion-backed in
+[`examples/ai-sdk-v7-safe-boundary.mjs`](../examples/ai-sdk-v7-safe-boundary.mjs).
 
 `createAiSdkExecutionGuard()` does not depend on the `ai` package at runtime
 and does not import its types - `push()` accepts `unknown`, matching every
 provider adapter's own `push()` signature. It has been verified (not merely
-documented) against the published `fullStream` part shape and finish-reason
-vocabulary of `ai@5.0.240`, `ai@6.0.259`, and `ai@7.0.70` - see
-`test/guard/ai-sdk-compatibility.test.ts` for the exact evidence and which
-fields were checked.
+documented) against the published `fullStream` part shape, finish-reason
+vocabulary, and real `streamText()` lifecycle of the exact pinned versions
+`ai@5.0.244`, `ai@6.0.264`, and `ai@7.0.77`. This is not a claim that every
+version in those majors is tested; see `test/integration/ai-sdk-lifecycle/`
+and `docs/COMPATIBILITY.md` for the exact evidence.
 
 The low-level API (adapter + gate, composed yourself) remains fully public
 and is what the high-level guard is built from - use it directly if you need

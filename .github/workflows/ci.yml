@@ -66,6 +66,9 @@ jobs:
     - name: Run end-to-end example (AI SDK execution guard)
       run: pnpm run example:ai-sdk-guard
 
+    - name: Run golden AI SDK ownership-boundary example
+      run: pnpm run example:ai-sdk-safe-boundary
+
     - name: Pack Check
       run: pnpm run pack:check
 
