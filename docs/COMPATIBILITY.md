@@ -24,6 +24,17 @@ and the machine-readable fixture corpus in `test/corpus/provider-envelopes.test.
 AI SDK adapter is, because none of these five import or type-check against
 an actual SDK package (by design — see "Runtime dependencies" below).
 
+The AI SDK claim is independently runnable with
+`pnpm run example:ai-sdk-lifecycle-proof`. The proof drives each exact pinned
+major's real `streamText()` lifecycle and reports observable counters for an
+unsafe unlocked control, a locked unsafe termination, and a locked complete
+call. It demonstrates local execution ownership—not sandboxing, authorization,
+idempotency, or provider-side tool execution. `ai@5.0.244` has no approval
+mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
+`ai@7.0.77` additionally use their approval mechanism as an `execute` backstop.
+Other provider entries above remain wire-shape-tested rather than SDK-lifecycle
+version claims.
+
 ## Runtime dependencies
 
 No provider adapter imports its vendor SDK's package or types. Every

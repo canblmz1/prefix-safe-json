@@ -80,13 +80,12 @@ In this pattern:
 - Application-level authorization and idempotency remain caller-owned.
 - `prefix-safe-json` returns decisions; it never hides or performs execution.
 
-[`examples/ai-sdk-v7-safe-boundary.mjs`](examples/ai-sdk-v7-safe-boundary.mjs)
-is the deterministic, executable proof of this exact ownership chain. It uses
-the real `ai@7.0.77` `streamText()` lifecycle and the AI SDK's own mock model,
-with no API key, network request, or paid model call. Lifecycle contracts are
-also verified against the exact pinned versions `ai@5.0.244`, `ai@6.0.264`,
-and `ai@7.0.77`; this is not a claim that every version in those majors is
-tested. See [Compatibility](docs/COMPATIBILITY.md).
+[`examples/ai-sdk-lifecycle-proof.mjs`](examples/ai-sdk-lifecycle-proof.mjs)
+runs deterministic execution-ownership proofs through the real `streamText()`
+lifecycle of the exact pins `ai@5.0.244`, `ai@6.0.264`, and `ai@7.0.77`, with
+no API key, network request, or paid model call. Run it with
+`pnpm run example:ai-sdk-lifecycle-proof`. This is not a claim that every
+version in those majors is tested. See [Compatibility](docs/COMPATIBILITY.md).
 
 **What the decisions mean**
 
@@ -435,13 +434,12 @@ and asserts the truncated call is never reported executable while a
 genuinely complete one is. This example runs in CI on every push, so it
 can't silently rot into a stale claim.
 
-For the canonical AI SDK ownership-boundary demonstration using the real
-`ai@7.0.77` `streamText()` lifecycle and official mock model, see
-[`examples/ai-sdk-v7-safe-boundary.mjs`](examples/ai-sdk-v7-safe-boundary.mjs)
-(`pnpm run example:ai-sdk-safe-boundary` after `pnpm run build`). It asserts
-that locked callbacks remain at zero, a safe call is manually dispatched
-exactly once, and an unsafe terminal state performs no operation. CI and the
-release workflow run this same file.
+For the exact-major AI SDK ownership proof, run
+`pnpm run example:ai-sdk-lifecycle-proof` after `pnpm run build`. It asserts
+for each exact pin that an unlocked control invokes caller code before guard
+authority, locked unsafe calls perform no operation, and locked safe calls are
+manually dispatched exactly once. CI and the release workflow run this same
+command.
 
 For the same raw-evidence demonstration through the low-level execution gate and the
 [Vercel AI SDK](https://ai-sdk.dev)'s `fullStream` shape instead, see

@@ -66,7 +66,11 @@
     "example:anthropic": "node examples/anthropic-truncation-safety.mjs",
     "example:ai-sdk": "node examples/ai-sdk-execution-gate.mjs",
     "example:ai-sdk-guard": "node examples/ai-sdk-guard.mjs",
-    "example:ai-sdk-safe-boundary": "node examples/ai-sdk-v7-safe-boundary.mjs"
+    "example:ai-sdk-safe-boundary": "node examples/ai-sdk-v7-safe-boundary.mjs",
+    "example:ai-sdk-v5-safe-boundary": "node examples/ai-sdk-v5-safe-boundary.mjs",
+    "example:ai-sdk-v6-safe-boundary": "node examples/ai-sdk-v6-safe-boundary.mjs",
+    "example:ai-sdk-v7-safe-boundary": "node examples/ai-sdk-v7-safe-boundary.mjs",
+    "example:ai-sdk-lifecycle-proof": "node examples/ai-sdk-lifecycle-proof.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.8.0",
