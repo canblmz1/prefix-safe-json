@@ -7,8 +7,9 @@
 //   const guard = createAiSdkExecutionGuard({ schemas: toolSchemas });
 //   for await (const part of result.fullStream) guard.push(part);
 //   const final = guard.finish();
-//   for (const decision of final.decisions) {
-//     if (decision.action === "execute") await tools[decision.name](decision.value);
+//   for (const observed of final.decisions) {
+//     const authority = guard.takeDecision(observed.internalId);
+//     if (authority) await tools[authority.name](authority.value);
 //   }
 //
 // Same fullStream part shapes as examples/ai-sdk-execution-gate.mjs (verified
@@ -39,7 +40,7 @@ function run(label, parts, schemas) {
       console.log(`  value:       ${JSON.stringify(decision.value)}`);
     }
   }
-  return decisions;
+  return { guard, decisions };
 }
 
 const toolSchemas = {
@@ -63,7 +64,7 @@ const truncatedParts = [
   { type: "finish", finishReason: "length" },
 ];
 
-const truncatedDecisions = run(
+const { guard: truncatedGuard, decisions: truncatedDecisions } = run(
   "Scenario A: write_file cut off mid-argument, finishReason \"length\"",
   truncatedParts,
   toolSchemas,
@@ -73,6 +74,9 @@ if (!truncatedDecision || truncatedDecision.action === "execute") {
   console.error("\nFAIL: a truncated tool call was reported as safe to execute.");
   process.exitCode = 1;
 } else {
+  if (truncatedGuard.takeDecision(truncatedDecision.internalId) !== undefined) {
+    throw new Error("unsafe call exposed executable authority");
+  }
   console.log("\nOK: the guard refuses this call before it ever reaches the tool.");
 }
 
@@ -85,11 +89,15 @@ const completeParts = [
   { type: "finish", finishReason: "tool-calls" },
 ];
 
-const completeDecisions = run("Scenario B: the same call, genuinely complete", completeParts, toolSchemas);
+const { guard: completeGuard, decisions: completeDecisions } = run("Scenario B: the same call, genuinely complete", completeParts, toolSchemas);
 const completeDecision = completeDecisions[0];
 if (!completeDecision || completeDecision.action !== "execute") {
   console.error("\nFAIL: a genuinely complete tool call was not reported executable.");
   process.exitCode = 1;
 } else {
-  console.log("\nOK: a real, fully-delivered call is reported action: \"execute\".");
+  const authority = completeGuard.takeDecision(completeDecision.internalId);
+  if (!authority || completeGuard.takeDecision(completeDecision.internalId) !== undefined) {
+    throw new Error("execute authority was not available exactly once");
+  }
+  console.log("\nOK: a real, fully-delivered call exposes execute authority exactly once.");
 }

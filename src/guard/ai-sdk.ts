@@ -26,10 +26,9 @@ import { AiSdkExecutionGuard, ExecutionGuardOptions } from "./types.js";
  * }
  *
  * const final = guard.finish();
- * for (const decision of final.decisions) {
- *   if (decision.action === "execute") {
- *     await tools[decision.name](decision.value);
- *   }
+ * for (const observed of final.decisions) {
+ *   const authority = guard.takeDecision(observed.internalId);
+ *   if (authority) await tools[authority.name](authority.value);
  * }
  * ```
  *

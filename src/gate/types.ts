@@ -34,6 +34,8 @@ export type ExecutionReason =
   | "provider_error"
   | "content_filtered"
   | "sdk_execution_observed"
+  | "projection_only"
+  | "protocol_violation"
   | "unknown";
 
 /**
@@ -213,6 +215,13 @@ export interface ToolCallExecutionGate {
 
   /** Drains the underlying coordinator's raw event queue, for advanced/UI consumers. */
   drainEvents(): readonly ToolCallCoordinatorEvent[];
+
+  /**
+   * Takes this call's executable decision at most once. Returns `undefined`
+   * before `finish()`, for non-executable/unknown calls, and after the same
+   * call's authority has already been taken. Other calls are unaffected.
+   */
+  takeDecision(internalId: string): ExecuteDecision | undefined;
 
   finish(meta?: {
     reason?: StreamEndReason;

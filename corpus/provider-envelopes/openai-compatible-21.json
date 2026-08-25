@@ -6,7 +6,7 @@
   "provider": "openai-compatible",
   "input": {
     "encoding": "utf8-text",
-    "data": "{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_8\",\"type\":\"function\",\"function\":{\"name\":\"foo\"}}]}}]}\\n{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"b\\\":8}\"}}]}}]}\\n{\"choices\":[{\"finish_reason\":\"tool_calls\"}]}"
+    "data": "{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_8\",\"type\":\"function\",\"function\":{\"name\":\"foo\"}}]},\"index\":0}]}\\n{\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"b\\\":8}\"}}]},\"index\":0}]}\\n{\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0}]}"
   },
   "stream": {
     "endReason": "complete",

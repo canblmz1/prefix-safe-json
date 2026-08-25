@@ -83,6 +83,15 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   equivalent "here's what I think you meant" value) is never read by any
   adapter; only what the model literally streamed, character for character,
   can ever become `decision.value`.
+- Structured provider projections remain inspectable but never receive strict
+  raw-proof authority. In particular, Gemini `functionCall.args` is rejected
+  as `projection_only` even when JSON, schema, and terminal state are valid.
+- Ordering violations in protocols that define explicit start/delta/end parts
+  are sticky and call-scoped. A later clean AI SDK sequence cannot erase a
+  delta/end-before-start or duplicate/illegal start history.
+- OpenAI-compatible identity uses both explicit `choice.index` and tool-call
+  index. Missing, invalid, or duplicate choice identity fails closed; array
+  position is never substituted for provider identity.
 - A schema mismatch (registered JSON Schema, draft-07, validated via ajv)
   never reaches `execute`, independent of structural completeness —
   `reject`/`schema_invalid`.
@@ -93,6 +102,9 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
   or otherwise shared mutable state exists anywhere in the decision path,
   so evidence recorded against one instance can never influence another,
   even when the same provider call ID string is reused across instances.
+- `takeDecision(internalId)` exposes each call's executable authority at most
+  once per gate/guard instance and never consumes an unrelated call. Replayable
+  `finish()` output remains diagnostic, not the recommended dispatch token.
 - Direct evidence that a provider SDK's own tool loop already invoked a
   call's `execute` callback (a `tool-result` or `tool-error` part on the
   Vercel AI SDK's `fullStream`) permanently blocks this library from *also*
@@ -136,6 +148,10 @@ general AI security platform. It is explicitly **not**:
   principal is allowed to invoke which tool. `action: "execute"` says
   nothing about *permission* — only that the arguments are genuinely
   complete and unfabricated.
+- **A transaction or durable idempotency system.** One-shot consumption only
+  prevents asking the same local guard instance for the same authority twice.
+  Persisted idempotency keys, crash recovery, retries, and distributed
+  exactly-once effects remain caller-owned.
 - **A sandbox.** It never runs, inspects, or constrains the tool
   implementation itself. `action: "execute"` means "safe to treat as the
   real, complete value the model produced," not "safe to run without your

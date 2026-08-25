@@ -1,10 +1,11 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
+import { PROJECTION_ONLY_ARGUMENTS_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
 
 // Gemini function call shape (structured)
 interface GeminiFunctionCall {
   name?: string;
-  args?: Record<string, unknown>; // Note: Gemini typically returns structured objects, not raw JSON strings
+  args?: unknown; // Gemini returns a structured value, not raw JSON argument evidence.
 }
 
 interface GeminiPart {
@@ -65,18 +66,44 @@ export class GeminiStreamAdapter implements ProviderStreamAdapter<unknown> {
                 callRef: { sourceKey },
                 name: fc.name,
               });
+
+              events.push({
+                type: "provider_diagnostic",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                code: PROJECTION_ONLY_ARGUMENTS_DIAGNOSTIC_CODE,
+                severity: "warning",
+                message: "Gemini function-call arguments are a structured projection, not raw streamed argument evidence",
+              });
               
-              if (fc.args) {
+              if (fc.args !== undefined) {
                 // Gemini currently emits structured objects.
                 // We serialize it to emulate a text delta, BUT it is documented in docs/providers/gemini.md 
                 // that this is NOT byte-level streaming. It is object-level final delivery.
-                events.push({
-                  type: "tool_call_arguments_delta",
-                  sequence: ++this.sequence,
-                  provider: this.provider,
-                  callRef: { sourceKey },
-                  delta: JSON.stringify(fc.args),
-                });
+                try {
+                  const projected = JSON.stringify(fc.args);
+                  if (projected === undefined) {
+                    throw new TypeError("structured arguments are not JSON-serializable");
+                  }
+                  events.push({
+                    type: "tool_call_arguments_delta",
+                    sequence: ++this.sequence,
+                    provider: this.provider,
+                    callRef: { sourceKey },
+                    delta: projected,
+                  });
+                } catch {
+                  events.push({
+                    type: "provider_diagnostic",
+                    sequence: ++this.sequence,
+                    provider: this.provider,
+                    callRef: { sourceKey },
+                    code: "E_GEMINI_ARGUMENT_PROJECTION_FAILED",
+                    severity: "error",
+                    message: "Gemini structured function-call arguments could not be projected to JSON",
+                  });
+                }
               }
               
               events.push({

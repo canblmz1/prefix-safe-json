@@ -20,6 +20,7 @@ import { NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/proto
 import { ParserOptions } from "../types.js";
 import { decideExecution } from "./decide.js";
 import {
+  ExecuteDecision,
   ExecutionDecision,
   ToolCallExecutionGate,
   ToolCallExecutionGateFinalResult,
@@ -37,6 +38,8 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
   private streamEndReason: StreamEndReason | undefined;
   private streamEndProviderReason: string | undefined;
   private streamEndCaptured = false;
+  private finalResult: ToolCallExecutionGateFinalResult | undefined;
+  private readonly consumedExecutionIds = new Set<string>();
 
   constructor(
     limits?: Partial<CoordinatorLimits>,
@@ -73,6 +76,18 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
     return this.coordinator.drainEvents();
   }
 
+  takeDecision(internalId: string): ExecuteDecision | undefined {
+    if (this.finalResult === undefined || this.consumedExecutionIds.has(internalId)) {
+      return undefined;
+    }
+    const decision = this.finalResult.decisions.find(
+      (candidate) => candidate.internalId === internalId,
+    );
+    if (decision?.action !== "execute") return undefined;
+    this.consumedExecutionIds.add(internalId);
+    return decision;
+  }
+
   finish(meta?: {
     reason?: StreamEndReason;
     providerReason?: string;
@@ -98,7 +113,8 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
     };
     const decisions = result.calls.map((call) => decideExecution(call, ctx));
 
-    return { decisions, diagnostics };
+    this.finalResult = { decisions, diagnostics };
+    return this.finalResult;
   }
 }
 
@@ -117,8 +133,10 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
  * for (const raw of providerEvents) {
  *   for (const normalized of adapter.push(raw)) gate.push(normalized);
  * }
- * for (const decision of gate.finish().decisions) {
- *   if (decision.action === "execute") await tools[decision.name](decision.value);
+ * const final = gate.finish();
+ * for (const observed of final.decisions) {
+ *   const authority = gate.takeDecision(observed.internalId);
+ *   if (authority) await tools[authority.name](authority.value);
  * }
  * ```
  */

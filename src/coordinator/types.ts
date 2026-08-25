@@ -121,6 +121,8 @@ export interface CoordinatorDiagnostic {
   readonly severity: "info" | "warning" | "error" | "fatal";
   readonly message: string;
   readonly internalId?: string;
+  /** Provider-local identity when a violation arrived before a call existed. */
+  readonly sourceKey?: string;
 }
 
 export interface CoordinatorPushResult {

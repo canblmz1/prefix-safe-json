@@ -14,8 +14,10 @@
 //   for await (const part of result.fullStream) {
 //     for (const normalized of adapter.push(part)) gate.push(normalized);
 //   }
-//   for (const decision of gate.finish().decisions) {
-//     if (decision.action === "execute") await tools[decision.name](decision.value);
+//   const final = gate.finish();
+//   for (const observed of final.decisions) {
+//     const authority = gate.takeDecision(observed.internalId);
+//     if (authority) await tools[authority.name](authority.value);
 //   }
 //
 // This example never calls a real model - it feeds literal, correctly-shaped
@@ -53,7 +55,7 @@ function run(label, parts) {
       console.log(`  value:       ${JSON.stringify(decision.value)}`);
     }
   }
-  return decisions;
+  return { gate, decisions };
 }
 
 // --- Scenario A: a tool call cut off mid-argument by finishReason "length" -
@@ -77,7 +79,7 @@ const truncatedParts = [
   { type: "finish", finishReason: "length" },
 ];
 
-const truncatedDecisions = run(
+const { gate: truncatedGate, decisions: truncatedDecisions } = run(
   "Scenario A: write_file cut off mid-argument, finishReason \"length\"",
   truncatedParts,
 );
@@ -88,6 +90,9 @@ if (!truncatedDecision || truncatedDecision.action === "execute") {
   );
   process.exitCode = 1;
 } else {
+  if (truncatedGate.takeDecision(truncatedDecision.internalId) !== undefined) {
+    throw new Error("unsafe call exposed executable authority");
+  }
   console.log(
     "\nOK: the execution gate refuses this call - the corrupted `content`",
     "\n    value never appears in stableValue, so a caller gating write_file",
@@ -107,11 +112,15 @@ const completeParts = [
   { type: "finish", finishReason: "tool-calls" },
 ];
 
-const completeDecisions = run("Scenario B: the same call, genuinely complete", completeParts);
+const { gate: completeGate, decisions: completeDecisions } = run("Scenario B: the same call, genuinely complete", completeParts);
 const completeDecision = completeDecisions[0];
 if (!completeDecision || completeDecision.action !== "execute") {
   console.error("\nFAIL: a genuinely complete tool call was not reported executable.");
   process.exitCode = 1;
 } else {
-  console.log("\nOK: a real, fully-delivered call is reported action: \"execute\".");
+  const authority = completeGate.takeDecision(completeDecision.internalId);
+  if (!authority || completeGate.takeDecision(completeDecision.internalId) !== undefined) {
+    throw new Error("execute authority was not available exactly once");
+  }
+  console.log("\nOK: a real, fully-delivered call exposes execute authority exactly once.");
 }

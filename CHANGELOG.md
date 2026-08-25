@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
 coverage) a version bump requires.
 
+## [Unreleased]
+
+### Security
+
+- Gemini structured argument projections are now inspection-only and reject
+  strict execution authority with `projection_only`.
+- AI SDK start/delta/end ordering violations are recorded as sticky,
+  source-scoped protocol poison; later valid parts cannot erase them.
+- OpenAI-compatible/OpenRouter tool identity now includes explicit
+  `choice.index` plus tool index. Missing, invalid, or duplicate choice
+  identity fails closed.
+- Added call-scoped `takeDecision(internalId)`, a one-shot execution-authority
+  path. `finish()` remains replayable for diagnostics; application
+  authorization and durable idempotency remain caller-owned.
+
 ## [0.3.0] - 2026-08-24
 
 Closes the execution-ownership gap `0.2.0`'s `sdk_execution_observed`

@@ -15,6 +15,8 @@ import {
   JsonSchemaLike
 } from "./types.js";
 import {
+  AUTHORITY_PROTOCOL_VIOLATION_CODES,
+  DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 } from "./diagnostic-codes.js";
@@ -59,6 +61,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   private readonly toolValidators: Map<string, ValidateFunction>;
   private calls: Map<string, CoordinatorCallState> = new Map();
   private sourceKeyToInternalId: Map<string, string> = new Map();
+  private pendingProtocolDiagnostics: Map<string, CoordinatorDiagnostic[]> = new Map();
   private callCounter = 0;
   private eventQueue: ToolCallCoordinatorEvent[] = [];
   private diagnostics: CoordinatorDiagnostic[] = [];
@@ -176,7 +179,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     const existingId = this.sourceKeyToInternalId.get(sourceKey);
     if (existingId !== undefined) {
       this.addDiagnostic({
-        code: "E_DUPLICATE_TOOL_CALL_START",
+        code: DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
         severity: "error",
         internalId: existingId,
         message: `Duplicate start for tool call sourceKey: ${sourceKey}`,
@@ -204,6 +207,18 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     if (event.name !== undefined) call.name = event.name;
 
     this.calls.set(internalId, call);
+
+    const pendingDiagnostics = this.pendingProtocolDiagnostics.get(sourceKey) ?? [];
+    if (pendingDiagnostics.length > 0) {
+      for (const diagnostic of pendingDiagnostics) {
+        this.addDiagnostic({
+          ...diagnostic,
+          internalId,
+          sourceKey: undefined,
+        });
+      }
+      this.pendingProtocolDiagnostics.delete(sourceKey);
+    }
     
     this.eventQueue.push({
       type: "tool_call_discovered",
@@ -440,13 +455,24 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   }
 
   private handleProviderDiagnostic(event: NormalizedToolStreamEvent & { type: "provider_diagnostic" }) {
-    const internalId = event.callRef ? this.sourceKeyToInternalId.get(event.callRef.sourceKey) : undefined;
-    this.addDiagnostic({
+    const sourceKey = event.callRef?.sourceKey;
+    const internalId = sourceKey ? this.sourceKeyToInternalId.get(sourceKey) : undefined;
+    const diagnostic: CoordinatorDiagnostic = {
       code: event.code,
       severity: event.severity,
       message: event.message,
       internalId,
-    });
+      ...(sourceKey !== undefined && internalId === undefined ? { sourceKey } : {}),
+    };
+    this.addDiagnostic(diagnostic);
+
+    if (AUTHORITY_PROTOCOL_VIOLATION_CODES.has(event.code)) {
+      if (internalId === undefined && sourceKey !== undefined) {
+        const pending = this.pendingProtocolDiagnostics.get(sourceKey) ?? [];
+        pending.push(diagnostic);
+        this.pendingProtocolDiagnostics.set(sourceKey, pending);
+      }
+    }
 
     // Mirrors handleIdentity()'s existing "mutate call.status mid-stream, not
     // only at finishCall() time" pattern for identity conflicts - this is

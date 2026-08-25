@@ -34,6 +34,10 @@ export function createProviderExecutionGuard<TRawEvent>(
       return gate.snapshot();
     },
 
+    takeDecision(internalId: string) {
+      return gate.takeDecision(internalId);
+    },
+
     finish(meta?: { reason?: StreamEndReason; providerReason?: string }): ToolCallExecutionGateFinalResult {
       // If the provider stream already delivered its own terminal event
       // through push() (the common case), the adapter is already

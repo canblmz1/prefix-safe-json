@@ -92,7 +92,7 @@ async function drainIntoGuard(fullStream, guard) {
   for await (const part of fullStream) {
     guard.push(part);
   }
-  return guard.finish();
+  return { guard, final: guard.finish() };
 }
 
 export async function runLifecycleProof({
@@ -118,7 +118,7 @@ export async function runLifecycleProof({
       }),
     },
   });
-  const unlockedFinal = await drainIntoGuard(unlockedResult.fullStream, createGuard());
+  const { final: unlockedFinal } = await drainIntoGuard(unlockedResult.fullStream, createGuard());
   unlockedGuardFinished = true;
   const unlockedNativeEffects = nativeEffectTotal(unlockedCounts);
   assert.ok(unlockedNativeEffects > 0);
@@ -136,13 +136,15 @@ export async function runLifecycleProof({
       }),
     }),
   });
-  const lockedUnsafeFinal = await drainIntoGuard(
+  const { guard: lockedUnsafeGuard, final: lockedUnsafeFinal } = await drainIntoGuard(
     lockedUnsafeResult.fullStream,
     createGuard(),
   );
   const lockedUnsafeDecision = lockedUnsafeFinal.decisions[0];
   assert.ok(lockedUnsafeDecision);
   assert.notEqual(lockedUnsafeDecision.action, "execute");
+  const lockedUnsafeAuthority = lockedUnsafeGuard.takeDecision(lockedUnsafeDecision.internalId);
+  assert.equal(lockedUnsafeAuthority, undefined);
   assert.deepEqual(lockedUnsafeCounts, zeroNativeCounts());
   assert.equal(lockedUnsafeManualEffects, 0);
 
@@ -159,17 +161,24 @@ export async function runLifecycleProof({
       }),
     }),
   });
-  const lockedSafeFinal = await drainIntoGuard(lockedSafeResult.fullStream, createGuard());
+  const { guard: lockedSafeGuard, final: lockedSafeFinal } = await drainIntoGuard(
+    lockedSafeResult.fullStream,
+    createGuard(),
+  );
   const lockedSafeDecision = lockedSafeFinal.decisions[0];
   assert.ok(lockedSafeDecision);
   assert.equal(lockedSafeDecision.action, "execute");
   assert.deepEqual(lockedSafeCounts, zeroNativeCounts());
 
-  if (lockedSafeDecision.action === "execute") {
-    assert.deepEqual(lockedSafeDecision.value, EXPECTED_VALUE);
+  const lockedSafeAuthority = lockedSafeGuard.takeDecision(lockedSafeDecision.internalId);
+  assert.ok(lockedSafeAuthority);
+  assert.deepEqual(lockedSafeAuthority.value, EXPECTED_VALUE);
+  if (lockedSafeAuthority) {
     lockedSafeManualEffects += 1;
   }
   assert.equal(lockedSafeManualEffects, 1);
+  const secondLockedSafeAuthority = lockedSafeGuard.takeDecision(lockedSafeDecision.internalId);
+  assert.equal(secondLockedSafeAuthority, undefined);
 
   const summary = {
     aiSdk: exactVersion,
@@ -184,11 +193,14 @@ export async function runLifecycleProof({
       terminalReason: "length",
       nativeEffects: nativeEffectTotal(lockedUnsafeCounts),
       manualEffects: lockedUnsafeManualEffects,
+      executableAuthorityConsumed: lockedUnsafeAuthority === undefined ? 0 : 1,
       guardDecision: lockedUnsafeDecision.action,
     },
     lockedSafe: {
       nativeEffects: nativeEffectTotal(lockedSafeCounts),
       manualEffects: lockedSafeManualEffects,
+      executableAuthorityConsumed: lockedSafeAuthority === undefined ? 0 : 1,
+      secondExecutableAuthority: secondLockedSafeAuthority === undefined ? 0 : 1,
       guardDecision: lockedSafeDecision.action,
     },
   };
