@@ -473,6 +473,29 @@ jobs:
         if: steps.version-check.outputs.should_publish == 'true'
         run: pnpm audit --prod --audit-level=high
 
+      # Use the same pinned npm CLI for both packing and publishing. The
+      # resulting tarball is the only artifact tested below and the only
+      # artifact passed to `npm publish`; the publish step must not repack
+      # the working directory after the smoke test has succeeded.
+      - name: Ensure npm CLI supports Trusted Publishing (11.5.1)
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: npm install -g npm@11.5.1
+
+      - name: Pack the exact release artifact
+        if: steps.version-check.outputs.should_publish == 'true'
+        id: release-artifact
+        run: |
+          set -euo pipefail
+          TARBALL=$(npm pack --silent)
+          SHA256=$(node -e "const fs=require('node:fs');const crypto=require('node:crypto');process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$TARBALL")
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "SHA-256: $SHA256"
+
+      - name: Enforce packed-package trust policy
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: node scripts/verify-package-policy.mjs "${{ steps.release-artifact.outputs.tarball }}"
+
       # The exact bug this step exists to catch: `npm publish` packs
       # whatever is in THIS job's own working directory, which shares
       # nothing with test-matrix's runners (needs:, above). A future
@@ -485,7 +508,7 @@ jobs:
         if: steps.version-check.outputs.should_publish == 'true'
         run: |
           set -euo pipefail
-          TARBALL=$(npm pack --silent)
+          TARBALL="${{ steps.release-artifact.outputs.tarball }}"
           echo "Packed: $TARBALL"
 
           SMOKE_DIR="$(mktemp -d)"
@@ -587,31 +610,14 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-      # Trusted Publishing prep (repository side only - see this
-      # workstream's NPM_ACCOUNT_ACTION_REQUIRED note for the npm-website
-      # step a human still has to do before this has any effect): npm's
-      # OIDC-based Trusted Publishing needs npm CLI >=11.5.1. The Node 22
-      # install above may bundle an older npm. Pinned to the exact,
-      # verified-published version 11.5.1 (not a `^11.5.1` range) - this is
-      # a security-sensitive release job, and an unbounded future 11.x
-      # resolution here would mean the exact CLI build doing the publish
-      # step can silently change between releases without this file
-      # changing. 11.5.1 is npm's own documented minimum for Trusted
-      # Publishing support, confirmed to exist on the npm registry
-      # (`npm view npm versions`) before being written here. This is
-      # harmless either way right now - NODE_AUTH_TOKEN below still
-      # authenticates publish exactly as before - it just means the CLI is
-      # already Trusted-Publishing-capable the moment the npm-side
-      # registration exists, with no further workflow change required here.
-      # Bump this pin deliberately (not silently) if a later npm release is
-      # ever wanted.
-      - name: Ensure npm CLI supports Trusted Publishing (11.5.1)
-        if: steps.version-check.outputs.should_publish == 'true'
-        run: npm install -g npm@11.5.1
-
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
-        run: npm publish --access public --provenance --tag ${{ steps.dist-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          TARBALL="${{ steps.release-artifact.outputs.tarball }}"
+          ACTUAL_SHA256=$(node -e "const fs=require('node:fs');const crypto=require('node:crypto');process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$TARBALL")
+          test "$ACTUAL_SHA256" = "${{ steps.release-artifact.outputs.sha256 }}"
+          npm publish "$TARBALL" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
