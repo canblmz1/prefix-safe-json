@@ -147,6 +147,9 @@ jobs:
       - name: Pack the real tarball
         run: pnpm pack --out prefix-safe-json-smoke.tgz
 
+      - name: Enforce packed-package trust policy
+        run: node scripts/verify-package-policy.mjs prefix-safe-json-smoke.tgz
+
       - name: Upload the exact packed tarball for the runtime matrix
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

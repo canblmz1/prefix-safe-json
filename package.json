@@ -61,6 +61,8 @@
     "test:fuzz": "vitest run test/fuzz/",
     "bench": "vitest bench --run",
     "validate-corpus": "tsx scripts/validate-corpus.ts",
+    "verify:package-policy": "node scripts/verify-package-policy.mjs",
+    "verify:published-release": "node scripts/verify-published-release.mjs",
     "clean": "rimraf dist coverage .vitest",
     "pack:check": "pnpm pack --dry-run",
     "example:anthropic": "node examples/anthropic-truncation-safety.mjs",

@@ -25,6 +25,17 @@ development and release jobs remain on Node 22/24 because the development
 toolchain and the exact `ai@7.0.77` lifecycle proof require newer Node; those
 requirements do not apply to the package's runtime dependency graph.
 
+## Supply-chain verification
+
+Verify releases independently rather than relying on publisher claims. The
+`0.4.1` npm artifact has npm provenance from this repository's GitHub Actions
+publish workflow, and its tarball can be rebuilt and compared with the release
+tag by running `npm run verify:published-release -- 0.4.1` from a clone with
+tags fetched. See the command-driven [maintainer audit](docs/MAINTAINER_AUDIT.md),
+the exact [release/hash mapping](docs/RELEASE_INTEGRITY.md), the
+[runtime dependency graph](docs/RUNTIME_DEPENDENCIES.md), and the
+[execution-critical source map](docs/EXECUTION_AUDIT_SURFACE.md).
+
 ## Recommended AI SDK boundary
 
 Lock the local tool definitions before the AI SDK sees them, feed the real
