@@ -1,5 +1,6 @@
 export interface ProvenanceFacts {
   available: boolean;
+  cryptographicallyVerified?: boolean;
   predicateType?: string;
   subject?: string;
   subjectSha512?: string;
@@ -15,6 +16,7 @@ export function decodeProvenance(
   attestations: unknown,
   tarballSha512: string,
   version: string,
+  cryptographicallyVerified: boolean,
 ): ProvenanceFacts;
 
 export interface ReleaseCommitInput {

@@ -19,6 +19,14 @@ const PACKAGE_NAME = "prefix-safe-json";
 const REGISTRY_ORIGIN = "https://registry.npmjs.org";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+// Pinned independently of the release's own `packNpmVersion` (read from the
+// release source's publish.yml, which isn't known yet at this point in the
+// flow - see `verifyProvenanceCryptographically`). Known to perform real
+// Sigstore-backed `npm audit signatures` attestation verification, which is
+// what this pin needs to guarantee rather than whatever npm happens to be
+// ambient on a given machine or CI runner.
+const PROVENANCE_VERIFICATION_NPM_VERSION = "11.5.1";
+
 function fail(message) {
   throw new Error(message);
 }
@@ -29,7 +37,12 @@ function executable(name) {
 }
 
 function capture(name, args, options = {}) {
-  return execFileSync(executable(name), args, { encoding: "utf8", ...options }).trim();
+  // `.cmd` shims (npx/corepack on Windows) need a shell to execute at all -
+  // execFileSync against them directly fails with EINVAL. Mirrors `run()`'s
+  // existing handling of the same issue; this path was previously untaken
+  // because capture() was never called with npx/corepack before.
+  const needsCommandShell = process.platform === "win32" && (name === "npx" || name === "corepack");
+  return execFileSync(executable(name), args, { encoding: "utf8", shell: needsCommandShell, ...options }).trim();
 }
 
 function run(name, args, options = {}) {
@@ -132,21 +145,111 @@ function compareManifests(published, rebuilt) {
   });
 }
 
+const SLSA_PREDICATE_TYPE = "https://slsa.dev/provenance/v1";
+
 /**
- * Decodes and validates one SLSA provenance statement's own internal claims:
- * that its subject digest matches the tarball we downloaded, and that it
- * names this project's repository and publish workflow. Does not know about
- * npm `gitHead` and does not pick a final release commit - see
- * `determineReleaseCommit` for that. Fails closed (throws) on anything
- * malformed or ambiguous enough that "available: false" would be misleading;
- * returns `{ available: false }` only for the clean "no SLSA statement
- * present at all" case.
+ * Cryptographically verifies that this package version's npm provenance
+ * attestation is real - a valid Sigstore-backed signature, not merely a
+ * DSSE envelope whose JSON payload happens to parse and whose fields happen
+ * to match what we expect. Delegates to the pinned npm CLI's own
+ * `audit signatures` (which performs genuine Sigstore/Rekor verification)
+ * in an isolated, disposable install, rather than hand-rolling signature
+ * verification or adding a Sigstore client as a project dependency.
+ *
+ * `expectedIntegrity` ties this check back to the exact tarball already
+ * downloaded and hashed: the isolated install's own resolved integrity for
+ * this exact version must match it, so a registry that served different
+ * bytes to this install than it served to the earlier download would be
+ * caught here rather than silently verifying signatures for something else.
+ *
+ * Never returns `false` - either the verification fully succeeds, or this
+ * throws (fail closed), including on any network/subprocess error.
  */
-export function decodeProvenance(attestations, tarballSha512, version) {
-  const attestation = attestations.attestations?.find(
-    (entry) => entry.predicateType === "https://slsa.dev/provenance/v1",
+function verifyProvenanceCryptographically({ version, expectedIntegrity }) {
+  const verifyRoot = mkdtempSync(join(tmpdir(), `${PACKAGE_NAME}-${version}-provenance-verify-`));
+  writeFileSync(
+    join(verifyRoot, "package.json"),
+    JSON.stringify({ name: "prefix-safe-json-provenance-verify", version: "0.0.0", private: true }),
   );
-  if (!attestation) return { available: false };
+
+  run(
+    "npx",
+    ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "install", `${PACKAGE_NAME}@${version}`, "--save-exact"],
+    { cwd: verifyRoot },
+  );
+
+  const lockfile = JSON.parse(readFileSync(join(verifyRoot, "package-lock.json"), "utf8"));
+  const installedIntegrity = lockfile.packages?.[`node_modules/${PACKAGE_NAME}`]?.integrity;
+  if (installedIntegrity !== expectedIntegrity) {
+    fail(
+      `isolated provenance-verification install resolved integrity ${installedIntegrity}, which does not match the already-downloaded and verified tarball's integrity ${expectedIntegrity}`,
+    );
+  }
+
+  const jsonReport = JSON.parse(
+    capture("npx", ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "audit", "signatures", "--json"], {
+      cwd: verifyRoot,
+    }),
+  );
+  const problems = [...(jsonReport.invalid ?? []), ...(jsonReport.missing ?? [])];
+  if (problems.length > 0) {
+    fail(`npm audit signatures reported unverified/invalid packages: ${JSON.stringify(problems)}`);
+  }
+
+  // `--json` only ever reports problems (see above) - it does not positively
+  // confirm that *this* package specifically has a verified attestation, as
+  // opposed to merely a verified registry signature (which every dependency
+  // here has, attestation or not). The plain-text report does say so
+  // explicitly, and only when at least one package's attestation verified;
+  // it is silently omitted rather than printed with a zero count otherwise
+  // (confirmed empirically against a package with no provenance at all).
+  // This isolated tree contains only prefix-safe-json and its own
+  // production dependencies (ajv and its four sub-dependencies, none of
+  // which ship provenance), so a nonzero count here can only be
+  // prefix-safe-json's own attestation.
+  const textReport = capture("npx", ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "audit", "signatures"], {
+    cwd: verifyRoot,
+  });
+  const attestationMatch = /(\d+) packages? has? a verified attestation/u.exec(textReport);
+  const verifiedAttestationCount = attestationMatch ? Number(attestationMatch[1]) : 0;
+  if (verifiedAttestationCount < 1) {
+    fail("npm audit signatures did not report any verified attestation for the isolated install");
+  }
+
+  return true;
+}
+
+/**
+ * Decodes and validates provenance for one package version. Does not know
+ * about npm `gitHead` and does not pick a final release commit - see
+ * `determineReleaseCommit` for that.
+ *
+ * `cryptographicallyVerified` must be the result of an already-performed,
+ * independent cryptographic verification of this exact attestation (see
+ * `verifyProvenanceCryptographically`) - this function never performs that
+ * verification itself and never treats "the JSON parsed and its fields
+ * matched" as equivalent to "the signature checked out." Content that would
+ * otherwise be perfectly valid still fails closed if this is not `true`.
+ *
+ * Also fails closed on anything malformed or ambiguous enough that
+ * `{ available: false }` would be misleading - including more than one SLSA
+ * statement for this subject, which is never reconciled automatically, even
+ * if every statement happens to agree. Returns `{ available: false }` only
+ * for the clean "no SLSA statement present at all" case.
+ */
+export function decodeProvenance(attestations, tarballSha512, version, cryptographicallyVerified) {
+  const candidates = (attestations.attestations ?? []).filter(
+    (entry) => entry.predicateType === SLSA_PREDICATE_TYPE,
+  );
+  if (candidates.length === 0) return { available: false };
+  if (candidates.length > 1) {
+    fail(`provenance has ${candidates.length} SLSA statements for this subject; refusing to reconcile multiple statements`);
+  }
+  if (cryptographicallyVerified !== true) {
+    fail("provenance attestation was not cryptographically verified; refusing to trust its content");
+  }
+
+  const [attestation] = candidates;
   const statement = JSON.parse(
     Buffer.from(attestation.bundle.dsseEnvelope.payload, "base64").toString("utf8"),
   );
@@ -176,6 +279,7 @@ export function decodeProvenance(attestations, tarballSha512, version) {
 
   return {
     available: true,
+    cryptographicallyVerified: true,
     predicateType: statement.predicateType,
     subject: subject?.name,
     subjectSha512,
@@ -194,17 +298,28 @@ export function decodeProvenance(attestations, tarballSha512, version) {
  * (throws) on any disagreement or on insufficient evidence - never silently
  * prefers one signal over another.
  *
- * - `npmGitHead` present: tag, gitHead, and (if available) provenance must
- *   all agree. This is the pre-existing policy, preserved unweakened; when
- *   provenance is unavailable it is simply not cross-checked, exactly as
- *   before this fallback existed.
+ * Unconditionally, in both cases below: available provenance that was not
+ * cryptographically verified is never usable, not even as a cross-check.
+ * This is checked again here (`decodeProvenance` already refuses to return
+ * `available: true` for unverified provenance) so this function's own
+ * guarantee does not depend on every caller going through `decodeProvenance`.
+ *
+ * - `npmGitHead` present: tag, gitHead, and (if available and verified)
+ *   provenance must all agree. This is the pre-existing policy, preserved
+ *   unweakened; when provenance is unavailable it is simply not
+ *   cross-checked, exactly as before this fallback existed.
  * - `npmGitHead` absent (e.g. published via `npm publish <tarball-path>`,
- *   which does not populate `gitHead`): provenance becomes REQUIRED. Its
- *   repository/workflow/subject-digest claims are validated by
- *   `decodeProvenance` before this function ever sees it; here we only need
- *   `provenance.sourceCommit` to exist and match the tag commit.
+ *   which does not populate `gitHead`): verified provenance becomes
+ *   REQUIRED. Its repository/workflow/subject-digest claims and its
+ *   cryptographic signature are validated by `decodeProvenance` before this
+ *   function ever sees it; here we only need `provenance.sourceCommit` to
+ *   exist and match the tag commit.
  */
 export function determineReleaseCommit({ tagCommit, npmGitHead, provenance }) {
+  if (provenance?.available && provenance.cryptographicallyVerified !== true) {
+    fail("provenance is available but was not cryptographically verified; refusing to use it for source identity");
+  }
+
   if (npmGitHead) {
     if (tagCommit !== npmGitHead) {
       fail(`tag resolves to ${tagCommit}, but npm gitHead is ${npmGitHead}`);
@@ -270,13 +385,23 @@ async function main() {
   const publishedSha512 = digest(publishedBytes, "sha512");
   if (publishedSha1 !== metadata.dist.shasum) fail("downloaded tarball does not match npm dist.shasum");
 
-  // 9. fetch provenance if available ; 10. validate provenance subject digest
-  // against the downloaded tarball (done inside decodeProvenance)
+  // 9. fetch provenance if available
   let provenance = { available: false };
   if (metadata.dist.attestations?.url) {
     const attestations = await fetchJson(metadata.dist.attestations.url);
     writeFileSync(join(auditRoot, "attestations.json"), `${JSON.stringify(attestations, null, 2)}\n`);
-    provenance = decodeProvenance(attestations, publishedSha512, version);
+
+    // Cryptographically verify BEFORE decoding/trusting any of its content -
+    // an unsigned or invalidly-signed attestation is never inspected for
+    // matching fields at all, let alone trusted for source identity.
+    const cryptographicallyVerified = verifyProvenanceCryptographically({
+      version,
+      expectedIntegrity: metadata.dist.integrity,
+    });
+
+    // 10. validate provenance subject digest against the downloaded tarball
+    // (done inside decodeProvenance, which also enforces the crypto result)
+    provenance = decodeProvenance(attestations, publishedSha512, version, cryptographicallyVerified);
   }
 
   // 11. determine authoritative source commit ; 12. require it == tag commit

@@ -40,28 +40,50 @@ published. `npm publish` given an explicit tarball path skips the git-aware
 packing step that would otherwise populate `gitHead`. This is a side effect
 of a real integrity improvement, not a loss of verifiability: the SLSA
 provenance attestation below independently binds this npm package version to
-release commit `8443e5f20d21d7b85e7568e97205645e92e0dfd4` with a signed
-statement — the same binding `gitHead` would have offered, at a stronger,
-cryptographically attested level. This is expected to recur for every future
-release published this way.
+release commit `8443e5f20d21d7b85e7568e97205645e92e0dfd4` with a
+cryptographically verified statement — the same binding `gitHead` would have
+offered, at a stronger level (see the three-tier distinction below). This is
+expected to recur for every future release published this way.
 
 `scripts/verify-published-release.mjs` now establishes the authoritative
-release commit through one policy, not through `gitHead` alone:
+release commit through one policy, not through `gitHead` alone. It
+distinguishes three separate things, none of which stands in for another:
+
+1. **Provenance claims decoded and content-matched**: the DSSE payload
+   parses as JSON and its self-reported subject digest, repository, and
+   workflow path match what is expected. On its own this proves nothing —
+   anyone can construct JSON that parses and has matching fields.
+2. **Provenance cryptographically verified**: the attestation's signature
+   itself checks out against Sigstore, via a pinned `npm audit signatures`
+   run in an isolated, disposable install of this exact package version
+   (`scripts/verify-published-release.mjs`'s `verifyProvenanceCryptographically`)
+   — not by decoding JSON. This is required before step 1's content is
+   trusted for anything; content that would otherwise be perfectly valid
+   still fails closed without it.
+3. **Reproducible rebuild**: once an authoritative release commit is
+   established (below), the package is independently rebuilt from that
+   exact commit and compared byte-for-byte against the published tarball —
+   see "Reproduction result" below.
+
+Identity policy, requiring (2) wherever provenance is used at all:
 
 - **`gitHead` present** (e.g. `0.4.1`): tag commit, npm `gitHead`, and — when
-  provenance is available — the provenance-attested source commit must all
-  agree. This is the original policy, preserved unweakened; if provenance
-  happens to be unavailable it is simply not cross-checked, exactly as
-  before this fallback existed.
-- **`gitHead` absent** (e.g. `0.4.2`): verified provenance becomes
-  *required*. The provenance statement's repository, workflow path, and
-  subject SHA-512 (against the independently downloaded tarball) are
-  validated first; only then may its source commit — checked against the
-  Git tag commit — stand in for the missing `gitHead`.
-- **Either way, if the required identities disagree, or provenance is
-  absent/malformed/ambiguous when `gitHead` is absent: the verifier fails
-  closed.** It never accepts the GitHub tag alone, and never treats a
-  missing `gitHead` as something to silently work around.
+  provenance is available — the cryptographically verified, content-matched
+  provenance source commit must all agree. This is the original policy,
+  preserved unweakened; if provenance happens to be unavailable it is simply
+  not cross-checked, exactly as before this fallback existed.
+- **`gitHead` absent** (e.g. `0.4.2`): cryptographically verified provenance
+  becomes *required*. The provenance statement's repository, workflow path,
+  and subject SHA-512 (against the independently downloaded tarball) are
+  validated only after its signature has verified; only then may its source
+  commit — checked against the Git tag commit — stand in for the missing
+  `gitHead`.
+- **Either way, if the required identities disagree, if provenance is
+  absent/malformed/ambiguous when `gitHead` is absent, or if provenance is
+  present but its signature does not verify: the verifier fails closed.** It
+  never accepts the GitHub tag alone, never treats a missing `gitHead` as
+  something to silently work around, and never treats matching JSON content
+  as a substitute for a verified signature.
 
 ## Reproduction result — 0.4.2
 
@@ -120,15 +142,25 @@ The SLSA v1 statement records:
 - GitHub-hosted Actions builder;
 - invocation `https://github.com/canblmz1/prefix-safe-json/actions/runs/33051234174/attempts/1`.
 
-`npm@11.5.1 audit signatures` on a clean installed dependency graph reported
-six verified registry signatures and one verified attestation — unchanged
-from `0.4.1`, since the production dependency graph did not change (see
-[`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md)).
+This statement's signature is cryptographically verified as part of
+`npm run verify:published-release` itself, not merely decoded: the verifier
+installs this exact version into an isolated, disposable directory with a
+pinned `npm@11.5.1`, confirms that install's own resolved integrity matches
+the already-downloaded-and-hashed tarball, then runs `npm audit signatures`
+against it. That run reported zero invalid or missing signatures and one
+verified attestation — unchanged in shape from `0.4.1` (six verified
+registry signatures, one verified attestation), since the production
+dependency graph did not change (see
+[`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md)). Only after this
+succeeds does the verifier decode the statement's content at all.
 
-Provenance binds an artifact digest to a repository, workflow, and commit. It
-does **not** prove the source is correct, the workflow is uncompromised, the
-dependencies are safe, or the runtime behavior matches a reviewer's policy.
-The independent rebuild and source audit remain necessary.
+Cryptographic verification proves this exact attestation was really signed
+and recorded the way Sigstore attests. Provenance overall — verified
+signature plus matched content — binds an artifact digest to a repository,
+workflow, and commit. It does **not** prove the source is correct, the
+workflow is uncompromised, the dependencies are safe, or the runtime
+behavior matches a reviewer's policy. The independent rebuild (above) and
+source audit remain necessary.
 
 ## Verified baseline — 0.4.1 (2026-08-27)
 

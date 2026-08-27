@@ -128,9 +128,17 @@ node -e "fetch('https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-jso
 ```
 
 Decode the SLSA DSSE payload and confirm its subject SHA-512, source commit,
-repository, workflow path, and invocation. The release verifier performs
-those comparisons. `npm audit signatures` performs npm's signature and
-attestation verification; merely decoding JSON is not signature validation.
+repository, workflow path, and invocation. `npm audit signatures` performs
+npm's own Sigstore-backed signature and attestation verification; merely
+decoding JSON is not signature validation, and the release verifier does not
+treat it as one. `npm run verify:published-release` itself now performs both,
+in order, for any release whose provenance it uses at all: it first
+cryptographically verifies the attestation (an isolated, disposable install
+of the exact version plus a pinned `npm audit signatures`, tied back to the
+already-downloaded tarball's integrity), and only after that succeeds does it
+decode and content-check the statement. Content that matches expectations
+perfectly is still rejected if the signature step did not run or did not
+verify.
 
 ## 10. Audit execution-critical source
 
