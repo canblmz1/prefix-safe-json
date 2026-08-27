@@ -1,6 +1,6 @@
 # prefix-safe-json
 
-> **v0.4.1** — Core APIs are stable; raw provider adapters remain
+> **v0.4.2** — Core APIs are stable; raw provider adapters remain
 > experimental. See [Current Status](#current-status) and
 > [CHANGELOG.md](CHANGELOG.md).
 
@@ -28,10 +28,13 @@ requirements do not apply to the package's runtime dependency graph.
 ## Supply-chain verification
 
 Verify releases independently rather than relying on publisher claims. The
-`0.4.1` npm artifact has npm provenance from this repository's GitHub Actions
+`0.4.2` npm artifact has npm provenance from this repository's GitHub Actions
 publish workflow, and its tarball can be rebuilt and compared with the release
-tag by running `npm run verify:published-release -- 0.4.1` from a clone with
-tags fetched. See the command-driven [maintainer audit](docs/MAINTAINER_AUDIT.md),
+tag by running `npm run verify:published-release -- 0.4.2` from a clone with
+tags fetched (see [`RELEASE_INTEGRITY.md`](docs/RELEASE_INTEGRITY.md) for a
+known gap: that command currently fails a precondition check for `0.4.2`
+specifically, and for the manually-anchored equivalent verification that was
+run instead). See the command-driven [maintainer audit](docs/MAINTAINER_AUDIT.md),
 the exact [release/hash mapping](docs/RELEASE_INTEGRITY.md), the
 [runtime dependency graph](docs/RUNTIME_DEPENDENCIES.md), and the
 [execution-critical source map](docs/EXECUTION_AUDIT_SURFACE.md).

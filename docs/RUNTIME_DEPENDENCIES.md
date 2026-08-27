@@ -1,10 +1,11 @@
 # Runtime dependencies
 
 This is an evidence snapshot, not a claim that semver ranges resolve forever.
-The published `0.4.1` tarball declares one direct production dependency:
+The published `0.4.2` tarball declares one direct production dependency,
+unchanged from `0.4.1`:
 
 ```text
-prefix-safe-json@0.4.1
+prefix-safe-json@0.4.2
 └── ajv@^8.20.0
     ├── fast-deep-equal@^3.1.3
     ├── fast-uri@^3.0.1
@@ -19,10 +20,11 @@ manager resolves this graph externally.
 ## Exact observed graphs
 
 The frozen `pnpm-lock.yaml` at release commit
-`2d2dc5ae5d83d8db73d485ade2872939459bdc09` resolves:
+`8443e5f20d21d7b85e7568e97205645e92e0dfd4` resolves the same graph as `0.4.1`'s
+release lock:
 
 ```text
-prefix-safe-json@0.4.1
+prefix-safe-json@0.4.2
 └── ajv@8.20.0
     ├── fast-deep-equal@3.1.3
     ├── fast-uri@3.1.5
@@ -58,7 +60,7 @@ compatibility/lifecycle proofs only.
 Release-lock snapshot:
 
 ```console
-git switch --detach v0.4.1
+git switch --detach v0.4.2
 corepack pnpm install --frozen-lockfile
 corepack pnpm list --prod --depth 99
 corepack pnpm licenses list --prod
@@ -70,7 +72,7 @@ Current consumer resolution and install-time observation:
 mkdir prefix-safe-json-consumer-audit
 cd prefix-safe-json-consumer-audit
 npm init -y
-npm install --foreground-scripts --loglevel verbose prefix-safe-json@0.4.1
+npm install --foreground-scripts --loglevel verbose prefix-safe-json@0.4.2
 npm ls --all prefix-safe-json ajv fast-deep-equal fast-uri json-schema-traverse require-from-string
 npm audit --omit=dev
 npx --yes npm@11.5.1 audit signatures

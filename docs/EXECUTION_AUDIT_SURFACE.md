@@ -82,6 +82,8 @@ validation, or terminal mapping are in scope.
 
 The TypeScript build emits one `dist/**/*.js`, one `.d.ts`, and corresponding
 maps for each of the 34 `src/**/*.ts` files. Each JavaScript source map names
-exactly one source path and embeds no source text. Use tag `v0.4.1` plus
+exactly one source path and embeds no source text. Use tag `v0.4.2` plus
 [`RELEASE_INTEGRITY.md`](RELEASE_INTEGRITY.md) to bind those source paths to
-the published bytes.
+the published bytes. (`v0.4.2`'s `dist/` is verified byte-identical to
+`v0.4.1`'s — see `RELEASE_INTEGRITY.md` — so this source-to-dist mapping is
+unchanged from the prior release.)

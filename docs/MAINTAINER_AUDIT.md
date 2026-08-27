@@ -15,17 +15,17 @@ cd prefix-safe-json
 git fetch origin --tags
 git remote get-url origin
 git rev-parse origin/main
-git rev-parse v0.4.1^{commit}
-git show --show-signature --no-patch v0.4.1^{commit}
+git rev-parse v0.4.2^{commit}
+git show --show-signature --no-patch v0.4.2^{commit}
 ```
 
-For `0.4.1`, the tag must resolve to
-`2d2dc5ae5d83d8db73d485ade2872939459bdc09`.
+For `0.4.2`, the tag must resolve to
+`8443e5f20d21d7b85e7568e97205645e92e0dfd4`.
 
 ## 2. Verify npm metadata
 
 ```console
-npm view prefix-safe-json@0.4.1 version gitHead engines license type files dependencies optionalDependencies peerDependencies scripts repository dist --json
+npm view prefix-safe-json@0.4.2 version gitHead engines license type files dependencies optionalDependencies peerDependencies scripts repository dist --json
 npm view prefix-safe-json dist-tags --json
 ```
 
@@ -38,13 +38,13 @@ This portable Node command reads the official metadata and writes the URL it
 actually downloaded:
 
 ```console
-node -e "fetch('https://registry.npmjs.org/prefix-safe-json/0.4.1').then(r=>r.json()).then(async m=>{const r=await fetch(m.dist.tarball);if(!r.ok)throw Error(String(r.status));require('node:fs').writeFileSync('prefix-safe-json-0.4.1.tgz',Buffer.from(await r.arrayBuffer()));console.log(m.dist.tarball)})"
+node -e "fetch('https://registry.npmjs.org/prefix-safe-json/0.4.2').then(r=>r.json()).then(async m=>{const r=await fetch(m.dist.tarball);if(!r.ok)throw Error(String(r.status));require('node:fs').writeFileSync('prefix-safe-json-0.4.2.tgz',Buffer.from(await r.arrayBuffer()));console.log(m.dist.tarball)})"
 ```
 
 ## 4. Verify tarball integrity
 
 ```console
-node -e "const fs=require('node:fs'),c=require('node:crypto'),b=fs.readFileSync('prefix-safe-json-0.4.1.tgz');for(const a of ['sha1','sha256','sha512'])console.log(a,c.createHash(a).update(b).digest(a==='sha512'?'base64':'hex'))"
+node -e "const fs=require('node:fs'),c=require('node:crypto'),b=fs.readFileSync('prefix-safe-json-0.4.2.tgz');for(const a of ['sha1','sha256','sha512'])console.log(a,c.createHash(a).update(b).digest(a==='sha512'?'base64':'hex'))"
 ```
 
 Expected SHA-1, SHA-256, and SRI SHA-512 are recorded in
@@ -54,11 +54,11 @@ Expected SHA-1, SHA-256, and SRI SHA-512 are recorded in
 ## 5. Inspect published files
 
 ```console
-tar -tzf prefix-safe-json-0.4.1.tgz
-tar -tvzf prefix-safe-json-0.4.1.tgz
+tar -tzf prefix-safe-json-0.4.2.tgz
+tar -tvzf prefix-safe-json-0.4.2.tgz
 mkdir npm-unpacked
-tar -xzf prefix-safe-json-0.4.1.tgz -C npm-unpacked
-npm run verify:package-policy -- prefix-safe-json-0.4.1.tgz
+tar -xzf prefix-safe-json-0.4.2.tgz -C npm-unpacked
+npm run verify:package-policy -- prefix-safe-json-0.4.2.tgz
 ```
 
 Review every path and mode. The policy command fails on hidden/unexpected
@@ -78,7 +78,7 @@ disposable consumer with visible lifecycle output:
 mkdir consumer-audit
 cd consumer-audit
 npm init -y
-npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.1.tgz
+npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.2.tgz
 ```
 
 ## 7. Compare npm bytes to a source build
@@ -86,13 +86,30 @@ npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.1.tg
 From the repository root:
 
 ```console
-npm run verify:published-release -- 0.4.1
+npm run verify:published-release -- 0.4.2
 ```
 
 Read the printed `result.json` and both per-file SHA-256 manifests. Require
 `packageContentIdentical: true`; treat every manifest difference as a stop.
 `tarballByteIdentical` is separate because container metadata/tool versions
-can differ even when content matches. For `0.4.1`, both results are `true`.
+can differ even when content matches.
+
+For `0.4.2` specifically, this command currently exits with `FAIL: registry
+metadata has no gitHead` before it reaches that comparison — `0.4.2` was
+published by `npm publish <tarball-path>` against an already-packed artifact
+(see [`RELEASE_INTEGRITY.md`](RELEASE_INTEGRITY.md)), which does not populate
+npm's `gitHead` field, and this script hard-requires it. This is a gap in the
+script, not evidence against the release. Anchor manually on the
+provenance-attested source commit instead: run steps 1–6 above to obtain the
+release commit and published tarball, then `git -c core.autocrlf=false
+archive --format=tar --output=source.tar <release-commit>`, extract it,
+`corepack pnpm install --frozen-lockfile`, `corepack pnpm run clean`,
+`corepack pnpm run build`, and `npx -y npm@<pinned-version> pack` (the pinned
+npm CLI version is in `.github/workflows/publish.yml`), then diff the two
+unpacked trees file-by-file (SHA-256) and the two `.tgz` files directly. For
+`0.4.2`, that manual run produced `tarballByteIdentical: true` and
+`packageContentIdentical: true` with 0 differences across 141 files — see
+`RELEASE_INTEGRITY.md` for the full result.
 
 ## 8. Inspect runtime dependencies
 
@@ -110,7 +127,7 @@ The published semver ranges are not a frozen consumer graph.
 
 ```console
 npx --yes npm@11.5.1 audit signatures
-node -e "fetch('https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-json@0.4.1').then(r=>r.json()).then(x=>console.log(JSON.stringify(x,null,2)))"
+node -e "fetch('https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-json@0.4.2').then(r=>r.json()).then(x=>console.log(JSON.stringify(x,null,2)))"
 ```
 
 Decode the SLSA DSSE payload and confirm its subject SHA-512, source commit,
