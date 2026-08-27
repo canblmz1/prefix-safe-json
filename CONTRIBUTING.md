@@ -20,6 +20,19 @@ pnpm lint
 - **Honest diagnostics**: Never fabricate or guess missing data.
 - **Execution integrity**: A syntactically repairable or schema-shaped value must not be treated as executable unless the stream state confirms it is complete.
 
+## Current Development Posture
+
+Runtime or public-API expansion currently requires at least one of:
+
+- a verified security or correctness defect;
+- a real adopter compatibility blocker;
+- a provider or SDK compatibility regression; or
+- an externally demonstrated execution-integrity gap.
+
+Nice-to-have features alone should not drive releases at this stage. This is a
+prioritization policy, not a freeze: focused fixes and evidence-backed
+compatibility work remain welcome.
+
 ## Test Corpus
 
 When adding new test fixtures, follow the schema in `corpus/schema/fixture.schema.json` and document the fixture in the appropriate category directory.

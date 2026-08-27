@@ -150,6 +150,24 @@ jobs:
       - name: Enforce packed-package trust policy
         run: node scripts/verify-package-policy.mjs prefix-safe-json-smoke.tgz
 
+      - name: Generate production dependency SBOM
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          pnpm run sbom:generate -- "artifacts/prefix-safe-json-$VERSION.cdx.json"
+
+      - name: Verify production dependency SBOM
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          pnpm run sbom:verify -- "artifacts/prefix-safe-json-$VERSION.cdx.json"
+
+      - name: Upload the verified production dependency SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: prefix-safe-json-production-sbom
+          path: artifacts/*.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload the exact packed tarball for the runtime matrix
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

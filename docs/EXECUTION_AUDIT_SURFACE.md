@@ -4,6 +4,61 @@ The library returns decisions; it does not execute tools. “Can grant” below
 means “can create or release an `ExecuteDecision` to caller code,” not “runs a
 side effect.”
 
+## First independent review package: stream termination authority
+
+### Scope and files
+
+Review the complete terminal-evidence path, not the whole parser:
+
+- `src/providers/ai-sdk.ts` — maps SDK finish, error, abort, and tool events;
+- `src/coordinator/coordinator.ts` — owns terminal state and rejects late or
+  conflicting lifecycle evidence;
+- `src/gate/decide.ts` — the only positive decision constructor;
+- `src/gate/gate.ts` — freezes decisions and releases one-shot authority.
+
+Focused tests:
+
+- `test/guard/ai-sdk-compatibility.test.ts`;
+- `test/providers/ai-sdk-adapter.test.ts`;
+- `test/unit/coordinator-error-paths.test.ts`;
+- `test/unit/coordinator-executable-policy.test.ts`;
+- `test/unit/execution-gate-decision-table.test.ts`;
+- `test/unit/execution-gate.test.ts`;
+- `test/integration/authority-boundaries.test.ts`.
+
+### Threat model and invariant
+
+Assume provider/SDK lifecycle events are malformed, reordered, duplicated,
+conflicting, truncated, or adversarial, while caller-owned tools may cause
+irreversible side effects.
+
+**Invariant:** execution authority must never be produced unless the relevant
+tool call has trustworthy positive terminal evidence. Missing, malformed,
+unsafe, late, conflicting, ambiguous, or duplicated lifecycle evidence must
+not upgrade an unsafe call into an executable one.
+
+### Attack ideas
+
+Exercise terminal-before-final-delta, missing terminal, unknown terminal
+reason, duplicate/conflicting terminal events, post-terminal argument or
+identity mutation, provider error, abort, content filter, length termination,
+interleaved parallel calls, and identity changes around terminal events.
+Existing tests cover examples of every listed class, but the reviewer should
+vary ordering and attribution independently rather than treating those tests
+as proof of completeness.
+
+### Focused commands and expected output
+
+```console
+pnpm vitest run test/guard/ai-sdk-compatibility.test.ts test/providers/ai-sdk-adapter.test.ts test/unit/coordinator-error-paths.test.ts test/unit/coordinator-executable-policy.test.ts test/unit/execution-gate-decision-table.test.ts test/unit/execution-gate.test.ts test/integration/authority-boundaries.test.ts
+pnpm run test:coverage
+```
+
+Return a short Markdown report containing: reviewed commit SHA, invariant
+verdict, event-order matrix, reproducible failing tests for every finding,
+severity/rationale, and any unreviewed assumptions. A pass should say only
+what was examined; it must not be presented as a whole-codebase audit.
+
 ## Smallest authority core
 
 There are two direct authority files:
