@@ -94,22 +94,19 @@ Read the printed `result.json` and both per-file SHA-256 manifests. Require
 `tarballByteIdentical` is separate because container metadata/tool versions
 can differ even when content matches.
 
-For `0.4.2` specifically, this command currently exits with `FAIL: registry
-metadata has no gitHead` before it reaches that comparison — `0.4.2` was
-published by `npm publish <tarball-path>` against an already-packed artifact
-(see [`RELEASE_INTEGRITY.md`](RELEASE_INTEGRITY.md)), which does not populate
-npm's `gitHead` field, and this script hard-requires it. This is a gap in the
-script, not evidence against the release. Anchor manually on the
-provenance-attested source commit instead: run steps 1–6 above to obtain the
-release commit and published tarball, then `git -c core.autocrlf=false
-archive --format=tar --output=source.tar <release-commit>`, extract it,
-`corepack pnpm install --frozen-lockfile`, `corepack pnpm run clean`,
-`corepack pnpm run build`, and `npx -y npm@<pinned-version> pack` (the pinned
-npm CLI version is in `.github/workflows/publish.yml`), then diff the two
-unpacked trees file-by-file (SHA-256) and the two `.tgz` files directly. For
-`0.4.2`, that manual run produced `tarballByteIdentical: true` and
-`packageContentIdentical: true` with 0 differences across 141 files — see
-`RELEASE_INTEGRITY.md` for the full result.
+For `0.4.2` specifically, npm's registry metadata has no `gitHead` — `0.4.2`
+was published by `npm publish <tarball-path>` against an already-packed
+artifact (see [`RELEASE_INTEGRITY.md`](RELEASE_INTEGRITY.md)), which does not
+populate that field. The verifier establishes the release commit through
+verified provenance instead in that case (`result.json`'s
+`sourceIdentityMethod` reads `"provenance"` rather than `"npm-gitHead"`) —
+requiring the provenance statement's repository, workflow, and subject
+SHA-512 to check out, and its source commit to match the Git tag, before
+using it. It fails closed if `gitHead` is absent and provenance is missing,
+malformed, ambiguous, or disagrees; see `determineReleaseCommit` and
+`decodeProvenance` in `scripts/verify-published-release.mjs` for the exact
+policy, and their tests in
+`test/unit/verify-published-release-identity.test.ts`.
 
 ## 8. Inspect runtime dependencies
 

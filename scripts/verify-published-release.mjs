@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PACKAGE_NAME = "prefix-safe-json";
 const REGISTRY_ORIGIN = "https://registry.npmjs.org";
@@ -72,8 +72,19 @@ function verifyIntegrity(buffer, integrity) {
   }
 }
 
+// This GNU tar build resolves an archive/`-C` path containing a drive-letter
+// colon inconsistently when passed Windows-style backslashes together with
+// `--force-local` (needed so `C:\...` isn't parsed as a remote `host:path`
+// spec in the first place). Forward slashes avoid both problems and are
+// accepted by both `tar` and Windows itself.
+function tarPath(path) {
+  return path.replaceAll("\\", "/");
+}
+
 function listArchive(tarball) {
-  const entries = capture("tar", ["-tzf", tarball]).split(/\r?\n/u).filter(Boolean);
+  const entries = capture("tar", ["--force-local", "-tzf", tarPath(tarball)])
+    .split(/\r?\n/u)
+    .filter(Boolean);
   for (const entry of entries) {
     const normalized = entry.replaceAll("\\", "/");
     if (
@@ -91,7 +102,7 @@ function listArchive(tarball) {
 function unpack(tarball, destination) {
   listArchive(tarball);
   mkdirSync(destination, { recursive: true });
-  run("tar", ["-xzf", tarball, "-C", destination]);
+  run("tar", ["--force-local", "-xzf", tarPath(tarball), "-C", tarPath(destination)]);
 }
 
 function manifest(root, current = root) {
@@ -121,7 +132,17 @@ function compareManifests(published, rebuilt) {
   });
 }
 
-function decodeProvenance(attestations, tarballSha512, gitHead, version) {
+/**
+ * Decodes and validates one SLSA provenance statement's own internal claims:
+ * that its subject digest matches the tarball we downloaded, and that it
+ * names this project's repository and publish workflow. Does not know about
+ * npm `gitHead` and does not pick a final release commit - see
+ * `determineReleaseCommit` for that. Fails closed (throws) on anything
+ * malformed or ambiguous enough that "available: false" would be misleading;
+ * returns `{ available: false }` only for the clean "no SLSA statement
+ * present at all" case.
+ */
+export function decodeProvenance(attestations, tarballSha512, version) {
   const attestation = attestations.attestations?.find(
     (entry) => entry.predicateType === "https://slsa.dev/provenance/v1",
   );
@@ -132,11 +153,8 @@ function decodeProvenance(attestations, tarballSha512, gitHead, version) {
   const subject = statement.subject?.find((entry) => entry.name === `pkg:npm/${PACKAGE_NAME}@${version}`);
   if (!subject) fail("provenance has no subject for the requested package version");
   const subjectSha512 = subject?.digest?.sha512;
-  const dependency = statement.predicate?.buildDefinition?.resolvedDependencies?.find(
-    (entry) => entry.digest?.gitCommit,
-  );
   if (subjectSha512 !== tarballSha512) fail("provenance subject SHA-512 does not match tarball");
-  if (dependency?.digest?.gitCommit !== gitHead) fail("provenance source commit does not match npm gitHead");
+
   const workflow = statement.predicate?.buildDefinition?.externalParameters?.workflow;
   if (workflow?.repository !== "https://github.com/canblmz1/prefix-safe-json") {
     fail(`unexpected provenance repository: ${workflow?.repository}`);
@@ -144,6 +162,18 @@ function decodeProvenance(attestations, tarballSha512, gitHead, version) {
   if (workflow?.path !== ".github/workflows/publish.yml") {
     fail(`unexpected provenance workflow: ${workflow?.path}`);
   }
+
+  const resolvedCommits = [
+    ...new Set(
+      (statement.predicate?.buildDefinition?.resolvedDependencies ?? [])
+        .map((entry) => entry.digest?.gitCommit)
+        .filter(Boolean),
+    ),
+  ];
+  if (resolvedCommits.length === 0) fail("provenance has no resolved source commit");
+  if (resolvedCommits.length > 1) fail("provenance has ambiguous, conflicting resolved source commits");
+  const [sourceCommit] = resolvedCommits;
+
   return {
     available: true,
     predicateType: statement.predicateType,
@@ -152,10 +182,51 @@ function decodeProvenance(attestations, tarballSha512, gitHead, version) {
     repository: workflow.repository,
     workflow: workflow.path,
     workflowRef: workflow.ref,
-    sourceCommit: dependency?.digest?.gitCommit,
+    sourceCommit,
     builder: statement.predicate?.runDetails?.builder?.id,
     invocation: statement.predicate?.runDetails?.metadata?.invocationId,
   };
+}
+
+/**
+ * Picks the single authoritative release source commit from every
+ * available identity signal, and how it was established. Fails closed
+ * (throws) on any disagreement or on insufficient evidence - never silently
+ * prefers one signal over another.
+ *
+ * - `npmGitHead` present: tag, gitHead, and (if available) provenance must
+ *   all agree. This is the pre-existing policy, preserved unweakened; when
+ *   provenance is unavailable it is simply not cross-checked, exactly as
+ *   before this fallback existed.
+ * - `npmGitHead` absent (e.g. published via `npm publish <tarball-path>`,
+ *   which does not populate `gitHead`): provenance becomes REQUIRED. Its
+ *   repository/workflow/subject-digest claims are validated by
+ *   `decodeProvenance` before this function ever sees it; here we only need
+ *   `provenance.sourceCommit` to exist and match the tag commit.
+ */
+export function determineReleaseCommit({ tagCommit, npmGitHead, provenance }) {
+  if (npmGitHead) {
+    if (tagCommit !== npmGitHead) {
+      fail(`tag resolves to ${tagCommit}, but npm gitHead is ${npmGitHead}`);
+    }
+    if (provenance?.available && provenance.sourceCommit !== npmGitHead) {
+      fail(
+        `provenance source commit ${provenance.sourceCommit} does not match npm gitHead ${npmGitHead}`,
+      );
+    }
+    return { releaseCommit: npmGitHead, sourceIdentityMethod: "npm-gitHead" };
+  }
+
+  if (!provenance?.available) {
+    fail(
+      "npm gitHead is absent and no verified provenance is available to establish release source identity",
+    );
+  }
+  if (!provenance.sourceCommit) fail("provenance is available but has no verified source commit");
+  if (provenance.sourceCommit !== tagCommit) {
+    fail(`provenance source commit ${provenance.sourceCommit} does not match tag commit ${tagCommit}`);
+  }
+  return { releaseCommit: tagCommit, sourceIdentityMethod: "provenance" };
 }
 
 function parseArgs(argv) {
@@ -167,40 +238,61 @@ function parseArgs(argv) {
 }
 
 async function main() {
+  // 1. parse exact version
   const { version } = parseArgs(process.argv.slice(2));
   const tag = `v${version}`;
   const currentHead = capture("git", ["rev-parse", "HEAD"], { cwd: repoRoot });
-  const releaseCommit = capture("git", ["rev-parse", `${tag}^{commit}`], { cwd: repoRoot });
+
+  // 2. resolve Git tag commit
+  const tagCommit = capture("git", ["rev-parse", `${tag}^{commit}`], { cwd: repoRoot });
+
+  // 3. fetch npm metadata
   const metadataUrl = `${REGISTRY_ORIGIN}/${PACKAGE_NAME}/${encodeURIComponent(version)}`;
   const metadata = await fetchJson(metadataUrl);
+
+  // 4. validate package/version identity
   if (metadata.name !== PACKAGE_NAME || metadata.version !== version) fail("registry metadata identity mismatch");
-  if (!metadata.gitHead) fail("registry metadata has no gitHead");
-  if (releaseCommit !== metadata.gitHead) {
-    fail(`${tag} resolves to ${releaseCommit}, but npm gitHead is ${metadata.gitHead}`);
-  }
+  const npmGitHead = metadata.gitHead ?? null;
 
   const auditRoot = mkdtempSync(join(tmpdir(), `${PACKAGE_NAME}-${version}-audit-`));
+
+  // 5. download official npm tarball
   const publishedTarball = join(auditRoot, `${PACKAGE_NAME}-${version}-published.tgz`);
   await download(metadata.dist.tarball, publishedTarball);
   const publishedBytes = readFileSync(publishedTarball);
+
+  // 6. verify dist.integrity
   verifyIntegrity(publishedBytes, metadata.dist.integrity);
+
+  // 7. verify dist.shasum ; 8. compute SHA-256 / SHA-512
   const publishedSha1 = digest(publishedBytes, "sha1");
   const publishedSha256 = digest(publishedBytes, "sha256");
   const publishedSha512 = digest(publishedBytes, "sha512");
   if (publishedSha1 !== metadata.dist.shasum) fail("downloaded tarball does not match npm dist.shasum");
 
+  // 9. fetch provenance if available ; 10. validate provenance subject digest
+  // against the downloaded tarball (done inside decodeProvenance)
   let provenance = { available: false };
   if (metadata.dist.attestations?.url) {
     const attestations = await fetchJson(metadata.dist.attestations.url);
     writeFileSync(join(auditRoot, "attestations.json"), `${JSON.stringify(attestations, null, 2)}\n`);
-    provenance = decodeProvenance(attestations, publishedSha512, metadata.gitHead, version);
+    provenance = decodeProvenance(attestations, publishedSha512, version);
   }
 
+  // 11. determine authoritative source commit ; 12. require it == tag commit
+  // (enforced inside determineReleaseCommit for both identity-method cases)
+  const { releaseCommit, sourceIdentityMethod } = determineReleaseCommit({
+    tagCommit,
+    npmGitHead,
+    provenance,
+  });
+
+  // 13. export exact source commit using canonical Git blob bytes
   const sourceTar = join(auditRoot, "release-source.tar");
   run("git", ["-c", "core.autocrlf=false", "archive", "--format=tar", `--output=${sourceTar}`, releaseCommit], { cwd: repoRoot });
   const sourceRoot = join(auditRoot, "source");
   mkdirSync(sourceRoot);
-  run("tar", ["-xf", sourceTar, "-C", sourceRoot]);
+  run("tar", ["--force-local", "-xf", tarPath(sourceTar), "-C", tarPath(sourceRoot)]);
   const packageManager = JSON.parse(readFileSync(join(sourceRoot, "package.json"), "utf8")).packageManager;
   if (!/^pnpm@\d+\.\d+\.\d+$/u.test(packageManager ?? "")) fail("release source lacks an exact pnpm packageManager pin");
   const publishWorkflow = readFileSync(join(sourceRoot, ".github", "workflows", "publish.yml"), "utf8");
@@ -234,8 +326,11 @@ async function main() {
     package: `${PACKAGE_NAME}@${version}`,
     runnerCheckoutHead: currentHead,
     tag,
+    tagCommit,
     releaseCommit,
-    npmGitHead: metadata.gitHead,
+    sourceIdentityMethod,
+    npmGitHead,
+    provenanceSourceCommit: provenance.available ? provenance.sourceCommit : null,
     packageManager,
     packNpmVersion,
     registryTarball: metadata.dist.tarball,
@@ -255,7 +350,12 @@ async function main() {
   if (!packageContentIdentical) fail(`published and rebuilt manifests differ; inspect ${auditRoot}`);
 }
 
-main().catch((error) => {
-  process.stderr.write(`FAIL: ${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+// Only run as a CLI entry point, not as a side effect of importing this
+// module for its exported pure functions (e.g. from unit tests).
+const isMainModule = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMainModule) {
+  main().catch((error) => {
+    process.stderr.write(`FAIL: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

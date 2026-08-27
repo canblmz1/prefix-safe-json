@@ -43,25 +43,38 @@ provenance attestation below independently binds this npm package version to
 release commit `8443e5f20d21d7b85e7568e97205645e92e0dfd4` with a signed
 statement — the same binding `gitHead` would have offered, at a stronger,
 cryptographically attested level. This is expected to recur for every future
-release published this way. `scripts/verify-published-release.mjs`
-currently hard-requires `gitHead` and fails closed rather than falling back
-to the provenance-attested commit; see below.
+release published this way.
+
+`scripts/verify-published-release.mjs` now establishes the authoritative
+release commit through one policy, not through `gitHead` alone:
+
+- **`gitHead` present** (e.g. `0.4.1`): tag commit, npm `gitHead`, and — when
+  provenance is available — the provenance-attested source commit must all
+  agree. This is the original policy, preserved unweakened; if provenance
+  happens to be unavailable it is simply not cross-checked, exactly as
+  before this fallback existed.
+- **`gitHead` absent** (e.g. `0.4.2`): verified provenance becomes
+  *required*. The provenance statement's repository, workflow path, and
+  subject SHA-512 (against the independently downloaded tarball) are
+  validated first; only then may its source commit — checked against the
+  Git tag commit — stand in for the missing `gitHead`.
+- **Either way, if the required identities disagree, or provenance is
+  absent/malformed/ambiguous when `gitHead` is absent: the verifier fails
+  closed.** It never accepts the GitHub tag alone, and never treats a
+  missing `gitHead` as something to silently work around.
 
 ## Reproduction result — 0.4.2
 
-`npm run verify:published-release -- 0.4.2` was run and currently exits with
-`FAIL: registry metadata has no gitHead` before performing any comparison,
-for the reason above — observed directly, not assumed. This is a gap in the
-verifier script's precondition, not a finding against the release.
-
-The equivalent verification was then performed manually, anchored on the
-provenance-attested release commit instead of `gitHead`, using the same
-steps the script runs after its `gitHead` check: `git -c
-core.autocrlf=false archive` of `8443e5f20d21d7b85e7568e97205645e92e0dfd4`
-into a clean directory, `pnpm@10.33.1` with a frozen lockfile, `pnpm run
-clean`, `pnpm run build`, and the publish workflow's exact `npm@11.5.1`
-packer, then a per-file SHA-256 manifest comparison of both unpacked trees
-plus a direct byte comparison of both `.tgz` files.
+`npm run verify:published-release -- 0.4.2` now passes end to end, with no
+manual workaround: it establishes `8443e5f20d21d7b85e7568e97205645e92e0dfd4`
+as the release commit via the provenance-fallback policy above
+(`sourceIdentityMethod: "provenance"` in its result JSON), then rebuilds
+from that exact commit and compares against the downloaded tarball exactly
+as it does for a release with `gitHead` present: `pnpm@10.33.1` with a
+frozen lockfile, `pnpm run clean`, `pnpm run build`, and the publish
+workflow's exact `npm@11.5.1` packer, then a per-file SHA-256 manifest
+comparison of both unpacked trees plus a direct byte comparison of both
+`.tgz` files.
 
 | Question | Result |
 | --- | --- |
@@ -260,9 +273,9 @@ not decide unrelated PRs. It is a command-driven release/audit check.
 
 ## Scope and history
 
-`0.4.1` and `0.4.2` have been independently rebuilt for this record — `0.4.2`
-by the manual procedure above, since its automated run currently fails a
-`gitHead` precondition unrelated to actual reproducibility. Earlier releases
-have tags and registry metadata but are **not** claimed reproducible here.
+`0.4.1` and `0.4.2` have both been independently rebuilt for this record via
+`npm run verify:published-release` — `0.4.1` through the `gitHead` policy,
+`0.4.2` through the provenance-fallback policy above. Earlier releases have
+tags and registry metadata but are **not** claimed reproducible here.
 Registry dependency ranges can resolve differently over time; see
 [`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md).

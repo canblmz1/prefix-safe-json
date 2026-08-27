@@ -31,10 +31,11 @@ Verify releases independently rather than relying on publisher claims. The
 `0.4.2` npm artifact has npm provenance from this repository's GitHub Actions
 publish workflow, and its tarball can be rebuilt and compared with the release
 tag by running `npm run verify:published-release -- 0.4.2` from a clone with
-tags fetched (see [`RELEASE_INTEGRITY.md`](docs/RELEASE_INTEGRITY.md) for a
-known gap: that command currently fails a precondition check for `0.4.2`
-specifically, and for the manually-anchored equivalent verification that was
-run instead). See the command-driven [maintainer audit](docs/MAINTAINER_AUDIT.md),
+tags fetched. `0.4.2` has no npm `gitHead` (see
+[`RELEASE_INTEGRITY.md`](docs/RELEASE_INTEGRITY.md) for why); the verifier
+establishes its release commit through verified provenance instead, failing
+closed if that provenance is missing or disagrees. See the command-driven
+[maintainer audit](docs/MAINTAINER_AUDIT.md),
 the exact [release/hash mapping](docs/RELEASE_INTEGRITY.md), the
 [runtime dependency graph](docs/RUNTIME_DEPENDENCIES.md), and the
 [execution-critical source map](docs/EXECUTION_AUDIT_SURFACE.md).
