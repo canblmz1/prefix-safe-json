@@ -19,6 +19,28 @@ export function decodeProvenance(
   cryptographicallyVerified: boolean,
 ): ProvenanceFacts;
 
+export interface VerifiedPackageEntry {
+  name: string;
+  version: string;
+  location?: string;
+  registry?: string;
+  attestationBundles?: unknown[];
+  [key: string]: unknown;
+}
+
+export interface NpmAuditSignaturesReport {
+  invalid?: Array<{ name?: string; version?: string; [key: string]: unknown }>;
+  missing?: Array<{ name?: string; version?: string; [key: string]: unknown }>;
+  verified?: VerifiedPackageEntry[];
+}
+
+export function selectVerifiedPackageEntry(
+  auditReport: NpmAuditSignaturesReport,
+  identity: { name: string; version: string },
+): VerifiedPackageEntry;
+
+export function requireVerifiedAttestationBundles(verifiedEntry: VerifiedPackageEntry): unknown[];
+
 export interface ReleaseCommitInput {
   tagCommit: string;
   npmGitHead: string | null;

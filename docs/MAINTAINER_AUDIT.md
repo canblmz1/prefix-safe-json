@@ -123,22 +123,36 @@ The published semver ranges are not a frozen consumer graph.
 ## 9. Verify provenance
 
 ```console
-npx --yes npm@11.5.1 audit signatures
-node -e "fetch('https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-json@0.4.2').then(r=>r.json()).then(x=>console.log(JSON.stringify(x,null,2)))"
+npx --yes npm@11.19.0 audit signatures --json --include-attestations
 ```
 
-Decode the SLSA DSSE payload and confirm its subject SHA-512, source commit,
-repository, workflow path, and invocation. `npm audit signatures` performs
-npm's own Sigstore-backed signature and attestation verification; merely
-decoding JSON is not signature validation, and the release verifier does not
-treat it as one. `npm run verify:published-release` itself now performs both,
-in order, for any release whose provenance it uses at all: it first
-cryptographically verifies the attestation (an isolated, disposable install
-of the exact version plus a pinned `npm audit signatures`, tied back to the
-already-downloaded tarball's integrity), and only after that succeeds does it
-decode and content-check the statement. Content that matches expectations
-perfectly is still rejected if the signature step did not run or did not
-verify.
+Confirm the printed `verified` array has exactly one entry whose `name` and
+`version` match `prefix-safe-json@0.4.2` exactly - another dependency having
+a verified attestation does not count, and neither does a name match at a
+different version - and that entry carries exactly one attestation bundle.
+Decode that bundle's DSSE payload and confirm its subject SHA-512, source
+commit, repository, workflow path, and invocation.
+
+This is not two independent checks layered together: `npm audit signatures`
+performs npm's own Sigstore-backed signature verification, and
+`--include-attestations` is what makes it return the *exact verified bundle*
+per package rather than only an aggregate pass/fail. Decoding JSON on its
+own is not signature validation, decoding a *separately fetched* copy of the
+attestation (e.g. from `https://registry.npmjs.org/-/npm/v1/attestations/...`)
+does not prove it is the same bytes npm verified, and neither does a global
+"N packages have a verified attestation" count, which a transitive
+dependency could equally satisfy without saying anything about
+`prefix-safe-json` itself.
+
+`npm run verify:published-release` performs exactly the sequence above, in
+order, for any release whose provenance it uses at all: isolated install of
+the exact version, integrity cross-check against the already-downloaded
+tarball, `npm audit signatures --json --include-attestations`, exact
+name+version match against `verified[]`, exactly-one-bundle check, and only
+then content decoding of that specific bundle. It never fetches the
+registry's attestations HTTP endpoint for this decision. Content that
+matches expectations perfectly is still rejected if any step before it did
+not run or did not succeed.
 
 ## 10. Audit execution-critical source
 

@@ -21,11 +21,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 // Pinned independently of the release's own `packNpmVersion` (read from the
 // release source's publish.yml, which isn't known yet at this point in the
-// flow - see `verifyProvenanceCryptographically`). Known to perform real
-// Sigstore-backed `npm audit signatures` attestation verification, which is
-// what this pin needs to guarantee rather than whatever npm happens to be
-// ambient on a given machine or CI runner.
-const PROVENANCE_VERIFICATION_NPM_VERSION = "11.5.1";
+// flow - see `verifyProvenanceCryptographically`). Must support
+// `npm audit signatures --json --include-attestations` (which returns the
+// exact verified Sigstore bundle per package, not just an aggregate count -
+// confirmed unavailable on 11.5.1, present on 11.19.0), not merely
+// perform Sigstore verification in general.
+const PROVENANCE_VERIFICATION_NPM_VERSION = "11.19.0";
 
 function fail(message) {
   throw new Error(message);
@@ -148,13 +149,56 @@ function compareManifests(published, rebuilt) {
 const SLSA_PREDICATE_TYPE = "https://slsa.dev/provenance/v1";
 
 /**
- * Cryptographically verifies that this package version's npm provenance
- * attestation is real - a valid Sigstore-backed signature, not merely a
- * DSSE envelope whose JSON payload happens to parse and whose fields happen
- * to match what we expect. Delegates to the pinned npm CLI's own
- * `audit signatures` (which performs genuine Sigstore/Rekor verification)
- * in an isolated, disposable install, rather than hand-rolling signature
- * verification or adding a Sigstore client as a project dependency.
+ * Picks the one npm-verified audit-report entry for an exact package
+ * identity. Pure and synchronous so the matching/uniqueness policy is
+ * directly unit-testable against hand-built npm report fixtures, with no
+ * network or subprocess involved.
+ *
+ * Fails closed - never returns an empty or ambiguous result - if: no entry
+ * matches this exact name and version (including when only some *other*
+ * package in the tree has a verified entry); or more than one entry claims
+ * to match (which should never happen for one exact name+version, and is
+ * treated as too suspicious to pick either).
+ */
+export function selectVerifiedPackageEntry(auditReport, { name, version }) {
+  const matches = (auditReport.verified ?? []).filter(
+    (entry) => entry.name === name && entry.version === version,
+  );
+  if (matches.length === 0) {
+    fail(`npm audit signatures reported no verified entry for ${name}@${version}`);
+  }
+  if (matches.length > 1) {
+    fail(`npm audit signatures reported ${matches.length} verified entries for ${name}@${version}; refusing to pick one`);
+  }
+  return matches[0];
+}
+
+/**
+ * A package can have a verified registry signature without carrying any
+ * attestation at all - `attestationBundles` empty is not itself suspicious
+ * in general, but it does mean there is nothing here to use for source
+ * identity. Pure and separately testable from the name/version matching
+ * above.
+ */
+export function requireVerifiedAttestationBundles(verifiedEntry) {
+  const bundles = verifiedEntry.attestationBundles ?? [];
+  if (bundles.length === 0) {
+    fail(
+      `npm verified ${verifiedEntry.name}@${verifiedEntry.version}'s registry signature but reported no attestation bundle for it`,
+    );
+  }
+  return bundles;
+}
+
+/**
+ * Cryptographically verifies this exact package version's npm provenance
+ * and returns the *exact bundle npm itself verified* - never a separately
+ * fetched blob that merely claims to be the same thing. Delegates to the
+ * pinned npm CLI's own `audit signatures --include-attestations` (real
+ * Sigstore/Rekor verification), in an isolated, disposable install, rather
+ * than hand-rolling signature verification, adding a Sigstore client as a
+ * dependency, or inferring "verified" from a global attestation count that
+ * some *other* dependency could equally satisfy.
  *
  * `expectedIntegrity` ties this check back to the exact tarball already
  * downloaded and hashed: the isolated install's own resolved integrity for
@@ -162,8 +206,8 @@ const SLSA_PREDICATE_TYPE = "https://slsa.dev/provenance/v1";
  * bytes to this install than it served to the earlier download would be
  * caught here rather than silently verifying signatures for something else.
  *
- * Never returns `false` - either the verification fully succeeds, or this
- * throws (fail closed), including on any network/subprocess error.
+ * Never returns anything but the verified bundle - any ambiguity, mismatch,
+ * or subprocess/network error fails closed (throws) instead.
  */
 function verifyProvenanceCryptographically({ version, expectedIntegrity }) {
   const verifyRoot = mkdtempSync(join(tmpdir(), `${PACKAGE_NAME}-${version}-provenance-verify-`));
@@ -186,37 +230,23 @@ function verifyProvenanceCryptographically({ version, expectedIntegrity }) {
     );
   }
 
-  const jsonReport = JSON.parse(
-    capture("npx", ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "audit", "signatures", "--json"], {
-      cwd: verifyRoot,
-    }),
+  const auditReport = JSON.parse(
+    capture(
+      "npx",
+      ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "audit", "signatures", "--json", "--include-attestations"],
+      { cwd: verifyRoot },
+    ),
   );
-  const problems = [...(jsonReport.invalid ?? []), ...(jsonReport.missing ?? [])];
-  if (problems.length > 0) {
-    fail(`npm audit signatures reported unverified/invalid packages: ${JSON.stringify(problems)}`);
+
+  const packageProblems = [...(auditReport.invalid ?? []), ...(auditReport.missing ?? [])].filter(
+    (entry) => entry.name === PACKAGE_NAME && entry.version === version,
+  );
+  if (packageProblems.length > 0) {
+    fail(`npm audit signatures reported ${PACKAGE_NAME}@${version} as invalid/missing: ${JSON.stringify(packageProblems)}`);
   }
 
-  // `--json` only ever reports problems (see above) - it does not positively
-  // confirm that *this* package specifically has a verified attestation, as
-  // opposed to merely a verified registry signature (which every dependency
-  // here has, attestation or not). The plain-text report does say so
-  // explicitly, and only when at least one package's attestation verified;
-  // it is silently omitted rather than printed with a zero count otherwise
-  // (confirmed empirically against a package with no provenance at all).
-  // This isolated tree contains only prefix-safe-json and its own
-  // production dependencies (ajv and its four sub-dependencies, none of
-  // which ship provenance), so a nonzero count here can only be
-  // prefix-safe-json's own attestation.
-  const textReport = capture("npx", ["-y", `npm@${PROVENANCE_VERIFICATION_NPM_VERSION}`, "audit", "signatures"], {
-    cwd: verifyRoot,
-  });
-  const attestationMatch = /(\d+) packages? has? a verified attestation/u.exec(textReport);
-  const verifiedAttestationCount = attestationMatch ? Number(attestationMatch[1]) : 0;
-  if (verifiedAttestationCount < 1) {
-    fail("npm audit signatures did not report any verified attestation for the isolated install");
-  }
-
-  return true;
+  const verifiedEntry = selectVerifiedPackageEntry(auditReport, { name: PACKAGE_NAME, version });
+  return requireVerifiedAttestationBundles(verifiedEntry);
 }
 
 /**
@@ -385,23 +415,26 @@ async function main() {
   const publishedSha512 = digest(publishedBytes, "sha512");
   if (publishedSha1 !== metadata.dist.shasum) fail("downloaded tarball does not match npm dist.shasum");
 
-  // 9. fetch provenance if available
+  // 9. obtain provenance - the exact bundle npm itself cryptographically
+  // verified (see verifyProvenanceCryptographically), never a separately
+  // fetched blob that merely claims to be the same thing. The registry's
+  // own attestations endpoint is deliberately never fetched here: there is
+  // no code path by which an independently-retrieved, unverified JSON
+  // document could reach the source-identity decision below.
   let provenance = { available: false };
   if (metadata.dist.attestations?.url) {
-    const attestations = await fetchJson(metadata.dist.attestations.url);
-    writeFileSync(join(auditRoot, "attestations.json"), `${JSON.stringify(attestations, null, 2)}\n`);
-
-    // Cryptographically verify BEFORE decoding/trusting any of its content -
-    // an unsigned or invalidly-signed attestation is never inspected for
-    // matching fields at all, let alone trusted for source identity.
-    const cryptographicallyVerified = verifyProvenanceCryptographically({
+    const verifiedBundles = verifyProvenanceCryptographically({
       version,
       expectedIntegrity: metadata.dist.integrity,
     });
+    writeFileSync(
+      join(auditRoot, "verified-attestation-bundles.json"),
+      `${JSON.stringify(verifiedBundles, null, 2)}\n`,
+    );
 
     // 10. validate provenance subject digest against the downloaded tarball
     // (done inside decodeProvenance, which also enforces the crypto result)
-    provenance = decodeProvenance(attestations, publishedSha512, version, cryptographicallyVerified);
+    provenance = decodeProvenance({ attestations: verifiedBundles }, publishedSha512, version, true);
   }
 
   // 11. determine authoritative source commit ; 12. require it == tag commit

@@ -143,24 +143,38 @@ The SLSA v1 statement records:
 - invocation `https://github.com/canblmz1/prefix-safe-json/actions/runs/33051234174/attempts/1`.
 
 This statement's signature is cryptographically verified as part of
-`npm run verify:published-release` itself, not merely decoded: the verifier
-installs this exact version into an isolated, disposable directory with a
-pinned `npm@11.5.1`, confirms that install's own resolved integrity matches
-the already-downloaded-and-hashed tarball, then runs `npm audit signatures`
-against it. That run reported zero invalid or missing signatures and one
-verified attestation — unchanged in shape from `0.4.1` (six verified
-registry signatures, one verified attestation), since the production
-dependency graph did not change (see
-[`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md)). Only after this
-succeeds does the verifier decode the statement's content at all.
+`npm run verify:published-release` itself, not merely decoded, and not
+inferred from a global attestation count that some unrelated dependency
+could equally satisfy: the verifier installs this exact version into an
+isolated, disposable directory with a pinned `npm@11.19.0` (the first
+version confirmed, live, to support the flag below — `11.5.1` predates it
+and silently ignores it), confirms that install's own resolved integrity
+matches the already-downloaded-and-hashed tarball, then runs `npm audit
+signatures --json --include-attestations` against it. That command returns
+npm's own per-package `verified[]` array, each entry carrying npm's own
+Sigstore-verified attestation bundle for that exact package and version —
+the verifier requires exactly one `verified[]` entry whose `name` and
+`version` match `prefix-safe-json@0.4.2` exactly (another dependency having
+a verified attestation does not count, and neither does a name match at a
+different version), requires that entry to carry exactly one attestation
+bundle, and decodes *that exact bundle* — never a separately fetched
+document that merely claims to be the same thing. The registry's own
+attestations HTTP endpoint is not fetched for this decision at all. This
+run found one such bundle, unchanged in shape from `0.4.1` (also one
+verified attestation, alongside six verified registry signatures across
+the dependency tree), since the production dependency graph did not change
+(see [`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md)). Only after all
+of the above succeeds does the verifier decode the bundle's content at all.
 
 Cryptographic verification proves this exact attestation was really signed
-and recorded the way Sigstore attests. Provenance overall — verified
-signature plus matched content — binds an artifact digest to a repository,
-workflow, and commit. It does **not** prove the source is correct, the
-workflow is uncompromised, the dependencies are safe, or the runtime
-behavior matches a reviewer's policy. The independent rebuild (above) and
-source audit remain necessary.
+and recorded the way Sigstore attests, and that the specific bundle decoded
+next is the specific bundle npm verified - not merely *a* verified bundle
+somewhere in the dependency tree. Provenance overall — verified signature
+plus matched content — binds an artifact digest to a repository, workflow,
+and commit. It does **not** prove the source is correct, the workflow is
+uncompromised, the dependencies are safe, or the runtime behavior matches a
+reviewer's policy. The independent rebuild (above) and source audit remain
+necessary.
 
 ## Verified baseline — 0.4.1 (2026-08-27)
 
@@ -276,8 +290,14 @@ The SLSA v1 statement records:
 - GitHub-hosted Actions builder;
 - invocation `https://github.com/canblmz1/prefix-safe-json/actions/runs/32855671942/attempts/1`.
 
-`npm@11.5.1 audit signatures` on a clean installed dependency graph reported
-six verified registry signatures and one verified attestation.
+This statement's signature is cryptographically verified the same way as
+`0.4.2`'s (see above): `npm run verify:published-release -- 0.4.1` runs
+`npm@11.19.0 audit signatures --json --include-attestations` against an
+isolated install of this exact version, requires exactly one `verified[]`
+entry matching `prefix-safe-json@0.4.1` exactly, requires that entry to
+carry exactly one attestation bundle, and decodes only that exact bundle —
+six verified registry signatures and one verified attestation, across the
+same unchanged dependency tree.
 
 Provenance binds an artifact digest to a repository, workflow, and commit. It
 does **not** prove the source is correct, the workflow is uncompromised, the

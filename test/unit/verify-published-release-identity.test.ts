@@ -4,6 +4,8 @@ import { Buffer } from "node:buffer";
 import {
   decodeProvenance,
   determineReleaseCommit,
+  requireVerifiedAttestationBundles,
+  selectVerifiedPackageEntry,
   type ProvenanceFacts,
 } from "../../scripts/verify-published-release.mjs";
 
@@ -246,5 +248,113 @@ describe("decodeProvenance", () => {
       builder: "https://github.com/actions/runner/github-hosted",
       invocation: "https://github.com/canblmz1/prefix-safe-json/actions/runs/1/attempts/1",
     });
+  });
+});
+
+const PACKAGE_NAME = "prefix-safe-json";
+
+function verifiedEntry(overrides: {
+  name?: string;
+  version?: string;
+  attestationBundles?: unknown[];
+}) {
+  const { name = PACKAGE_NAME, version = VERSION, attestationBundles } = overrides;
+  return {
+    name,
+    version,
+    location: `node_modules/${name}`,
+    registry: "https://registry.npmjs.org/",
+    attestationBundles: attestationBundles ?? [attestationEntry(slsaStatement({ version }))],
+  };
+}
+
+describe("selectVerifiedPackageEntry", () => {
+  it("exact prefix-safe-json verified entry -> PASS", () => {
+    const report = { verified: [verifiedEntry({})], invalid: [], missing: [] };
+    const result = selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION });
+    expect(result.name).toBe(PACKAGE_NAME);
+    expect(result.version).toBe(VERSION);
+  });
+
+  it("verified attestation belongs only to another dependency -> FAIL", () => {
+    const report = { verified: [verifiedEntry({ name: "ajv" })], invalid: [], missing: [] };
+    expect(() => selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION })).toThrow(
+      /no verified entry/i,
+    );
+  });
+
+  it("correct package name but wrong version -> FAIL", () => {
+    const report = { verified: [verifiedEntry({ version: "0.4.1" })], invalid: [], missing: [] };
+    expect(() => selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION })).toThrow(
+      /no verified entry/i,
+    );
+  });
+
+  it("two matching verified package entries -> FAIL", () => {
+    const report = { verified: [verifiedEntry({}), verifiedEntry({})], invalid: [], missing: [] };
+    expect(() => selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION })).toThrow(
+      /2 verified entries/i,
+    );
+  });
+});
+
+describe("requireVerifiedAttestationBundles", () => {
+  it("target package verified but no provenance bundle -> FAIL", () => {
+    const entry = verifiedEntry({ attestationBundles: [] });
+    expect(() => requireVerifiedAttestationBundles(entry)).toThrow(/no attestation bundle/i);
+  });
+
+  it("target package verified with a bundle -> returns it", () => {
+    const bundle = attestationEntry(slsaStatement({}));
+    const entry = verifiedEntry({ attestationBundles: [bundle] });
+    expect(requireVerifiedAttestationBundles(entry)).toEqual([bundle]);
+  });
+});
+
+describe("separately fetched, unverified JSON has no path to the identity decision", () => {
+  it("case 8: a forged 'attestations endpoint' blob cannot influence the result, because nothing in the verified path ever reads it", () => {
+    // Simulates what an attacker (or a misbehaving registry) might have
+    // served from the separate, independently-fetched attestations
+    // endpoint - forged to look plausible (right shape, wrong content).
+    const forgedRegistryBlob = attestationBundle(
+      slsaStatement({ sourceCommit: COMMIT_B, subjectSha512: "0".repeat(128) }),
+    );
+
+    // This is what npm itself cryptographically verified - the only thing
+    // that actually feeds the identity decision now.
+    const npmVerifiedBundles = [attestationEntry(slsaStatement({ sourceCommit: COMMIT_A }))];
+    const report = {
+      verified: [verifiedEntry({ attestationBundles: npmVerifiedBundles })],
+      invalid: [],
+      missing: [],
+    };
+
+    const entry = selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION });
+    const bundles = requireVerifiedAttestationBundles(entry);
+
+    // Neither selectVerifiedPackageEntry nor requireVerifiedAttestationBundles
+    // takes the forged blob as a parameter at all - there is no channel by
+    // which it could have influenced `bundles`. Decoding it confirms the
+    // result still traces to npm's own verified data, not the forged one.
+    const result = decodeProvenance({ attestations: bundles }, TARBALL_SHA512, VERSION, true);
+    // Confirms the result traces to npm's own verified data (COMMIT_A),
+    // never to the forged blob's content (COMMIT_B) - even though the
+    // forged blob exists in scope, nothing above ever read it.
+    expect(result.sourceCommit).toBe(COMMIT_A);
+    expect(result.sourceCommit).not.toBe(COMMIT_B);
+    expect(forgedRegistryBlob).toBeDefined(); // exists, but unused by the decision above
+  });
+});
+
+describe("gitHead absent + no exact verified provenance for this package (case 9)", () => {
+  it("no verified entry at all -> selectVerifiedPackageEntry fails before a provenance object is ever built", () => {
+    const report = { verified: [], invalid: [], missing: [] };
+    expect(() => selectVerifiedPackageEntry(report, { name: PACKAGE_NAME, version: VERSION })).toThrow();
+  });
+
+  it("if that were bypassed anyway, determineReleaseCommit still fails closed with gitHead absent and no provenance", () => {
+    expect(() =>
+      determineReleaseCommit({ tagCommit: COMMIT_A, npmGitHead: null, provenance: { available: false } }),
+    ).toThrow(/provenance/i);
   });
 });
