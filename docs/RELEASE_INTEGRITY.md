@@ -4,7 +4,179 @@ This document records independently rechecked release evidence. It is not a
 promise about future artifacts. Re-run the commands in
 [`MAINTAINER_AUDIT.md`](MAINTAINER_AUDIT.md) before making a trust decision.
 
-## Verified baseline (2026-08-27)
+## Verified baseline — 0.4.2 (2026-08-27)
+
+The default GitHub branch was `main`; `origin/main` resolved to the exact
+same commit as tag `v0.4.2`.
+
+| Field | Verified value |
+| --- | --- |
+| npm `latest` | `0.4.2` |
+| npm `next` | `0.0.1-alpha.4` |
+| GitHub release/tag | `v0.4.2` |
+| release commit | `8443e5f20d21d7b85e7568e97205645e92e0dfd4` |
+| npm `gitHead` | **absent** (see note below; this differs from `0.4.1`) |
+| registry tarball | `https://registry.npmjs.org/prefix-safe-json/-/prefix-safe-json-0.4.2.tgz` |
+| packed bytes | `110575` |
+| unpacked bytes | `496543` |
+| files | `141` |
+| SHA-1 / npm `dist.shasum` | `9d069c431890d7ff06e86866f8d4dd2e0bbc9437` |
+| SHA-256 | `94d308d26d09c1ecf0cb77a362a39a4c5938021295e7bd82b6ae987529a5e87b` |
+| SHA-512 (hex) | `cfa212385cc1e65ea6438293c9d61125b3499e9fb482f30b582fd6825d9a8dc004042829a931e7c4fad8a34ffb0e88af0d95b7874ae499cefe98d7df5bbb4c3c` |
+| npm `dist.integrity` | `sha512-z6ISOFzB5l6mQ4KTydYRJbNJnp+0gvMLWC/Wgl2ajcAEBCgpqTHnxPrYo0/7DoivDZW3h0rkmc7+mNffW7tMPA==` |
+| provenance | SLSA provenance v1 present; subject SHA-512 matches the tarball |
+
+The release commit is a GitHub-verified merge commit. GitHub release `v0.4.2`
+was published at `2026-08-27T08:20:17Z`. Publish workflow run
+`https://github.com/canblmz1/prefix-safe-json/actions/runs/33051234174`
+concluded `success` with `head_sha` equal to the release commit above.
+
+**`gitHead` is absent from `0.4.2`'s npm metadata**, unlike `0.4.1`'s. The
+`publish` job (`.github/workflows/publish.yml`) packs one tarball with `npm
+pack`, smoke-tests that exact file, then runs `npm publish <tarball-path>`
+against it instead of re-packing the working directory — deliberately, so
+the artifact that was tested is guaranteed to be the artifact that gets
+published. `npm publish` given an explicit tarball path skips the git-aware
+packing step that would otherwise populate `gitHead`. This is a side effect
+of a real integrity improvement, not a loss of verifiability: the SLSA
+provenance attestation below independently binds this npm package version to
+release commit `8443e5f20d21d7b85e7568e97205645e92e0dfd4` with a
+cryptographically verified statement — the same binding `gitHead` would have
+offered, at a stronger level (see the three-tier distinction below). This is
+expected to recur for every future release published this way.
+
+`scripts/verify-published-release.mjs` now establishes the authoritative
+release commit through one policy, not through `gitHead` alone. It
+distinguishes three separate things, none of which stands in for another:
+
+1. **Provenance claims decoded and content-matched**: the DSSE payload
+   parses as JSON and its self-reported subject digest, repository, and
+   workflow path match what is expected. On its own this proves nothing —
+   anyone can construct JSON that parses and has matching fields.
+2. **Provenance cryptographically verified**: the attestation's signature
+   itself checks out against Sigstore, via a pinned `npm audit signatures`
+   run in an isolated, disposable install of this exact package version
+   (`scripts/verify-published-release.mjs`'s `verifyProvenanceCryptographically`)
+   — not by decoding JSON. This is required before step 1's content is
+   trusted for anything; content that would otherwise be perfectly valid
+   still fails closed without it.
+3. **Reproducible rebuild**: once an authoritative release commit is
+   established (below), the package is independently rebuilt from that
+   exact commit and compared byte-for-byte against the published tarball —
+   see "Reproduction result" below.
+
+Identity policy, requiring (2) wherever provenance is used at all:
+
+- **`gitHead` present** (e.g. `0.4.1`): tag commit, npm `gitHead`, and — when
+  provenance is available — the cryptographically verified, content-matched
+  provenance source commit must all agree. This is the original policy,
+  preserved unweakened; if provenance happens to be unavailable it is simply
+  not cross-checked, exactly as before this fallback existed.
+- **`gitHead` absent** (e.g. `0.4.2`): cryptographically verified provenance
+  becomes *required*. The provenance statement's repository, workflow path,
+  and subject SHA-512 (against the independently downloaded tarball) are
+  validated only after its signature has verified; only then may its source
+  commit — checked against the Git tag commit — stand in for the missing
+  `gitHead`.
+- **Either way, if the required identities disagree, if provenance is
+  absent/malformed/ambiguous when `gitHead` is absent, or if provenance is
+  present but its signature does not verify: the verifier fails closed.** It
+  never accepts the GitHub tag alone, never treats a missing `gitHead` as
+  something to silently work around, and never treats matching JSON content
+  as a substitute for a verified signature.
+
+## Reproduction result — 0.4.2
+
+`npm run verify:published-release -- 0.4.2` now passes end to end, with no
+manual workaround: it establishes `8443e5f20d21d7b85e7568e97205645e92e0dfd4`
+as the release commit via the provenance-fallback policy above
+(`sourceIdentityMethod: "provenance"` in its result JSON), then rebuilds
+from that exact commit and compares against the downloaded tarball exactly
+as it does for a release with `gitHead` present: `pnpm@10.33.1` with a
+frozen lockfile, `pnpm run clean`, `pnpm run build`, and the publish
+workflow's exact `npm@11.5.1` packer, then a per-file SHA-256 manifest
+comparison of both unpacked trees plus a direct byte comparison of both
+`.tgz` files.
+
+| Question | Result |
+| --- | --- |
+| Rebuilt `.tgz` byte-identical to npm | **YES** |
+| All unpacked files byte-identical | **YES** |
+| Published manifest entries | `141` |
+| Rebuilt manifest entries | `141` |
+| Per-file manifest differences | `0` |
+
+No file content was normalized during comparison. As with `0.4.1`,
+`core.autocrlf=false` was required for a clean result: a first attempt built
+directly inside an already-checked-out Windows worktree (this machine's
+`core.autocrlf=true`, no repository `.gitattributes` overriding it) and
+produced 5 false-positive text-file differences — `LICENSE`,
+`LICENSE-APACHE`, `LICENSE-MIT`, `README.md`, and `package.json`, each
+inflated by CRLF line-ending conversion — while all 136 `dist/**` files
+already matched exactly in that first attempt. Re-running from a `git
+archive --output=... -c core.autocrlf=false` export (matching what the
+official script does) eliminated all 5 differences.
+
+`0.4.2`'s published `dist/` is also byte-for-byte identical to `0.4.1`'s
+published `dist/` (`diff -rq` of both unpacked tarballs' `dist/` trees: no
+differences), and `git diff --stat 2d2dc5ae5d83d8db73d485ade2872939459bdc09
+8443e5f20d21d7b85e7568e97205645e92e0dfd4 -- src/` is empty. The entire
+release-to-release diff touches only `.github/workflows/{ci,publish}.yml`,
+`README.md`, this record and the other three `docs/*.md` files it lives
+alongside, the two new `scripts/verify-*.mjs` maintainer tools, and a
+`package.json` version bump plus those two new script entries.
+**`0.4.2` ships zero runtime code changes relative to `0.4.1`.**
+
+## Provenance mapping — 0.4.2
+
+```text
+https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-json@0.4.2
+```
+
+The SLSA v1 statement records:
+
+- subject `pkg:npm/prefix-safe-json@0.4.2` with the SHA-512 above;
+- repository `https://github.com/canblmz1/prefix-safe-json`;
+- workflow `.github/workflows/publish.yml` at `refs/heads/main`;
+- source commit `8443e5f20d21d7b85e7568e97205645e92e0dfd4`;
+- GitHub-hosted Actions builder;
+- invocation `https://github.com/canblmz1/prefix-safe-json/actions/runs/33051234174/attempts/1`.
+
+This statement's signature is cryptographically verified as part of
+`npm run verify:published-release` itself, not merely decoded, and not
+inferred from a global attestation count that some unrelated dependency
+could equally satisfy: the verifier installs this exact version into an
+isolated, disposable directory with a pinned `npm@11.19.0` (the first
+version confirmed, live, to support the flag below — `11.5.1` predates it
+and silently ignores it), confirms that install's own resolved integrity
+matches the already-downloaded-and-hashed tarball, then runs `npm audit
+signatures --json --include-attestations` against it. That command returns
+npm's own per-package `verified[]` array, each entry carrying npm's own
+Sigstore-verified attestation bundle for that exact package and version —
+the verifier requires exactly one `verified[]` entry whose `name` and
+`version` match `prefix-safe-json@0.4.2` exactly (another dependency having
+a verified attestation does not count, and neither does a name match at a
+different version), requires that entry to carry exactly one attestation
+bundle, and decodes *that exact bundle* — never a separately fetched
+document that merely claims to be the same thing. The registry's own
+attestations HTTP endpoint is not fetched for this decision at all. This
+run found one such bundle, unchanged in shape from `0.4.1` (also one
+verified attestation, alongside six verified registry signatures across
+the dependency tree), since the production dependency graph did not change
+(see [`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md)). Only after all
+of the above succeeds does the verifier decode the bundle's content at all.
+
+Cryptographic verification proves this exact attestation was really signed
+and recorded the way Sigstore attests, and that the specific bundle decoded
+next is the specific bundle npm verified - not merely *a* verified bundle
+somewhere in the dependency tree. Provenance overall — verified signature
+plus matched content — binds an artifact digest to a repository, workflow,
+and commit. It does **not** prove the source is correct, the workflow is
+uncompromised, the dependencies are safe, or the runtime behavior matches a
+reviewer's policy. The independent rebuild (above) and source audit remain
+necessary.
+
+## Verified baseline — 0.4.1 (2026-08-27)
 
 The default GitHub branch was `main`. The audit began from local HEAD
 `4ccc5ff22afb344f08ac04c9da5e5376e0857494` (`release/0.4.1`), then fetched
@@ -30,7 +202,7 @@ The default GitHub branch was `main`. The audit began from local HEAD
 The release commit is a GitHub-verified merge commit. GitHub release `v0.4.1`
 was published at `2026-08-25T14:29:19Z`.
 
-## Reproduction result
+## Reproduction result — 0.4.1
 
 The release was rebuilt from the exact Git commit using the repository's
 `pnpm@10.33.1` pin, a frozen lockfile, `pnpm run clean`, `pnpm run build`, and
@@ -75,6 +247,11 @@ The artifact contains only:
 - `package.json` (`3145` bytes);
 - README and three license files (`31919` bytes).
 
+`0.4.2` matches exactly on the first three (independently confirmed via a
+direct `dist/` diff against `0.4.1`, above); `0.4.2`'s `package.json` is
+`3293` bytes (the version bump plus two new script entries) and its README
+plus three license files total `32539` bytes.
+
 All archive members were regular, non-executable files with no hidden paths,
 symlinks, native binaries, or bundled dependency directories. A credential
 marker scan found only the intentionally truncated password example in the
@@ -96,7 +273,7 @@ names exactly one corresponding `src/**/*.ts` input; no map embeds
 `sourcesContent`. This is a one-source-file-to-one-emitted-module build, not a
 bundle. Consumers must retrieve the tagged source to inspect source text.
 
-## Provenance mapping
+## Provenance mapping — 0.4.1
 
 The official npm attestation endpoint is:
 
@@ -113,8 +290,14 @@ The SLSA v1 statement records:
 - GitHub-hosted Actions builder;
 - invocation `https://github.com/canblmz1/prefix-safe-json/actions/runs/32855671942/attempts/1`.
 
-`npm@11.5.1 audit signatures` on a clean installed dependency graph reported
-six verified registry signatures and one verified attestation.
+This statement's signature is cryptographically verified the same way as
+`0.4.2`'s (see above): `npm run verify:published-release -- 0.4.1` runs
+`npm@11.19.0 audit signatures --json --include-attestations` against an
+isolated install of this exact version, requires exactly one `verified[]`
+entry matching `prefix-safe-json@0.4.1` exactly, requires that entry to
+carry exactly one attestation bundle, and decodes only that exact bundle —
+six verified registry signatures and one verified attestation, across the
+same unchanged dependency tree.
 
 Provenance binds an artifact digest to a repository, workflow, and commit. It
 does **not** prove the source is correct, the workflow is uncompromised, the
@@ -142,7 +325,9 @@ not decide unrelated PRs. It is a command-driven release/audit check.
 
 ## Scope and history
 
-Only `0.4.1` has been independently rebuilt for this record. Earlier releases
-have tags and registry metadata but are **not** claimed reproducible here.
+`0.4.1` and `0.4.2` have both been independently rebuilt for this record via
+`npm run verify:published-release` — `0.4.1` through the `gitHead` policy,
+`0.4.2` through the provenance-fallback policy above. Earlier releases have
+tags and registry metadata but are **not** claimed reproducible here.
 Registry dependency ranges can resolve differently over time; see
 [`RUNTIME_DEPENDENCIES.md`](RUNTIME_DEPENDENCIES.md).

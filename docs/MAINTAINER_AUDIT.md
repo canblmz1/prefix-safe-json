@@ -15,17 +15,17 @@ cd prefix-safe-json
 git fetch origin --tags
 git remote get-url origin
 git rev-parse origin/main
-git rev-parse v0.4.1^{commit}
-git show --show-signature --no-patch v0.4.1^{commit}
+git rev-parse v0.4.2^{commit}
+git show --show-signature --no-patch v0.4.2^{commit}
 ```
 
-For `0.4.1`, the tag must resolve to
-`2d2dc5ae5d83d8db73d485ade2872939459bdc09`.
+For `0.4.2`, the tag must resolve to
+`8443e5f20d21d7b85e7568e97205645e92e0dfd4`.
 
 ## 2. Verify npm metadata
 
 ```console
-npm view prefix-safe-json@0.4.1 version gitHead engines license type files dependencies optionalDependencies peerDependencies scripts repository dist --json
+npm view prefix-safe-json@0.4.2 version gitHead engines license type files dependencies optionalDependencies peerDependencies scripts repository dist --json
 npm view prefix-safe-json dist-tags --json
 ```
 
@@ -38,13 +38,13 @@ This portable Node command reads the official metadata and writes the URL it
 actually downloaded:
 
 ```console
-node -e "fetch('https://registry.npmjs.org/prefix-safe-json/0.4.1').then(r=>r.json()).then(async m=>{const r=await fetch(m.dist.tarball);if(!r.ok)throw Error(String(r.status));require('node:fs').writeFileSync('prefix-safe-json-0.4.1.tgz',Buffer.from(await r.arrayBuffer()));console.log(m.dist.tarball)})"
+node -e "fetch('https://registry.npmjs.org/prefix-safe-json/0.4.2').then(r=>r.json()).then(async m=>{const r=await fetch(m.dist.tarball);if(!r.ok)throw Error(String(r.status));require('node:fs').writeFileSync('prefix-safe-json-0.4.2.tgz',Buffer.from(await r.arrayBuffer()));console.log(m.dist.tarball)})"
 ```
 
 ## 4. Verify tarball integrity
 
 ```console
-node -e "const fs=require('node:fs'),c=require('node:crypto'),b=fs.readFileSync('prefix-safe-json-0.4.1.tgz');for(const a of ['sha1','sha256','sha512'])console.log(a,c.createHash(a).update(b).digest(a==='sha512'?'base64':'hex'))"
+node -e "const fs=require('node:fs'),c=require('node:crypto'),b=fs.readFileSync('prefix-safe-json-0.4.2.tgz');for(const a of ['sha1','sha256','sha512'])console.log(a,c.createHash(a).update(b).digest(a==='sha512'?'base64':'hex'))"
 ```
 
 Expected SHA-1, SHA-256, and SRI SHA-512 are recorded in
@@ -54,11 +54,11 @@ Expected SHA-1, SHA-256, and SRI SHA-512 are recorded in
 ## 5. Inspect published files
 
 ```console
-tar -tzf prefix-safe-json-0.4.1.tgz
-tar -tvzf prefix-safe-json-0.4.1.tgz
+tar -tzf prefix-safe-json-0.4.2.tgz
+tar -tvzf prefix-safe-json-0.4.2.tgz
 mkdir npm-unpacked
-tar -xzf prefix-safe-json-0.4.1.tgz -C npm-unpacked
-npm run verify:package-policy -- prefix-safe-json-0.4.1.tgz
+tar -xzf prefix-safe-json-0.4.2.tgz -C npm-unpacked
+npm run verify:package-policy -- prefix-safe-json-0.4.2.tgz
 ```
 
 Review every path and mode. The policy command fails on hidden/unexpected
@@ -78,7 +78,7 @@ disposable consumer with visible lifecycle output:
 mkdir consumer-audit
 cd consumer-audit
 npm init -y
-npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.1.tgz
+npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.2.tgz
 ```
 
 ## 7. Compare npm bytes to a source build
@@ -86,13 +86,27 @@ npm install --foreground-scripts --loglevel verbose ../prefix-safe-json-0.4.1.tg
 From the repository root:
 
 ```console
-npm run verify:published-release -- 0.4.1
+npm run verify:published-release -- 0.4.2
 ```
 
 Read the printed `result.json` and both per-file SHA-256 manifests. Require
 `packageContentIdentical: true`; treat every manifest difference as a stop.
 `tarballByteIdentical` is separate because container metadata/tool versions
-can differ even when content matches. For `0.4.1`, both results are `true`.
+can differ even when content matches.
+
+For `0.4.2` specifically, npm's registry metadata has no `gitHead` — `0.4.2`
+was published by `npm publish <tarball-path>` against an already-packed
+artifact (see [`RELEASE_INTEGRITY.md`](RELEASE_INTEGRITY.md)), which does not
+populate that field. The verifier establishes the release commit through
+verified provenance instead in that case (`result.json`'s
+`sourceIdentityMethod` reads `"provenance"` rather than `"npm-gitHead"`) —
+requiring the provenance statement's repository, workflow, and subject
+SHA-512 to check out, and its source commit to match the Git tag, before
+using it. It fails closed if `gitHead` is absent and provenance is missing,
+malformed, ambiguous, or disagrees; see `determineReleaseCommit` and
+`decodeProvenance` in `scripts/verify-published-release.mjs` for the exact
+policy, and their tests in
+`test/unit/verify-published-release-identity.test.ts`.
 
 ## 8. Inspect runtime dependencies
 
@@ -109,14 +123,36 @@ The published semver ranges are not a frozen consumer graph.
 ## 9. Verify provenance
 
 ```console
-npx --yes npm@11.5.1 audit signatures
-node -e "fetch('https://registry.npmjs.org/-/npm/v1/attestations/prefix-safe-json@0.4.1').then(r=>r.json()).then(x=>console.log(JSON.stringify(x,null,2)))"
+npx --yes npm@11.19.0 audit signatures --json --include-attestations
 ```
 
-Decode the SLSA DSSE payload and confirm its subject SHA-512, source commit,
-repository, workflow path, and invocation. The release verifier performs
-those comparisons. `npm audit signatures` performs npm's signature and
-attestation verification; merely decoding JSON is not signature validation.
+Confirm the printed `verified` array has exactly one entry whose `name` and
+`version` match `prefix-safe-json@0.4.2` exactly - another dependency having
+a verified attestation does not count, and neither does a name match at a
+different version - and that entry carries exactly one attestation bundle.
+Decode that bundle's DSSE payload and confirm its subject SHA-512, source
+commit, repository, workflow path, and invocation.
+
+This is not two independent checks layered together: `npm audit signatures`
+performs npm's own Sigstore-backed signature verification, and
+`--include-attestations` is what makes it return the *exact verified bundle*
+per package rather than only an aggregate pass/fail. Decoding JSON on its
+own is not signature validation, decoding a *separately fetched* copy of the
+attestation (e.g. from `https://registry.npmjs.org/-/npm/v1/attestations/...`)
+does not prove it is the same bytes npm verified, and neither does a global
+"N packages have a verified attestation" count, which a transitive
+dependency could equally satisfy without saying anything about
+`prefix-safe-json` itself.
+
+`npm run verify:published-release` performs exactly the sequence above, in
+order, for any release whose provenance it uses at all: isolated install of
+the exact version, integrity cross-check against the already-downloaded
+tarball, `npm audit signatures --json --include-attestations`, exact
+name+version match against `verified[]`, exactly-one-bundle check, and only
+then content decoding of that specific bundle. It never fetches the
+registry's attestations HTTP endpoint for this decision. Content that
+matches expectations perfectly is still rejected if any step before it did
+not run or did not succeed.
 
 ## 10. Audit execution-critical source
 
