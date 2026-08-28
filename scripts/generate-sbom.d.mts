@@ -41,3 +41,4 @@ export function buildCycloneDx(
 ): CycloneDxBom;
 export function serializeCycloneDx(bom: CycloneDxBom): string;
 export function defaultSbomPath(version: string): string;
+export function parseOutputPathArgument(argv: string[]): string | undefined;

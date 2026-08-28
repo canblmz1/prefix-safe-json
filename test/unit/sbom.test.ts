@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCycloneDx, serializeCycloneDx } from "../../scripts/generate-sbom.mjs";
+import { buildCycloneDx, parseOutputPathArgument, serializeCycloneDx } from "../../scripts/generate-sbom.mjs";
 
 const manifests: Record<string, { license: string }> = {
   "/root": { license: "MIT OR Apache-2.0" },
@@ -24,6 +24,13 @@ const tree = {
 };
 
 describe("production SBOM", () => {
+  it("accepts package-manager argument forwarding with or without a separator", () => {
+    expect(parseOutputPathArgument(["node", "script", "artifact.cdx.json"])).toBe("artifact.cdx.json");
+    expect(parseOutputPathArgument(["node", "script", "--", "artifact.cdx.json"])).toBe("artifact.cdx.json");
+    expect(parseOutputPathArgument(["node", "script"])).toBeUndefined();
+    expect(() => parseOutputPathArgument(["node", "script", "one", "two"])).toThrow(/at most one/u);
+  });
+
   it("emits a deterministic CycloneDX graph without development dependencies or local paths", () => {
     const loadManifest = (path: string) => {
       const manifest = manifests[path];

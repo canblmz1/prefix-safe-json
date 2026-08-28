@@ -130,11 +130,18 @@ export function defaultSbomPath(version) {
   return resolve(PROJECT_ROOT, "artifacts", `prefix-safe-json-${version}.cdx.json`);
 }
 
+export function parseOutputPathArgument(argv) {
+  const args = argv.slice(2);
+  if (args[0] === "--") args.shift();
+  if (args.length > 1) throw new Error("expected at most one SBOM output path");
+  return args[0];
+}
+
 const invokedDirectly = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 if (invokedDirectly) {
   try {
     const tree = readProductionDependencyTree();
-    const output = resolve(process.argv[2] ?? defaultSbomPath(tree.version));
+    const output = resolve(parseOutputPathArgument(process.argv) ?? defaultSbomPath(tree.version));
     const bom = buildCycloneDx(tree);
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, serializeCycloneDx(bom));

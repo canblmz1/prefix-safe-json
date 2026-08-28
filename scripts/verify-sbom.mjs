@@ -4,6 +4,7 @@ import process from "node:process";
 import {
   buildCycloneDx,
   defaultSbomPath,
+  parseOutputPathArgument,
   readProductionDependencyTree,
   serializeCycloneDx,
 } from "./generate-sbom.mjs";
@@ -14,7 +15,7 @@ function fail(message) {
 
 try {
   const tree = readProductionDependencyTree();
-  const sbomPath = resolve(process.argv[2] ?? defaultSbomPath(tree.version));
+  const sbomPath = resolve(parseOutputPathArgument(process.argv) ?? defaultSbomPath(tree.version));
   const actualText = readFileSync(sbomPath, "utf8");
   const actual = JSON.parse(actualText);
   const expected = buildCycloneDx(tree);
