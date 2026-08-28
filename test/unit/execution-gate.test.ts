@@ -412,20 +412,26 @@ describe("execution gate — concurrency and protocol edge cases", () => {
     expect(() => gate.finish()).not.toThrow();
   });
 
-  it("only the first provider_stream_end is captured — a later/duplicate one can't override it", () => {
+  it("only the first provider_stream_end sets the captured reason — a later/duplicate one can't override it, and now permanently disqualifies the decision (GHSA-3xpw-9694-2xxp)", () => {
     const gate = gateWith();
     gate.push(start("call-0", "write_file"));
     gate.push(argsDelta("call-0", '{"path":"a.txt","content":"hi"}'));
     gate.push(callEnd("call-0"));
     gate.push(streamEnd("length", "max_tokens"));
-    // The coordinator itself would already reject this as
-    // E_EVENT_AFTER_STREAM_END, but the gate's own reason-capture must not
-    // be fooled into overriding what it already captured either.
+    // The coordinator records this second, conflicting terminal as
+    // E_TERMINAL_REASON_CONFLICT. AUTHORITY_PROTOCOL_VIOLATION_CODES
+    // membership (GHSA-3xpw-9694-2xxp) means that diagnostic now actually
+    // disqualifies the decision - it is no longer merely observable. The
+    // gate's own reason-capture below is a separate, still-unaffected
+    // guarantee: streamEndReason/evidence stay "length", never overridden
+    // to "provider_error".
     gate.push(streamEnd("provider_error", "should be ignored"));
 
     const decision = expectDefined(gate.finish().decisions[0]);
     expect(decision.reason).not.toBe("provider_error");
-    expect(decision.reason).toBe("stream_incomplete");
+    expect(decision.evidence.streamEndReason).toBe("length");
+    expect(decision.reason).toBe("protocol_violation");
+    expect(decision.action).toBe("reject");
   });
 
   it("snapshot() called after the stream has ended (but before finish()) reflects the real captured reason, not a neutral placeholder", () => {

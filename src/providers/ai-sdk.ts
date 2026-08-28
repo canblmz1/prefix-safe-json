@@ -8,6 +8,7 @@ import {
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
   TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE,
   TOOL_END_BEFORE_START_DIAGNOSTIC_CODE,
+  PROVIDER_EVENT_IDENTITY_AMBIGUOUS_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 // ---------------------------------------------------------------------------
@@ -95,14 +96,6 @@ export type AiSdkStreamPart =
   | AiSdkAbortPart
   | { type: string; [key: string]: unknown };
 
-function toolPartId(part: { id?: string; toolCallId?: string }): string | undefined {
-  // "tool-input-start"/"tool-input-delta" carry `id`; "tool-input-end" is
-  // documented with `toolCallId`. Reading both defensively means this
-  // adapter keeps working correlated-by-ID either way, rather than silently
-  // dropping events if one part type uses the other field name.
-  return part.id ?? part.toolCallId;
-}
-
 function stringifyError(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -128,9 +121,61 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
   private readonly startedCallKeys = new Set<string>();
   private readonly endedCallKeys = new Set<string>();
 
-  push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
-    if (this.finished) return [];
+  /**
+   * Resolves one raw part's call identity from `id`/`toolCallId`
+   * ("tool-input-start"/"tool-input-delta" carry `id`; "tool-input-end" is
+   * documented with `toolCallId`; reading both defensively means this
+   * adapter keeps working correlated-by-ID either way, rather than silently
+   * dropping events if one part type uses the other field name).
+   *
+   * When both are present and disagree, which one names the real call
+   * cannot be inferred - silently preferring one (as this used to) risks
+   * attributing subsequent evidence, including a positive decision, to the
+   * wrong call. Rather than guess, this pushes a stream-wide (no `callRef`)
+   * authority-disqualifying diagnostic - `AUTHORITY_PROTOCOL_VIOLATION_CODES`
+   * membership means `decideExecution()` fails every call in the stream
+   * closed once it observes this, not only whichever call the model may
+   * have meant - and returns `undefined`, so the caller's own "no id at
+   * all" no-op path handles the rest without a second special case
+   * (GHSA-3xpw-9694-2xxp).
+   */
+  private resolveIdentity(
+    part: { id?: string; toolCallId?: string },
+    events: NormalizedToolStreamEvent[],
+  ): string | undefined {
+    const { id, toolCallId } = part;
+    if (id !== undefined && toolCallId !== undefined && id !== toolCallId) {
+      events.push({
+        type: "provider_diagnostic",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        code: PROVIDER_EVENT_IDENTITY_AMBIGUOUS_DIAGNOSTIC_CODE,
+        severity: "fatal",
+        message: `AI SDK event carried conflicting id ("${id}") and toolCallId ("${toolCallId}"); identity cannot be trusted`,
+      });
+      return undefined;
+    }
+    return id ?? toolCallId;
+  }
 
+  push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
+    // No `finished` early return here: silently dropping every event after
+    // the first terminal (as this used to) meant an argument delta, a
+    // provider error/abort, a conflicting or duplicate finish, or SDK
+    // tool-result/tool-error evidence that arrived even one raw event late
+    // never reached the coordinator at all - not even as a diagnostic - so
+    // an already-decided call's authority could never be revoked by it.
+    // Every case below that has ITS OWN meaningful post-terminal handling
+    // (a genuine argument delta, a second tool-input-start/-end, a second
+    // stream-terminal part) still fires exactly as if the stream were open;
+    // the coordinator's own `isFinished` gate (coordinator.ts's `push()`)
+    // is what turns each of those into a sticky, stream-wide
+    // AUTHORITY_PROTOCOL_VIOLATION_CODES diagnostic once it actually
+    // receives them. A raw part with no observable tool-argument or
+    // stream-termination meaning at all (text-delta, reasoning-delta,
+    // start-step, finish-step, ...) still falls through to `default: break`
+    // below and produces nothing, before or after `finished` - this fix
+    // does not manufacture new diagnostics for those (GHSA-3xpw-9694-2xxp).
     const events: NormalizedToolStreamEvent[] = [];
 
     if (!rawEvent || typeof rawEvent !== "object") {
@@ -164,7 +209,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
 
     switch (part.type) {
       case "tool-input-start": {
-        const id = toolPartId(part);
+        const id = this.resolveIdentity(part, events);
         if (id === undefined) break;
         this.startedCallKeys.add(`tool-input:${id}`);
         events.push({
@@ -178,7 +223,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         break;
       }
       case "tool-input-delta": {
-        const id = toolPartId(part);
+        const id = this.resolveIdentity(part, events);
         if (id === undefined || typeof part.delta !== "string") break;
         const sourceKey = `tool-input:${id}`;
         if (!this.startedCallKeys.has(sourceKey)) {
@@ -215,7 +260,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         break;
       }
       case "tool-input-end": {
-        const id = toolPartId(part);
+        const id = this.resolveIdentity(part, events);
         if (id === undefined) break;
         const sourceKey = `tool-input:${id}`;
         if (!this.startedCallKeys.has(sourceKey)) {
@@ -273,7 +318,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         // acts on this code). An unattributable result (no id at all) still
         // gets reported - just without a callRef, matching "tool-error"
         // below - rather than silently dropped.
-        const id = toolPartId(part);
+        const id = this.resolveIdentity(part, events);
         events.push({
           type: "provider_diagnostic",
           sequence: ++this.sequence,
@@ -291,7 +336,7 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         // irreversible side effect occurred first. Deliberately the same
         // fail-closed treatment as "tool-result" above: see
         // SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE's own docs.
-        const id = toolPartId(part);
+        const id = this.resolveIdentity(part, events);
         events.push({
           type: "provider_diagnostic",
           sequence: ++this.sequence,

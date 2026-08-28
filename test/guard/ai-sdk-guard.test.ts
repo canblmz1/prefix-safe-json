@@ -93,15 +93,25 @@ describe("createAiSdkExecutionGuard — basic API surface", () => {
     expect(inFlight.every((d) => d.action !== "execute")).toBe(true);
   });
 
-  it("push() after the stream's own finish part does not reopen or change the decision", () => {
+  it("push() after the stream's own finish part revokes the decision instead of silently reusing it (GHSA-3xpw-9694-2xxp)", () => {
     const guard = createAiSdkExecutionGuard();
     for (const part of completeWriteFileParts) guard.push(part);
     const before = guard.finish();
+    expect(before.decisions[0]?.action).toBe("execute");
     // A stray extra part arriving after the stream has already reported its
-    // own terminal event (e.g. a bug upstream, or a re-entrant call).
+    // own terminal event (e.g. a bug upstream, or a re-entrant call). Before
+    // the fix, the adapter's own `finished` flag silently dropped this -
+    // "does not change the decision" was true only because the event never
+    // reached the coordinator at all, which is exactly how a late/malicious
+    // delta could still ride an already-frozen `execute` decision out
+    // through takeDecision(). It now reaches the coordinator, which records
+    // E_EVENT_AFTER_STREAM_END - an AUTHORITY_PROTOCOL_VIOLATION_CODES
+    // member - permanently revoking this call's authority instead.
     guard.push({ type: "tool-input-delta", id: "call_1", delta: "malicious-late-data" });
     const after = guard.finish();
-    expect(after.decisions).toEqual(before.decisions);
+    expect(after.decisions[0]?.action).not.toBe("execute");
+    expect(after.decisions[0]?.reason).toBe("protocol_violation");
+    expect(guard.takeDecision(after.decisions[0]?.internalId ?? "missing")).toBeUndefined();
   });
 
   it("finish() is idempotent - calling it twice returns the same decisions", () => {

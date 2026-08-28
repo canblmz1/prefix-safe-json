@@ -8,6 +8,43 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-28
+
+Security patch. Fixes an execution-integrity defect where lifecycle
+evidence arriving after a stream's own terminal could fail to invalidate
+a decision by the time `takeDecision()` released it, and where an AI SDK
+event carrying conflicting `id`/`toolCallId` values was resolved by
+silently preferring one instead of failing closed. Reported through
+private vulnerability disclosure; see GHSA-3xpw-9694-2xxp for the
+published advisory once it is available.
+
+### Security
+
+- `takeDecision()` now re-derives its decision from the coordinator's
+  current diagnostics on every call, instead of trusting the snapshot
+  frozen at `finish()` time. Contradictory or late evidence observed
+  after `finish()` but before one specific call's authority is consumed
+  now correctly revokes it; `finish()` having been called at least once
+  remains required before any authority is available at all.
+- `AiSdkStreamAdapter.push()` no longer discards every event once the
+  stream has already reported its own terminal. Post-terminal input
+  (a late argument delta, provider error, abort, a conflicting or
+  duplicate terminal, or SDK `tool-result`/`tool-error` evidence) still
+  reaches the coordinator, and the coordinator's own post-terminal
+  diagnostics are now part of the set that disqualifies execution
+  authority rather than being merely observable.
+- A raw AI SDK event carrying both `id` and `toolCallId`, present and
+  unequal, now fails the whole stream closed with a diagnostic instead
+  of silently preferring `id`. Equal or single-field identity is
+  unaffected.
+
+Affected: every published release through 0.4.2. Patched: 0.4.3. No
+public API change - `ExecuteDecision`/`NonExecutableDecision` shapes,
+`ToolCallExecutionGate`/`AiSdkExecutionGuard` method signatures, and
+every existing diagnostic code are unchanged. Upgrade is recommended
+for every user of `createAiSdkExecutionGuard()` or the lower-level
+`createToolCallExecutionGate()`/`AiSdkStreamAdapter` composition.
+
 ## [0.4.1] - 2026-08-25
 
 Publishes the already-merged package-runtime compatibility widening. This is

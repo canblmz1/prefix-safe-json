@@ -80,10 +80,28 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
     if (this.finalResult === undefined || this.consumedExecutionIds.has(internalId)) {
       return undefined;
     }
-    const decision = this.finalResult.decisions.find(
-      (candidate) => candidate.internalId === internalId,
-    );
-    if (decision?.action !== "execute") return undefined;
+    // Re-derive against the coordinator's CURRENT diagnostics, never the
+    // decisions frozen into `finalResult` at finish()-time: a `push()` after
+    // finish() still reaches the coordinator (push() above has no
+    // "already finished" guard of its own) and records a sticky, stream-wide
+    // AUTHORITY_PROTOCOL_VIOLATION_CODES diagnostic there, but that
+    // diagnostic would otherwise never be consulted again, since
+    // `finalResult` was already computed from an earlier, frozen
+    // snapshot. Authority must not survive contradictory or late evidence
+    // observed after finish() but before this exact call is consumed
+    // (GHSA-3xpw-9694-2xxp) — `finalResult !== undefined` above still gates
+    // this on finish() having been called at all, so authority is still
+    // never released before the stream was reported complete at least once.
+    const snap = this.coordinator.snapshot();
+    const call = snap.calls.find((candidate) => candidate.internalId === internalId);
+    if (call === undefined) return undefined;
+    const ctx = {
+      streamEndReason: this.streamEndReason as StreamEndReason,
+      streamEndProviderReason: this.streamEndProviderReason,
+      diagnostics: snap.diagnostics,
+    };
+    const decision = decideExecution(call, ctx);
+    if (decision.action !== "execute") return undefined;
     this.consumedExecutionIds.add(internalId);
     return decision;
   }

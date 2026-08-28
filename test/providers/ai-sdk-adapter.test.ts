@@ -194,7 +194,7 @@ describe("AiSdkStreamAdapter — finishReason mapping", () => {
     expect(diag?.message).toContain("content filter");
   });
 
-  it('an "error" part ends the stream with reason "provider_error" and stops accepting further events', () => {
+  it('an "error" part ends the stream with reason "provider_error" and still normalizes (never silently drops) further events (GHSA-3xpw-9694-2xxp)', () => {
     const adapter = new AiSdkStreamAdapter();
     const events = adapter.push({ type: "error", error: new Error("upstream failure") });
     const end = events.find((e) => e.type === "provider_stream_end") as
@@ -202,17 +202,45 @@ describe("AiSdkStreamAdapter — finishReason mapping", () => {
       | undefined;
     expect(end?.reason).toBe("provider_error");
     expect(end?.providerReason).toContain("upstream failure");
-    expect(adapter.push({ type: "tool-input-start", id: "x", toolName: "f" })).toEqual([]);
+    // The adapter itself no longer decides "further events don't matter" -
+    // it still normalizes them; DefaultToolCallStreamCoordinator's own
+    // isFinished gate is what disqualifies a call built from them.
+    expect(adapter.push({ type: "tool-input-start", id: "x", toolName: "f" })).toEqual([{
+      type: "tool_call_start",
+      sequence: 2,
+      provider: "ai-sdk",
+      callRef: { sourceKey: "tool-input:x" },
+      toolCallId: "x",
+      name: "f",
+    }]);
   });
 
-  it("push() after finish returns no events; finish() is idempotent", () => {
+  it("push() after finish still normalizes events instead of silently dropping them (GHSA-3xpw-9694-2xxp); adapter.finish() itself remains idempotent", () => {
+    // Before the fix, this adapter's own `finished` flag made push() return
+    // `[]` for every event after the first terminal - including a late
+    // argument delta, provider error/abort, conflicting/duplicate finish,
+    // or SDK tool-result/tool-error evidence - so none of it ever reached
+    // the coordinator, not even as a diagnostic. The adapter now normalizes
+    // post-terminal input like any other; DefaultToolCallStreamCoordinator's
+    // own `isFinished` gate is what turns it into a sticky, stream-wide
+    // disqualifying diagnostic once it actually receives it.
     const adapter = new AiSdkStreamAdapter();
     adapter.push({ type: "finish", finishReason: "stop" });
-    expect(adapter.push({ type: "tool-input-start", id: "x", toolName: "f" })).toEqual([]);
+    expect(adapter.push({ type: "tool-input-start", id: "x", toolName: "f" })).toEqual([{
+      type: "tool_call_start",
+      sequence: 2,
+      provider: "ai-sdk",
+      callRef: { sourceKey: "tool-input:x" },
+      toolCallId: "x",
+      name: "f",
+    }]);
+    // adapter.finish() (the caller's own manual completion hook, distinct
+    // from push()'s handling of raw SDK events) is unaffected by the fix
+    // and remains a no-op once the adapter is already finished.
     expect(adapter.finish()).toEqual([]);
   });
 
-  it("finish() with no prior \"finish\"/\"error\" part still ends the stream using the caller-supplied reason, and is idempotent afterward", () => {
+  it("finish() with no prior \"finish\"/\"error\" part still ends the stream using the caller-supplied reason, and adapter.finish() is idempotent afterward", () => {
     const adapter = new AiSdkStreamAdapter();
     adapter.push({ type: "tool-input-start", id: "call_1", toolName: "f" });
     const events = adapter.finish({ reason: "cancelled", providerReason: "caller-cancelled" });
@@ -223,7 +251,16 @@ describe("AiSdkStreamAdapter — finishReason mapping", () => {
     expect(end.providerReason).toBe("caller-cancelled");
     // finish() must mark the adapter finished, not just return an event.
     expect(adapter.finish()).toEqual([]);
-    expect(adapter.push({ type: "tool-input-start", id: "call_2", toolName: "g" })).toEqual([]);
+    // push() no longer silently drops post-terminal input (GHSA-3xpw-9694-2xxp)
+    // - it still normalizes it; the coordinator is what disqualifies it.
+    expect(adapter.push({ type: "tool-input-start", id: "call_2", toolName: "g" })).toEqual([{
+      type: "tool_call_start",
+      sequence: 3,
+      provider: "ai-sdk",
+      callRef: { sourceKey: "tool-input:call_2" },
+      toolCallId: "call_2",
+      name: "g",
+    }]);
   });
 
   it("finish() with zero arguments on a fresh adapter doesn't throw and defaults to reason \"unknown\"", () => {

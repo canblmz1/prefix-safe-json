@@ -76,6 +76,40 @@ export const INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_INVALID";
 /** An OpenAI-compatible event repeated the same explicit choice index. */
 export const DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_DUPLICATE";
 
+/**
+ * A normalized event was pushed into the coordinator after `isFinished` was
+ * already set — a genuine post-terminal delivery that is neither a
+ * conflicting nor a duplicate `provider_stream_end` (see
+ * `TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE` for that narrower case).
+ * Stream-wide (no `internalId`/`sourceKey`): once any evidence has arrived
+ * after the stream's own terminal, every open or already-decided call in
+ * that stream is authority-disqualified — see
+ * `AUTHORITY_PROTOCOL_VIOLATION_CODES` and `ToolCallExecutionGate.takeDecision()`
+ * (GHSA-3xpw-9694-2xxp).
+ */
+export const EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE = "E_EVENT_AFTER_STREAM_END";
+
+/**
+ * A second `provider_stream_end` arrived whose `reason` disagrees with the
+ * one that already ended the stream (e.g. `"complete"` then
+ * `"provider_error"`). Stream-wide, same disqualifying treatment as
+ * `EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE` — a distinct code purely so a
+ * caller can tell the two apart without comparing diagnostic payloads
+ * (GHSA-3xpw-9694-2xxp).
+ */
+export const TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE = "E_TERMINAL_REASON_CONFLICT";
+
+/**
+ * A single raw provider event carried both `id` and `toolCallId`, non-empty
+ * and unequal. Which one names the real call cannot be inferred — silently
+ * preferring either one risks attributing evidence (including a positive
+ * decision) to the wrong call. Stream-wide (no `internalId`/`sourceKey`):
+ * with attribution itself ambiguous, every call in the stream fails closed
+ * rather than guessing which one is affected (GHSA-3xpw-9694-2xxp).
+ */
+export const PROVIDER_EVENT_IDENTITY_AMBIGUOUS_DIAGNOSTIC_CODE =
+  "E_PROVIDER_EVENT_IDENTITY_AMBIGUOUS";
+
 /** Diagnostics that permanently disqualify their affected authority scope. */
 export const AUTHORITY_PROTOCOL_VIOLATION_CODES: ReadonlySet<string> = new Set([
   TOOL_ARGUMENTS_BEFORE_START_DIAGNOSTIC_CODE,
@@ -85,4 +119,7 @@ export const AUTHORITY_PROTOCOL_VIOLATION_CODES: ReadonlySet<string> = new Set([
   DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
   INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
   DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE,
+  TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE,
+  PROVIDER_EVENT_IDENTITY_AMBIGUOUS_DIAGNOSTIC_CODE,
 ]);
