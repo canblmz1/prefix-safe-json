@@ -160,6 +160,32 @@ describe("GHSA-3xpw-9694-2xxp — stream-termination authority survives late/amb
       expect(decision?.action).not.toBe("execute");
       expect(guard.takeDecision(decision?.internalId ?? "missing")).toBeUndefined();
     });
+
+    it("takeDecision() never releases authority before finish() is called, even once the underlying stream already reached its own terminal via push() alone", () => {
+      // finish() is a distinct, required action from the stream's own
+      // termination: an adapter observing a natural SDK "finish" part
+      // already drives the coordinator to isFinished (and the call to
+      // status "complete") through push() alone - snapshot()'s own
+      // "in-flight" view already reports this call as executable at that
+      // point. takeDecision() must still refuse until the gate's finish()
+      // has itself been called at least once (see
+      // ToolCallExecutionGate.takeDecision's own doc comment) - this is the
+      // temporal boundary the fix in this commit does not, and must not,
+      // relax.
+      const gate = createToolCallExecutionGate();
+      const adapter = new AiSdkStreamAdapter();
+      for (const raw of [
+        { type: "tool-input-start", id: "c1", toolName: "danger" },
+        { type: "tool-input-delta", id: "c1", delta: '{"x":1}' },
+        { type: "tool-input-end", id: "c1" },
+        { type: "finish", finishReason: "tool-calls" },
+      ]) {
+        for (const event of adapter.push(raw)) gate.push(event);
+      }
+      const inFlight = gate.snapshot()[0];
+      expect(inFlight?.action).toBe("execute"); // control: the stream itself is already, genuinely done
+      expect(gate.takeDecision(inFlight?.internalId ?? "missing")).toBeUndefined();
+    });
   });
 
   describe("conflicting id/toolCallId identity on a single raw event", () => {
