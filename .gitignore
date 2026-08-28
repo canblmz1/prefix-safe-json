@@ -10,3 +10,4 @@ reports/mutation
 .DS_Store
 *.tsbuildinfo
 *.tgz
+artifacts/

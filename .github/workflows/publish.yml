@@ -496,6 +496,28 @@ jobs:
         if: steps.version-check.outputs.should_publish == 'true'
         run: node scripts/verify-package-policy.mjs "${{ steps.release-artifact.outputs.tarball }}"
 
+      - name: Generate production dependency SBOM
+        if: steps.version-check.outputs.should_publish == 'true'
+        id: sbom
+        run: |
+          set -euo pipefail
+          SBOM_PATH="artifacts/prefix-safe-json-${{ steps.version-check.outputs.version }}.cdx.json"
+          pnpm run sbom:generate -- "$SBOM_PATH"
+          echo "path=$SBOM_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Verify production dependency SBOM
+        if: steps.version-check.outputs.should_publish == 'true'
+        run: pnpm run sbom:verify -- "${{ steps.sbom.outputs.path }}"
+
+      - name: Preserve the verified production dependency SBOM
+        if: steps.version-check.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: prefix-safe-json-${{ steps.version-check.outputs.version }}-production-sbom
+          path: ${{ steps.sbom.outputs.path }}
+          if-no-files-found: error
+          retention-days: 90
+
       # The exact bug this step exists to catch: `npm publish` packs
       # whatever is in THIS job's own working directory, which shares
       # nothing with test-matrix's runners (needs:, above). A future
@@ -641,4 +663,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "v$VERSION" \
             "${PRERELEASE_FLAG[@]}" \
+            "${{ steps.sbom.outputs.path }}#CycloneDX production dependency SBOM" \
             --generate-notes

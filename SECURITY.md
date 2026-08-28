@@ -2,24 +2,26 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it responsibly.
+Report vulnerabilities through GitHub's private reporting form:
 
-**Do not open a public issue containing vulnerability details.**
+https://github.com/canblmz1/prefix-safe-json/security/advisories/new
 
-Use GitHub's private vulnerability reporting for this repository when available. If that option is not available, contact the maintainer through the GitHub profile before sharing sensitive reproduction details publicly.
+Do not open a public issue containing exploit details before coordinated
+disclosure. If the private form is unavailable, contact the maintainer through
+the GitHub profile without including sensitive reproduction details publicly.
 
-A useful report includes:
-
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+Reports should include the affected version, impact, reproduction steps, and
+any suggested mitigation. The maintainer will acknowledge the report when
+practical, validate and triage it, coordinate remediation, and agree on public
+disclosure with the reporter. No fixed response-time guarantee is made.
 
 ## Scope
 
 This library parses untrusted JSON input from LLM streaming endpoints and can be used to gate side-effecting tool execution. Security-relevant concerns include:
 
-- **Execution integrity**: Truncated, malformed, schema-invalid, provider-failed, or otherwise unconfirmed tool-call input must not be represented as safely executable.
+- **Execution-integrity bypasses**: Any path that could represent truncated,
+  malformed, schema-invalid, provider-failed, identity-ambiguous, or otherwise
+  unconfirmed tool-call input as safely executable is security-sensitive.
 - **Denial of service**: Adversarial payloads designed to cause excessive memory or CPU consumption. The parser enforces configurable limits on input size, nesting depth, string length, and event queue size.
 - **Memory/resource safety**: The implementation avoids intentionally unbounded parser state and keeps resource limits explicit.
 - **No dynamic code execution**: The parser never uses `eval`, `Function`, or similar dynamic code execution.
@@ -28,6 +30,6 @@ This library parses untrusted JSON input from LLM streaming endpoints and can be
 
 ## Supported Versions
 
-This project is pre-1.0 (see [README.md](README.md) for what's currently
-considered stable). Security fixes are applied to the latest published
-version only — there is no back-port policy across older minor versions.
+This project is pre-1.0 (see [README.md](README.md) for what is currently
+considered stable). Only the latest published version is supported for
+security fixes; older minor versions do not have a backport policy.

@@ -63,6 +63,8 @@
     "validate-corpus": "tsx scripts/validate-corpus.ts",
     "verify:package-policy": "node scripts/verify-package-policy.mjs",
     "verify:published-release": "node scripts/verify-published-release.mjs",
+    "sbom:generate": "node scripts/generate-sbom.mjs",
+    "sbom:verify": "node scripts/verify-sbom.mjs",
     "clean": "rimraf dist coverage .vitest",
     "pack:check": "pnpm pack --dry-run",
     "example:anthropic": "node examples/anthropic-truncation-safety.mjs",

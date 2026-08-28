@@ -51,21 +51,25 @@ version-bump PR is not it.
 2. Runs the example scripts end-to-end.
 3. `pnpm pack --dry-run` and a production-dependency audit
    (`pnpm audit --prod`).
-4. Installs the actual packed tarball into a scratch project and imports it
+4. Generates and verifies a deterministic CycloneDX 1.6 JSON SBOM from the
+   frozen production dependency graph, then preserves it as a workflow
+   artifact.
+5. Installs the actual packed tarball into a scratch project and imports it
    - not source, not a workspace symlink.
-5. A **second**, exact-version npm lookup, immediately before publishing -
+6. A **second**, exact-version npm lookup, immediately before publishing -
    closes the TOCTOU window the ~30+ minute gate chain above would
    otherwise leave open between the first check and the actual publish.
    If this recheck finds the version now published (a race with some other
    process), publish is skipped rather than retried or forced.
-6. `npm publish --access public --provenance` - Sigstore-signed provenance
+7. `npm publish --access public --provenance` - Sigstore-signed provenance
    attached, verifiable via `npm view <pkg>@<version> dist --json` after the
    fact.
-7. Only after publish succeeds: tags the release (`vX.Y.Z`, pointing at the
-   commit that was actually published) and creates a GitHub Release.
+8. Only after publish succeeds: tags the release (`vX.Y.Z`, pointing at the
+   commit that was actually published) and creates a GitHub Release with the
+   verified SBOM attached.
 
-If step 6 fails, nothing after it runs - no tag, no release, matching what
-was actually published (nothing). If step 6 succeeds but step 7 fails, the
+If step 7 fails, nothing after it runs - no tag, no release, matching what
+was actually published (nothing). If step 7 succeeds but step 8 fails, the
 package is already live on npm; that partial state needs manual recovery
 (create the tag/release by hand pointing at the right commit), never a
 second `npm publish` attempt for the same version.
@@ -86,7 +90,7 @@ that blocks the release either way.
 - `engines.node` and the CI matrix are Active LTS Node lines only - see
   `docs/COMPATIBILITY.md`.
 - The packed tarball's contents are checked against the `files` allowlist
-  in `package.json` (`dist`, `LICENSE*`, `README.md`) as part of step 4
+  in `package.json` (`dist`, `LICENSE*`, `README.md`) as part of step 3
   above - nothing else should ever be in it.
 - Public API surface (`src/index.ts`) and its Stable/Experimental
   classification should be reviewed for accidental exposure before opening
@@ -97,6 +101,57 @@ that blocks the release either way.
 `publish.yml` pins the npm CLI to the exact version npm requires for
 OIDC-based Trusted Publishing and requests `id-token: write`, but the
 actual publish auth path today is still `NODE_AUTH_TOKEN`
-(`secrets.NPM_TOKEN`). Registering this package as a Trusted Publisher on
-npm's website - a separate, human, npm-account-side action - has not been
-done. Until it has, do not remove `NPM_TOKEN`.
+(`secrets.NPM_TOKEN`). The npm-side Trusted Publisher configuration could
+not be authenticated and inspected during Trust Baseline v1, so OIDC-only
+publishing is **not claimed** and the functional token path remains.
+
+Before removing `NPM_TOKEN`, an npm package owner must open
+`npmjs.com -> prefix-safe-json -> Settings -> Trusted publishing`, configure
+GitHub Actions with these exact values, and verify them with an authenticated
+`npm trust list prefix-safe-json --json`:
+
+- organization or user: `canblmz1`;
+- repository: `prefix-safe-json`;
+- workflow filename: `publish.yml` (filename only);
+- environment: `npm-publish`;
+- allowed action: `npm publish`.
+
+After that configuration is independently confirmed, remove the workflow's
+`NODE_AUTH_TOKEN` environment entry, run one normal versioned release through
+the protected environment, confirm provenance, set npm Publishing access to
+"Require two-factor authentication and disallow tokens", revoke the legacy
+automation token, and remove the `NPM_TOKEN` GitHub secret. Do not reverse
+that order: npm does not validate Trusted Publisher fields when they are
+saved, and removing the token first could break releases.
+
+## 8. Production SBOM
+
+`pnpm run sbom:generate` emits deterministic CycloneDX 1.6 JSON under
+`artifacts/`. It uses `pnpm list --prod --depth Infinity --json` after the
+frozen install, excludes development tooling, records the exact resolved
+production versions and dependency edges, and contains no local filesystem
+paths or generation timestamp.
+
+Verify an artifact against the current frozen production graph with:
+
+```console
+pnpm run sbom:generate
+pnpm run sbom:verify
+```
+
+CI preserves a verified SBOM for 14 days. A future release run preserves it
+for 90 days as a workflow artifact and attaches the same file to the GitHub
+Release. This change does not retrofit an SBOM onto existing releases.
+
+## 9. Repository governance baseline
+
+As of 2026-08-28, `main` requires a pull request and the repository's named
+CI/CodeQL/dependency-review checks. Repository-role bypass actors were
+removed from that ruleset. The `npm-publish` environment is restricted to
+`main`, requires an explicit reviewer, and no longer permits administrators
+to bypass its protection rules.
+
+This remains a single-maintainer project. Required PR approvals remain zero
+and environment self-review remains allowed because enabling either control
+without an independent reviewer would make the project unreleasable rather
+than independent. Those are residual governance risks, not solved controls.
