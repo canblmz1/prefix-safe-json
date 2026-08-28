@@ -147,6 +147,41 @@ describe("GHSA-3xpw-9694-2xxp — stream-termination authority survives late/amb
       expect(guard.takeDecision(internalId)).toBeUndefined();
     });
 
+    it("late evidence attributable to one specific call still disqualifies the whole stream, by design (documented scope, not a bug)", () => {
+      // Distinguishes "attributable" from "unattributable" late evidence at
+      // the SAME post-terminal boundary: DefaultToolCallStreamCoordinator's
+      // isFinished branch (coordinator.ts push()) records
+      // E_EVENT_AFTER_STREAM_END/E_TERMINAL_REASON_CONFLICT as stream-wide
+      // diagnostics (no internalId/sourceKey) unconditionally - it does not
+      // attempt per-call attribution for ANY post-terminal event, even one
+      // that names a specific, still-known call. That is intentional: by
+      // the time the stream has already ended, "no open call exists left to
+      // attribute it to" (see the coordinator's own comment) - so a late
+      // `tool-result` naming call "a" specifically gets exactly the same
+      // whole-stream disqualification as one with no id at all (see the
+      // "unattributable" cases above). The two scenarios reach the SAME
+      // safe outcome through different reasoning, not different code paths.
+      const guard = createAiSdkExecutionGuard();
+      guard.push({ type: "tool-input-start", id: "a", toolName: "danger_a" });
+      guard.push({ type: "tool-input-delta", id: "a", delta: "{}" });
+      guard.push({ type: "tool-input-end", id: "a" });
+      guard.push({ type: "tool-input-start", id: "b", toolName: "danger_b" });
+      guard.push({ type: "tool-input-delta", id: "b", delta: "{}" });
+      guard.push({ type: "tool-input-end", id: "b" });
+      guard.push({ type: "finish", finishReason: "tool-calls" });
+      const final = guard.finish();
+      expect(final.decisions.every((d) => d.action === "execute")).toBe(true); // control: both clean
+
+      // Late evidence naming call "a" specifically - attributable, not ambiguous.
+      guard.push({ type: "tool-result", toolCallId: "a", toolName: "danger_a" });
+
+      const callA = final.decisions.find((d) => d.toolCallId === "a");
+      const callB = final.decisions.find((d) => d.toolCallId === "b");
+      // Both are disqualified, including "b", which the late evidence never named.
+      expect(guard.takeDecision(callA?.internalId ?? "missing")).toBeUndefined();
+      expect(guard.takeDecision(callB?.internalId ?? "missing")).toBeUndefined();
+    });
+
     it("the exact advisory reproduction: complete terminal, late tool-result, then finish() and takeDecision()", () => {
       const guard = createAiSdkExecutionGuard();
       guard.push({ type: "tool-input-start", id: "c1", toolName: "danger" });
@@ -237,6 +272,28 @@ describe("GHSA-3xpw-9694-2xxp — stream-termination authority survives late/amb
 
       const final = guard.finish();
       expect(final.decisions.every((d) => d.action !== "execute")).toBe(true);
+    });
+
+    it("single id only (no toolCallId field at all) is accepted normally through to takeDecision()", () => {
+      const guard = createAiSdkExecutionGuard();
+      guard.push({ type: "tool-input-start", id: "id-only", toolName: "danger" });
+      guard.push({ type: "tool-input-delta", id: "id-only", delta: '{"x":1}' });
+      guard.push({ type: "tool-input-end", id: "id-only" });
+      guard.push({ type: "finish", finishReason: "tool-calls" });
+      const final = guard.finish();
+      expect(final.decisions[0]?.action).toBe("execute");
+      expect(guard.takeDecision(final.decisions[0]?.internalId ?? "missing")?.action).toBe("execute");
+    });
+
+    it("single toolCallId only (no id field at all, the real AI SDK's documented tool-input-end shape) is accepted normally through to takeDecision()", () => {
+      const guard = createAiSdkExecutionGuard();
+      guard.push({ type: "tool-input-start", id: "tc-only", toolName: "danger" });
+      guard.push({ type: "tool-input-delta", id: "tc-only", delta: '{"x":1}' });
+      guard.push({ type: "tool-input-end", toolCallId: "tc-only" });
+      guard.push({ type: "finish", finishReason: "tool-calls" });
+      const final = guard.finish();
+      expect(final.decisions[0]?.action).toBe("execute");
+      expect(guard.takeDecision(final.decisions[0]?.internalId ?? "missing")?.action).toBe("execute");
     });
 
     it("conflicting id/toolCallId is stream-wide: an unrelated clean sibling call is also disqualified", () => {
