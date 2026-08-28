@@ -218,14 +218,24 @@ describe("AiSdkStreamAdapter 'abort' part — exact field mapping", () => {
     expect(decision.evidence.providerReason).toBeUndefined();
   });
 
-  it("marks the adapter finished - a part pushed after 'abort' is silently ignored, not reopening the call", () => {
+  it("a conflicting 'finish' pushed after 'abort' does not reopen the call - and now permanently disqualifies it (GHSA-3xpw-9694-2xxp)", () => {
     const guard = createAiSdkExecutionGuard();
     for (const part of toolInputParts("c1", "delete_widget", ['{"path":"widget.txt"}'])) guard.push(part);
     guard.push({ type: "abort", reason: "stopped" });
     const before = guard.finish();
-    guard.push({ type: "finish", finishReason: "tool-calls" }); // must be a no-op
+    expect(before.decisions[0]?.action).not.toBe("execute");
+    expect(before.decisions[0]?.reason).toBe("stream_incomplete");
+    // Before the fix, the adapter's own `finished` flag silently dropped
+    // this event, so it never reached the coordinator at all - "a no-op"
+    // was true only because the event was discarded, not because it was
+    // evaluated and found harmless. The adapter now normalizes it; the
+    // coordinator records the conflicting terminal reason ("tool-calls"
+    // i.e. "complete", contradicting the earlier "cancelled") as
+    // E_TERMINAL_REASON_CONFLICT, which now actually disqualifies the
+    // decision instead of merely being observable.
+    guard.push({ type: "finish", finishReason: "tool-calls" });
     const after = guard.finish();
-    expect(after.decisions).toEqual(before.decisions);
     expect(after.decisions[0]?.action).not.toBe("execute");
+    expect(after.decisions[0]?.reason).toBe("protocol_violation");
   });
 });

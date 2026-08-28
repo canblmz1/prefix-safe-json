@@ -19,6 +19,8 @@ import {
   DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
+  EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE,
+  TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE,
 } from "./diagnostic-codes.js";
 
 // A `provider_diagnostic` carrying either code is proof that a provider SDK's
@@ -122,12 +124,12 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
       this.addDiagnostic(
         isConflictingTerminalReason
           ? {
-              code: "E_TERMINAL_REASON_CONFLICT",
+              code: TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE,
               severity: "fatal",
               message: `Stream already ended with reason "${this.finishedReason}"; a second, conflicting terminal reason "${(event as NormalizedToolStreamEvent & { type: "provider_stream_end" }).reason}" arrived afterward`,
             }
           : {
-              code: "E_EVENT_AFTER_STREAM_END",
+              code: EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE,
               severity: "error",
               message: "Event pushed after stream end",
             },
