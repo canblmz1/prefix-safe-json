@@ -632,6 +632,13 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
+      # No NODE_AUTH_TOKEN here, deliberately: this step authenticates via
+      # npm CLI's native GitHub Actions OIDC / Trusted Publishing support
+      # (npm >=11.5.1, pinned above), using the job's `id-token: write`
+      # permission and the `npm-publish` environment's OIDC trust
+      # relationship, not a long-lived secret. See RELEASE.md for the npm
+      # account-side Trusted Publisher configuration this depends on and
+      # the rollback path if it is ever unconfigured or misconfigured.
       - name: Publish to npm
         if: steps.version-check.outputs.should_publish == 'true'
         run: |
@@ -640,8 +647,6 @@ jobs:
           ACTUAL_SHA256=$(node -e "const fs=require('node:fs');const crypto=require('node:crypto');process.stdout.write(crypto.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$TARBALL")
           test "$ACTUAL_SHA256" = "${{ steps.release-artifact.outputs.sha256 }}"
           npm publish "$TARBALL" --access public --provenance --tag "${{ steps.dist-tag.outputs.tag }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag the release
         if: steps.version-check.outputs.should_publish == 'true'

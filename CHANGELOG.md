@@ -8,6 +8,18 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Changed
+
+- `publish.yml`'s "Publish to npm" step no longer injects `NODE_AUTH_TOKEN`
+  (`secrets.NPM_TOKEN`) - it authenticates exclusively through npm CLI's
+  native GitHub Actions OIDC / Trusted Publishing support (`npm@11.5.1`,
+  already pinned; job-scoped `id-token: write`, already present). The
+  `NPM_TOKEN` GitHub secret is not removed and remains available as a
+  rollback credential; see `RELEASE.md`'s "Trusted Publishing" section for
+  the npm-account-side configuration this depends on and why it is
+  intentionally unverified from source alone. This change does not publish
+  a package, bump the version, or modify any runtime behavior.
+
 ## [0.4.3] - 2026-08-28
 
 Security patch. Fixes an execution-integrity defect where lifecycle

@@ -99,16 +99,19 @@ that blocks the release either way.
 ## 7. Trusted Publishing
 
 `publish.yml` pins the npm CLI to the exact version npm requires for
-OIDC-based Trusted Publishing and requests `id-token: write`, but the
-actual publish auth path today is still `NODE_AUTH_TOKEN`
-(`secrets.NPM_TOKEN`). The npm-side Trusted Publisher configuration could
-not be authenticated and inspected during Trust Baseline v1, so OIDC-only
-publishing is **not claimed** and the functional token path remains.
+OIDC-based Trusted Publishing (`npm@11.5.1`) and requests `id-token: write`
+on the `publish` job. As of the `ci: require npm Trusted Publishing for
+releases` change, the actual `npm publish` step no longer receives
+`NODE_AUTH_TOKEN` (`secrets.NPM_TOKEN`) at all - the workflow is prepared
+to authenticate exclusively through npm CLI's native GitHub Actions OIDC /
+Trusted Publishing support.
 
-Before removing `NPM_TOKEN`, an npm package owner must open
-`npmjs.com -> prefix-safe-json -> Settings -> Trusted publishing`, configure
-GitHub Actions with these exact values, and verify them with an authenticated
-`npm trust list prefix-safe-json --json`:
+**This is a repository-side statement only.** Whether npmjs.com actually
+has a matching Trusted Publisher registered for this repository is
+npm-account-side state that cannot be proven from anything in this
+repository's source - it must be independently confirmed on npmjs.com (or
+via an authenticated `npm trust list prefix-safe-json --json`) before
+relying on it. The required npm-side configuration is:
 
 - organization or user: `canblmz1`;
 - repository: `prefix-safe-json`;
@@ -116,13 +119,33 @@ GitHub Actions with these exact values, and verify them with an authenticated
 - environment: `npm-publish`;
 - allowed action: `npm publish`.
 
-After that configuration is independently confirmed, remove the workflow's
-`NODE_AUTH_TOKEN` environment entry, run one normal versioned release through
-the protected environment, confirm provenance, set npm Publishing access to
-"Require two-factor authentication and disallow tokens", revoke the legacy
-automation token, and remove the `NPM_TOKEN` GitHub secret. Do not reverse
-that order: npm does not validate Trusted Publisher fields when they are
-saved, and removing the token first could break releases.
+Configure this at `npmjs.com -> prefix-safe-json -> Settings -> Trusted
+publishing` if it is not already present.
+
+Removing the token from the workflow before independently confirming the
+npm-side configuration is deliberate, not an oversight: it means the next
+real release is the actual proof. If the npm-side Trusted Publisher is
+correctly configured, that release succeeds through OIDC exactly as any
+other `npm publish --provenance` would. If it is missing or misconfigured,
+`npm publish` fails closed with an authentication error - no publish, no
+tag, no GitHub Release (the same `set -euo pipefail` / step-ordering
+guarantees that already protect every other publish failure mode) - rather
+than silently and ambiguously succeeding via a token fallback that would
+leave the actual authentication path unverified. The `NPM_TOKEN` GitHub
+secret is **intentionally not removed** by this change - it remains
+available, external to the workflow, purely as a rollback credential (add
+the `env:` entry back to the "Publish to npm" step) if OIDC publishing
+does not work on the first real attempt.
+
+Only after a real, protected release has actually succeeded through OIDC
+and its provenance/source identity has been independently verified should
+the rollback path be retired: set npm Publishing access to "Require
+two-factor authentication and disallow tokens", revoke the legacy
+automation token, and remove the `NPM_TOKEN` GitHub secret. Do not do this
+before that first real OIDC release has succeeded - npm does not validate
+Trusted Publisher fields when they are saved, so an unverified
+configuration plus an already-removed rollback token would leave releases
+broken with no fallback.
 
 ## 8. Production SBOM
 
