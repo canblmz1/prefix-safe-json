@@ -8,18 +8,29 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-31
+
+Maintenance / release-infrastructure release. No runtime, public API, or
+dependency changes - `src/**` is untouched, confirmed by diff. This
+version bump exists to trigger this project's real, automated publish
+workflow, which is the first genuine test of the release-infrastructure
+change below.
+
 ### Changed
 
 - `publish.yml`'s "Publish to npm" step no longer injects `NODE_AUTH_TOKEN`
-  (`secrets.NPM_TOKEN`) - it authenticates exclusively through npm CLI's
-  native GitHub Actions OIDC / Trusted Publishing support (`npm@11.5.1`,
-  already pinned; job-scoped `id-token: write`, already present). This
-  change does not remove or revoke any GitHub secret - repository source
-  cannot prove whether the `NPM_TOKEN` secret currently exists at all;
-  see `RELEASE.md`'s "Trusted Publishing" section for that distinction,
-  the npm-account-side configuration this depends on, and why both are
-  intentionally unverified from source alone. This change does not
-  publish a package, bump the version, or modify any runtime behavior.
+  (`secrets.NPM_TOKEN`). Release authentication is intended to go through
+  npm CLI's native GitHub Actions OIDC / Trusted Publishing support
+  instead (`npm@11.5.1`, already pinned; job-scoped `id-token: write` and
+  the protected `npm-publish` environment both remain unchanged from
+  prior releases).
+- This is a proof *attempt*, not a proof of success: whether the
+  configured npm Trusted Publisher actually authenticates this exact
+  release is only established by this release workflow's own real
+  publish step, not by anything in this changelog entry or repository
+  source. Repository source cannot prove npm account-side configuration
+  either before or after this entry was written - see `RELEASE.md`'s
+  "Trusted Publishing" section.
 
 ## [0.4.3] - 2026-08-28
 
