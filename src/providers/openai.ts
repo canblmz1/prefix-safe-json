@@ -57,6 +57,14 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   // For function_call (legacy)
   private hasLegacyFunctionCall = false;
   private legacySourceKey = "legacy-function-call";
+  // Distinct from hasLegacyFunctionCall, which must stay true forever once
+  // set (finish()'s own branch-selection depends on it) - this instead
+  // tracks whether the one legacy call currently has an open argument
+  // stream that still needs its own tool_call_end before the provider
+  // stream terminates, mirroring OpenAICompatibleStreamAdapter's
+  // knownSourceKeys (cleared once closed, re-set only by a genuine new
+  // start - which the legacy singular format never has more than one of).
+  private legacyCallOpen = false;
   
   // For Responses API
   private accumulatedArguments = new Map<string, string>();
@@ -255,6 +263,7 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
           const fc = choice.delta.function_call;
           if (!this.hasLegacyFunctionCall) {
             this.hasLegacyFunctionCall = true;
+            this.legacyCallOpen = true;
             events.push({
               type: "tool_call_start",
               sequence: ++this.sequence,
@@ -293,7 +302,19 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
           } else if (choice.finish_reason === "cancelled") {
             reason = "cancelled";
           }
-          
+
+          if (this.legacyCallOpen) {
+            events.push({
+              type: "tool_call_end",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              callRef: { sourceKey: this.legacySourceKey },
+              reason,
+              providerReason: choice.finish_reason,
+            });
+            this.legacyCallOpen = false;
+          }
+
           events.push({
             type: "provider_stream_end",
             sequence: ++this.sequence,
@@ -318,12 +339,26 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
        return compatibleEvents.map(e => ({ ...e, provider: this.provider, sequence: ++this.sequence }));
     }
 
-    return [{
+    const events: NormalizedToolStreamEvent[] = [];
+    if (this.legacyCallOpen) {
+      events.push({
+        type: "tool_call_end",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        callRef: { sourceKey: this.legacySourceKey },
+        reason: meta?.reason ?? "unknown",
+        providerReason: meta?.providerReason,
+      });
+      this.legacyCallOpen = false;
+    }
+
+    events.push({
       type: "provider_stream_end",
       sequence: ++this.sequence,
       provider: this.provider,
       reason: meta?.reason ?? "unknown",
       providerReason: meta?.providerReason,
-    }];
+    });
+    return events;
   }
 }

@@ -833,18 +833,21 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     expect((delta as { delta?: string })?.delta).toBe('{"q":"x"}');
   });
 
-  it("finish() on a legacy function_call stream (no finish_reason chunk ever pushed) synthesizes its own provider_stream_end", () => {
+  it("finish() on a legacy function_call stream (no finish_reason chunk ever pushed) closes the open call and synthesizes its own provider_stream_end", () => {
     const a = new OpenAIStreamAdapter();
     // Only the raw legacy singular `function_call` path is used, which never
     // touches the internal compatibleAdapter - so compatibleAdapter.finish()
     // has nothing to report, and finish() must fall through to its own
-    // synthesized terminal event rather than an empty/compatible one.
+    // synthesis branch rather than an empty/compatible one. That branch must
+    // also close the still-open legacy call (tool_call_end) before its own
+    // provider_stream_end - see the OpenAI legacy function_call termination
+    // bug fix (src/providers/openai.ts's legacyCallOpen).
     a.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: "{}" } } }] });
     const events = a.finish({ reason: "complete", providerReason: "stop" });
-    expect(events).toHaveLength(1);
-    expect(events[0]?.type).toBe("provider_stream_end");
+    expect(events.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
     expect((events[0] as { reason?: string })?.reason).toBe("complete");
-    expect((events[0] as { providerReason?: string })?.providerReason).toBe("stop");
+    expect((events[1] as { reason?: string })?.reason).toBe("complete");
+    expect((events[1] as { providerReason?: string })?.providerReason).toBe("stop");
   });
 
   it("finish() with no arguments at all does not throw and defaults reason to 'unknown'", () => {
@@ -853,12 +856,13 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     expect(events.some((e) => e.type === "provider_stream_end" && (e as { reason?: string }).reason === "unknown")).toBe(true);
   });
 
-  it("finish() with no arguments on a legacy function_call stream also defaults reason to 'unknown'", () => {
+  it("finish() with no arguments on a legacy function_call stream also defaults reason to 'unknown', on both the tool_call_end and the provider_stream_end", () => {
     const a = new OpenAIStreamAdapter();
     a.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: "{}" } } }] });
     const events = a.finish();
-    expect(events).toHaveLength(1);
+    expect(events.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
     expect((events[0] as { reason?: string })?.reason).toBe("unknown");
+    expect((events[1] as { reason?: string })?.reason).toBe("unknown");
   });
 
   // --- Group 6: finish()'s delegation-branch-selection
@@ -893,24 +897,24 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     expect(gate.takeDecision(decision.internalId)).toBeDefined();
   });
 
-  it("finish() branch selection 3: an in-progress legacy singular function_call call synthesizes its own terminal, matching the finish_reason-chunk path exactly (see NEW PRODUCTION BUG CANDIDATE: neither path emits a tool_call_end for this call, so it currently fails closed as malformed despite structurally-valid JSON)", () => {
+  it("finish() branch selection 3: an in-progress legacy singular function_call call synthesizes its own terminal via the legacy-synthesis fallback (not the compatible-forwarding branch), closes the call, and executes", () => {
     const gate = createToolCallExecutionGate();
     const a = new OpenAIStreamAdapter();
     for (const e of a.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: "{}" } } }] })) gate.push(e);
     const finishEvents = a.finish({ reason: "complete" });
-    // Correct branch WAS selected (the legacy-synthesis fallback, not the
-    // compatible-forwarding branch) - proven by the shape: exactly one
-    // provider_stream_end, no tool_call_end (the compatible-forwarding
-    // branch would have produced a tool_call_end first, as scenario 2 does).
-    expect(finishEvents).toHaveLength(1);
-    expect(finishEvents[0]?.type).toBe("provider_stream_end");
+    // Correct branch selected (the legacy-synthesis fallback, not the
+    // compatible-forwarding branch): both branches now produce a
+    // [tool_call_end, provider_stream_end] pair after the termination fix,
+    // so the distinguishing signal is the tool_call_end's own callRef -
+    // the fixed legacy sourceKey, not compatible-forwarding's
+    // "choice:N/tool-index:N" shape (compare scenario 2 above).
+    expect(finishEvents.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
+    expect((finishEvents[0] as { callRef?: { sourceKey?: string } })?.callRef?.sourceKey).toBe("legacy-function-call");
     for (const e of finishEvents) gate.push(e);
     const decision = expectDefined(gate.finish().decisions[0]);
-    // Currently fails closed (safe, not permissive) due to the separately-
-    // reported bug - this is the actual current behavior, encoded as
-    // observed, not as intended design.
-    expect(decision.action).not.toBe("execute");
-    expect(gate.takeDecision(decision.internalId)).toBeUndefined();
+    expect(decision.action).toBe("execute");
+    const authority = expectDefined(gate.takeDecision(decision.internalId));
+    expect(authority.value).toEqual({});
   });
 
   it("finish() branch selection 4: no active call at all produces only a terminal event and no decisions", () => {
