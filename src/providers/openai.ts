@@ -65,10 +65,21 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   private finished = false;
 
   push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
-    if (this.finished) return [];
-
+    // No `finished` early return here: silently dropping every event after
+    // the first terminal meant a late argument delta, a conflicting or
+    // duplicate finish, or a provider error that arrived even one raw event
+    // late never reached the coordinator at all - not even as a diagnostic -
+    // so an already-decided call's authority could never be revoked by it.
+    // Every case below that has ITS OWN meaningful post-terminal handling
+    // (a genuine argument delta, a second output_item.added, a second
+    // stream-terminal) still fires exactly as if the stream were open; the
+    // coordinator's own `isFinished` gate (coordinator.ts's `push()`) is
+    // what turns each of those into a sticky, stream-wide
+    // AUTHORITY_PROTOCOL_VIOLATION_CODES diagnostic once it actually
+    // receives them. Mirrors the fix already applied to AiSdkStreamAdapter
+    // for the same invariant (GHSA-3xpw-9694-2xxp).
     const events: NormalizedToolStreamEvent[] = [];
-    
+
     if (!rawEvent || typeof rawEvent !== "object") {
       events.push({
         type: "provider_diagnostic",

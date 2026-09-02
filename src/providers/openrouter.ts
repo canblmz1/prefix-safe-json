@@ -31,8 +31,20 @@ export class OpenRouterStreamAdapter implements ProviderStreamAdapter<unknown> {
   private finished = false;
 
   push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
-    if (this.finished) return [];
-
+    // No `finished` early return here - see the identical fix and rationale
+    // in AnthropicStreamAdapter.push()/OpenAIStreamAdapter.push() (same
+    // invariant class as GHSA-3xpw-9694-2xxp). `this.finished` is set on
+    // this adapter's own provider-level error shortcut (below) and
+    // unconditionally by finish() (a legitimate public lifecycle call, e.g.
+    // `finish({reason:"complete"})`) - either way, dropping every push
+    // after that point meant a late error/data event never reached the
+    // coordinator at all, so an already-decided call's authority could
+    // never be revoked by it (proven empirically: reverting this guard
+    // alone makes a real post-finish() late `{error:...}` push leave
+    // `takeDecision()` returning the full stale execute decision instead of
+    // undefined). The normal path already delegates every push to
+    // `compatibleAdapter`, which enforces the same invariant on its own
+    // `finished` state.
     const events: NormalizedToolStreamEvent[] = [];
     
     if (!rawEvent || typeof rawEvent !== "object") {

@@ -60,11 +60,20 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
     expect((end as { reason?: string })?.reason).toBe("complete");
   });
 
-  it("ignores events after finished", () => {
+  it("still forwards a post-terminal event's real content instead of silently discarding it (GHSA-3xpw-9694-2xxp class)", () => {
+    // Pre-fix, this adapter's own `finished` flag short-circuited push() with
+    // `return []` before the coordinator ever saw the event - so the
+    // coordinator's own post-terminal authority-revocation diagnostic
+    // (EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE) could never fire on evidence
+    // it was never shown. The adapter's job is to normalize what the
+    // provider actually sent, not to pre-judge whether it still matters;
+    // see test/security/post-terminal-adapter-evidence.test.ts for the
+    // end-to-end authority-revocation proof through a real gate.
     const a = new AnthropicStreamAdapter();
     a.push({ type: "message_delta", delta: { stop_reason: "end_turn" } });
     const events = a.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } });
-    expect(events).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe("tool_call_arguments_delta");
   });
 
   it("handles content_block_start with non-tool_use type", () => {
@@ -429,11 +438,21 @@ describe("OpenRouterStreamAdapter — uncovered branches", () => {
     expect((diag as { message: string })?.message).toContain("429");
   });
 
-  it("ignores events after finished", () => {
+  it("still forwards the delegated adapter's own post-terminal diagnostic instead of silently discarding it (GHSA-3xpw-9694-2xxp class)", () => {
+    // This adapter's own outer `finished` flag no longer short-circuits
+    // push() (see push()'s own comment) - so a push after the provider-error
+    // shortcut below now falls through to the normal delegated path, where
+    // the internal OpenAICompatibleStreamAdapter's own (untouched, still
+    // guarded) push() recognizes it is itself already finished and returns
+    // its real "W_EVENT_AFTER_STREAM_END" diagnostic rather than nothing.
+    // That diagnostic is real, coordinator-meaningful content - not a
+    // discarded event - which is exactly the invariant this suite covers.
     const r = new OpenRouterStreamAdapter();
     r.push({ error: "rate_limit" });
     const events = r.push({ choices: [{ index: 0, delta: { tool_calls: [] } }] });
-    expect(events).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe("provider_diagnostic");
+    expect((events[0] as { code?: string })?.code).toBe("W_EVENT_AFTER_STREAM_END");
   });
 
   it("finish() delegates to compatible adapter", () => {
