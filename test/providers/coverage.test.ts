@@ -13,6 +13,7 @@ import { OpenRouterStreamAdapter } from "../../src/providers/openrouter.js";
 import { DefaultToolCallStreamCoordinator } from "../../src/coordinator/coordinator.js";
 import { createToolCallExecutionGate } from "../../src/gate/gate.js";
 import type { ProviderStreamAdapter } from "../../src/providers/adapter.js";
+import { TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE } from "../../src/coordinator/diagnostic-codes.js";
 import { expectDefined } from "../utils/expect-defined.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -674,6 +675,25 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     expect((end as { providerReason?: string })?.providerReason).toBe("max_output_tokens");
   });
 
+  it("P4.1 Phase 9: response.incomplete/max_output_tokens cannot execute a SYNTACTICALLY COMPLETE tool call - JSON shape alone is never sufficient, provider-confirmed length truncation must still fail closed", () => {
+    const gate = createToolCallExecutionGate();
+    const adapter = new OpenAIStreamAdapter();
+    for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA" } })) gate.push(e);
+    // Genuinely, syntactically COMPLETE - not truncated JSON.
+    for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"a":1}' })) gate.push(e);
+    for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-1" } })) gate.push(e);
+    // The provider itself confirms the WHOLE response was cut short by its
+    // own output budget - even though this one item's JSON happens to look
+    // complete, that completeness was never confirmed as genuine intent.
+    for (const e of adapter.push({ type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } } })) gate.push(e);
+
+    const final = gate.finish();
+    const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+    expect(a.evidence.structurallyComplete).toBe(true); // the JSON really is valid and closed
+    expect(a.action).not.toBe("execute"); // but never executable under a length-truncated stream
+    expect(gate.takeDecision(a.internalId)).toBeUndefined();
+  });
+
   it("handles response.incomplete with content_filter as a content-filtered diagnostic", () => {
     const a = new OpenAIStreamAdapter();
     const events = a.push({
@@ -991,6 +1011,127 @@ describe("OpenAIStreamAdapter — Responses API", () => {
       expect(expectDefined(events[i]).sequence, `event ${i} sequence`).toBeGreaterThan(expectDefined(events[i - 1]).sequence);
     }
     expect(events.length).toBeGreaterThan(1);
+  });
+
+  // ---------------------------------------------------------------------
+  // P4.1 / F-2: item-local post-terminal evidence hardening.
+  // ---------------------------------------------------------------------
+  describe("item-local post-terminal evidence (response.output_item.done) is hardened, not silently merged", () => {
+    it("A. existing item, INCOMPLETE before done: a later delta that closes the JSON with injected content is rejected, not executed", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new OpenAIStreamAdapter();
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"a":1' })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-1" } })) gate.push(e);
+
+      const lateEvents = adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: ',"evil":true}' });
+      const diag = expectDefined(lateEvents.find((e) => e.type === "provider_diagnostic"));
+      expect((diag as { code?: string }).code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect((diag as { callRef?: { sourceKey?: string } }).callRef?.sourceKey).toBe("output-item:item-1");
+      expect(lateEvents.some((e) => e.type === "tool_call_arguments_delta")).toBe(false); // never merged as normal evidence
+      for (const e of lateEvents) gate.push(e);
+
+      for (const e of adapter.push({ type: "response.completed", response: { status: "completed" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("B. existing item, ALREADY structurally complete before done: a later delta is rejected via the actual diagnostic, not merely by coincidental JSON trailing-data failure", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new OpenAIStreamAdapter();
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"a":1}' })) gate.push(e); // already closed
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-1" } })) gate.push(e);
+
+      const lateEvents = adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"more":true}' });
+      // Assert the actual protocol-violation diagnostic exists - not merely
+      // that the call ends up non-executable, which trailing-data parse
+      // failure alone would also produce.
+      const diag = expectDefined(lateEvents.find((e) => e.type === "provider_diagnostic"));
+      expect((diag as { code?: string }).code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect(lateEvents.some((e) => e.type === "tool_call_arguments_delta")).toBe(false);
+      for (const e of lateEvents) gate.push(e);
+
+      for (const e of adapter.push({ type: "response.completed", response: { status: "completed" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("C. multiple output items: A done + late A evidence does not poison B, which remains executable (exact attribution, not stream-wide)", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new OpenAIStreamAdapter();
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-A", call_id: "call-A", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 1, item: { type: "function_call", id: "item-B", call_id: "call-B", name: "toolB" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-A", delta: '{"a":1' })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-A" } })) gate.push(e);
+
+      // Late evidence for the already-done A.
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-A", delta: ',"evil":true}' })) gate.push(e);
+
+      // B continues and finishes completely normally, unaffected.
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-B", delta: '{"b":2}' })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-B" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.completed", response: { status: "completed" } })) gate.push(e);
+
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+      expect(b.action).toBe("execute");
+      expect(expectDefined(gate.takeDecision(b.internalId)).value).toEqual({ b: 2 });
+    });
+
+    it("A2. same hardening applies to response.function_call_arguments.done (the final-arguments shape), not only .delta", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new OpenAIStreamAdapter();
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-1", delta: '{"a":1}' })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-1" } })) gate.push(e);
+
+      const lateEvents = adapter.push({ type: "response.function_call_arguments.done", item_id: "item-1", arguments: '{"a":1,"evil":true}' });
+      const diag = expectDefined(lateEvents.find((e) => e.type === "provider_diagnostic"));
+      expect((diag as { code?: string }).code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect((diag as { callRef?: { sourceKey?: string } }).callRef?.sourceKey).toBe("output-item:item-1");
+      expect(lateEvents.some((e) => e.type === "tool_call_arguments_delta")).toBe(false);
+      for (const e of lateEvents) gate.push(e);
+
+      for (const e of adapter.push({ type: "response.completed", response: { status: "completed" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("D. a NEW, never-started item_id after another item is done is NOT conflated with late evidence for the done item - existing before-start identity behavior is preserved", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new OpenAIStreamAdapter();
+      for (const e of adapter.push({ type: "response.output_item.added", output_index: 0, item: { type: "function_call", id: "item-A", call_id: "call-A", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-A", delta: '{"a":1}' })) gate.push(e);
+      for (const e of adapter.push({ type: "response.output_item.done", item: { id: "item-A" } })) gate.push(e);
+
+      // A delta for a DIFFERENT, never-added item_id - not "late evidence
+      // for A", a genuinely distinct identity that was simply never started.
+      const events = adapter.push({ type: "response.function_call_arguments.delta", item_id: "item-never-started", delta: "{}" });
+      // doneOutputItemIds only ever contains item-A - item-never-started is
+      // not in it, so this must NOT be attributed to A's TOOL_ARGUMENTS_AFTER_END
+      // path. It is still not tracked as a real call (no tool_call_start
+      // ever preceded it) - the coordinator resolves it to nothing.
+      expect(events.some((e) => (e as { callRef?: { sourceKey?: string } }).callRef?.sourceKey === "output-item:item-A")).toBe(false);
+      for (const e of events) gate.push(e);
+
+      for (const e of adapter.push({ type: "response.completed", response: { status: "completed" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      // A's own clean, legitimate authority is unaffected by the unrelated
+      // never-started identity's delta.
+      expect(a.action).toBe("execute");
+      expect(expectDefined(gate.takeDecision(a.internalId)).value).toEqual({ a: 1 });
+    });
   });
 });
 

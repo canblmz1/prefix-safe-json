@@ -1,7 +1,10 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
 import { OpenAICompatibleStreamAdapter } from "./openai-compatible.js";
-import { CONTENT_FILTERED_DIAGNOSTIC_CODE } from "../coordinator/diagnostic-codes.js";
+import {
+  CONTENT_FILTERED_DIAGNOSTIC_CODE,
+  TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+} from "../coordinator/diagnostic-codes.js";
 
 interface OpenAIFunctionCallDelta {
   name?: string;
@@ -99,6 +102,17 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   // For Responses API
   private accumulatedArguments = new Map<string, string>();
   private receivedDeltas = new Set<string>();
+  // Item-local terminal state (P4.1 / F-2): every output-item id that has
+  // already received its own `response.output_item.done`. Uses the exact
+  // same identity as this adapter's own `output-item:{id}` sourceKey - no
+  // second identity system. `output_item.done` closes the argument stream
+  // choice-locally (tool_call_end), but that alone does not stop the
+  // coordinator from silently merging a LATER, real
+  // `response.function_call_arguments.delta`/`.done` for the SAME item_id
+  // into the same still-"collecting" call (handleCallEnd never changes
+  // call.status - see coordinator.ts). Recognized argument evidence for an
+  // item already in this set is therefore hardened below instead of merged.
+  private doneOutputItemIds = new Set<string>();
   
   private finished = false;
 
@@ -168,43 +182,81 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
           name: chunk.item.name,
         });
       } else if (chunk.type === "response.function_call_arguments.delta" && chunk.item_id && chunk.delta) {
-        this.receivedDeltas.add(chunk.item_id);
-        const acc = this.accumulatedArguments.get(chunk.item_id) ?? "";
-        this.accumulatedArguments.set(chunk.item_id, acc + chunk.delta);
-        
-        events.push({
-          type: "tool_call_arguments_delta",
-          sequence: ++this.sequence,
-          provider: this.provider,
-          callRef: { sourceKey: `output-item:${chunk.item_id}` },
-          delta: chunk.delta,
-        });
-      } else if (chunk.type === "response.function_call_arguments.done" && chunk.item_id && chunk.arguments !== undefined) {
-        const acc = this.accumulatedArguments.get(chunk.item_id) ?? "";
-        const hasDeltas = this.receivedDeltas.has(chunk.item_id);
-        
-        if (!hasDeltas && chunk.arguments.length > 0) {
-          // No deltas, just final arguments.
-          events.push({
-            type: "tool_call_arguments_delta",
-            sequence: ++this.sequence,
-            provider: this.provider,
-            callRef: { sourceKey: `output-item:${chunk.item_id}` },
-            delta: chunk.arguments,
-          });
-          this.accumulatedArguments.set(chunk.item_id, chunk.arguments);
-        } else if (hasDeltas && chunk.arguments !== acc) {
+        if (this.doneOutputItemIds.has(chunk.item_id)) {
+          // Item-local post-terminal evidence (P4.1 / F-2): this exact
+          // item already recorded its own output_item.done. Never merge
+          // further argument evidence as normal - that would silently
+          // mutate (and, if left structurally unclosed at done time,
+          // silently CLOSE) an already-ended item's value with no record
+          // of the anomaly. Same diagnostic code AiSdkStreamAdapter/
+          // OpenAICompatibleStreamAdapter already use for materially
+          // identical semantics ("tool argument evidence arrived after
+          // that call's end"), attributed to the item's own real,
+          // already-tool_call_start'd sourceKey so the coordinator
+          // resolves it to the actual call, not a phantom identity.
           events.push({
             type: "provider_diagnostic",
             sequence: ++this.sequence,
             provider: this.provider,
             callRef: { sourceKey: `output-item:${chunk.item_id}` },
-            code: "E_FINAL_ARGUMENTS_CONFLICT",
+            code: TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
             severity: "error",
-            message: "Final arguments do not match accumulated deltas",
+            message: `Tool call argument evidence for item ${chunk.item_id} arrived after that item's own output_item.done`,
+          });
+        } else {
+          this.receivedDeltas.add(chunk.item_id);
+          const acc = this.accumulatedArguments.get(chunk.item_id) ?? "";
+          this.accumulatedArguments.set(chunk.item_id, acc + chunk.delta);
+
+          events.push({
+            type: "tool_call_arguments_delta",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey: `output-item:${chunk.item_id}` },
+            delta: chunk.delta,
           });
         }
+      } else if (chunk.type === "response.function_call_arguments.done" && chunk.item_id && chunk.arguments !== undefined) {
+        if (this.doneOutputItemIds.has(chunk.item_id)) {
+          // Same item-local post-terminal hardening as the `.delta` branch
+          // above, for the `.done` (final-arguments) shape specifically.
+          events.push({
+            type: "provider_diagnostic",
+            sequence: ++this.sequence,
+            provider: this.provider,
+            callRef: { sourceKey: `output-item:${chunk.item_id}` },
+            code: TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+            severity: "error",
+            message: `Tool call argument evidence for item ${chunk.item_id} arrived after that item's own output_item.done`,
+          });
+        } else {
+          const acc = this.accumulatedArguments.get(chunk.item_id) ?? "";
+          const hasDeltas = this.receivedDeltas.has(chunk.item_id);
+
+          if (!hasDeltas && chunk.arguments.length > 0) {
+            // No deltas, just final arguments.
+            events.push({
+              type: "tool_call_arguments_delta",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              callRef: { sourceKey: `output-item:${chunk.item_id}` },
+              delta: chunk.arguments,
+            });
+            this.accumulatedArguments.set(chunk.item_id, chunk.arguments);
+          } else if (hasDeltas && chunk.arguments !== acc) {
+            events.push({
+              type: "provider_diagnostic",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              callRef: { sourceKey: `output-item:${chunk.item_id}` },
+              code: "E_FINAL_ARGUMENTS_CONFLICT",
+              severity: "error",
+              message: "Final arguments do not match accumulated deltas",
+            });
+          }
+        }
       } else if (chunk.type === "response.output_item.done" && chunk.item?.id) {
+         this.doneOutputItemIds.add(chunk.item.id);
          events.push({
            type: "tool_call_end",
            sequence: ++this.sequence,

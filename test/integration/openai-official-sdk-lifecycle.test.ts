@@ -198,6 +198,89 @@ describe("OpenAI official SDK (openai@7.8.0): Responses API streaming, through t
       expect(gate.takeDecision(decision.internalId)).toBeUndefined();
     });
 
+    it("P4.1 F-2: response.output_item.done seals the item against later real-SDK-yielded argument evidence for the same item_id (L3 regression; RED pre-fix)", async () => {
+      // Exact adversarial sequence from the P4 audit's F-2 finding: the item
+      // is left structurally UNCLOSED before output_item.done (matching a
+      // real truncation/interruption shape), then a later delta for the
+      // SAME item_id closes it while injecting content. Per the (C) test
+      // above, the real SDK's own async iterator has already been proven to
+      // yield every SSE frame written on this connection, regardless of
+      // output_item.done/response.completed timing - so this exact
+      // adversarial shape is expected to survive real SDK parsing unchanged.
+      server = await startSseFixtureServer({
+        chunks: [
+          sseFrame("response.output_item.added", {
+            type: "response.output_item.added", output_index: 0,
+            item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA", arguments: "", status: "in_progress" },
+            sequence_number: 1,
+          }),
+          sseFrame("response.function_call_arguments.delta", {
+            type: "response.function_call_arguments.delta", item_id: "item-1", output_index: 0, delta: '{"a":1', sequence_number: 2,
+          }),
+          sseFrame("response.output_item.done", {
+            type: "response.output_item.done", output_index: 0,
+            item: { type: "function_call", id: "item-1", call_id: "call-1", name: "toolA", arguments: '{"a":1', status: "incomplete" },
+            sequence_number: 3,
+          }),
+          // Late evidence for the SAME item_id, written on the same
+          // connection after output_item.done, closing the object with
+          // injected content.
+          sseFrame("response.function_call_arguments.delta", {
+            type: "response.function_call_arguments.delta", item_id: "item-1", output_index: 0, delta: ',"evil":true}', sequence_number: 4,
+          }),
+          sseFrame("response.completed", {
+            type: "response.completed", sequence_number: 5, response: { id: "resp_test_f2", status: "completed", output: [] },
+          }),
+        ],
+      });
+
+      const stream = await client(server.baseUrl).responses.create({ model: "gpt-4o-mini", input: "irrelevant", stream: true });
+      const rawEvents: unknown[] = [];
+      for await (const event of stream) rawEvents.push(event);
+
+      // Official-SDK-parser reachability proof: every frame, including the
+      // adversarial late delta, was yielded by the real openai@7.8.0 client
+      // unchanged, in order - not filtered, transformed, or dropped.
+      expect(rawEvents.map((e) => (e as { type: string }).type)).toEqual([
+        "response.output_item.added",
+        "response.function_call_arguments.delta",
+        "response.output_item.done",
+        "response.function_call_arguments.delta",
+        "response.completed",
+      ]);
+      const lateDeltaEvent = rawEvents[3] as { item_id?: string; delta?: string };
+      expect(lateDeltaEvent.item_id).toBe("item-1"); // same item_id, survives real SDK parsing unchanged
+      expect(lateDeltaEvent.delta).toBe(',"evil":true}');
+
+      const adapter = new OpenAIStreamAdapter();
+      const gate = createToolCallExecutionGate();
+      for (const event of rawEvents) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+      // Universal documented lifecycle (docs/EXECUTION_GATE.md#example): the
+      // raw SDK iterator is exhausted above, so call adapter.finish() before
+      // gate.finish() - always, regardless of provider. This fixture already
+      // contains response.completed, a genuine provider-level terminal the
+      // adapter's push() already observed, so this must be the standard
+      // idempotent no-op every adapter guarantees (see
+      // ALREADY-GLOBALLY-FINISHED CONTROL in
+      // test/providers/openai-compatible-choice-lifecycle.test.ts) - no
+      // Responses-specific lifecycle exception.
+      const finishEvents = adapter.finish();
+      expect(finishEvents).toEqual([]);
+      for (const normalized of finishEvents) gate.push(normalized);
+
+      const final = gate.finish();
+      const decision = expectDefined(final.decisions[0]);
+
+      // REQUIRED INVARIANT (genuine RED on pre-fix production, L3-confirmed
+      // via the real SDK-yielded events above - see P4 audit finding F-2:
+      // pre-fix this was {action:"execute", reason:"complete",
+      // value:{a:1,evil:true}}, takeDecision() returned the full live
+      // authority with the injected value):
+      expect(decision.action).not.toBe("execute");
+      expect(gate.takeDecision(decision.internalId)).toBeUndefined();
+    });
+
     it("Chat Completions: contrasts with the above - [DONE] IS a real sentinel here, and the SDK's own iterator never yields anything the server writes after it, even on the same connection", async () => {
       server = await startSseFixtureServer({
         chunks: [
