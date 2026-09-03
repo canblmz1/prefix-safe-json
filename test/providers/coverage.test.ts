@@ -13,7 +13,7 @@ import { OpenRouterStreamAdapter } from "../../src/providers/openrouter.js";
 import { DefaultToolCallStreamCoordinator } from "../../src/coordinator/coordinator.js";
 import { createToolCallExecutionGate } from "../../src/gate/gate.js";
 import type { ProviderStreamAdapter } from "../../src/providers/adapter.js";
-import { TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE } from "../../src/coordinator/diagnostic-codes.js";
+import { TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE, DUPLICATE_TOOL_END_DIAGNOSTIC_CODE } from "../../src/coordinator/diagnostic-codes.js";
 import { expectDefined } from "../utils/expect-defined.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +172,146 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       expect(expectDefined(events[i]).sequence, `event ${i} sequence`).toBeGreaterThan(expectDefined(events[i - 1]).sequence);
     }
     expect(events.length).toBeGreaterThan(1);
+  });
+
+  // ---------------------------------------------------------------------
+  // P4.2 / F-1: block-local post-terminal evidence hardening.
+  // ---------------------------------------------------------------------
+  describe("block-local post-terminal evidence (content_block_stop) is hardened, not silently merged", () => {
+    it("A. existing block, INCOMPLETE before stop: a later delta that closes the JSON with injected content is rejected, not executed", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1' } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_stop", index: 0 })) gate.push(e);
+
+      const lateEvents = adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: ',"evil":true}' } });
+      const diag = expectDefined(lateEvents.find((e) => e.type === "provider_diagnostic"));
+      expect((diag as { code?: string }).code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect((diag as { callRef?: { sourceKey?: string } }).callRef?.sourceKey).toBe("content-block:0");
+      expect(lateEvents.some((e) => e.type === "tool_call_arguments_delta")).toBe(false); // never merged as normal evidence
+      for (const e of lateEvents) gate.push(e);
+
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("B. existing block, ALREADY structurally complete before stop: a later delta is rejected via the actual diagnostic, not merely by coincidental JSON trailing-data failure", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1}' } })) gate.push(e); // already closed
+      for (const e of adapter.push({ type: "content_block_stop", index: 0 })) gate.push(e);
+
+      const lateEvents = adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"more":true}' } });
+      // Assert the actual protocol-violation diagnostic exists - not merely
+      // that the call ends up non-executable, which trailing-data parse
+      // failure alone would also produce.
+      const diag = expectDefined(lateEvents.find((e) => e.type === "provider_diagnostic"));
+      expect((diag as { code?: string }).code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect(lateEvents.some((e) => e.type === "tool_call_arguments_delta")).toBe(false);
+      for (const e of lateEvents) gate.push(e);
+
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("C. multiple tool-use blocks: A stop + late A evidence does not poison B, which remains executable (exact attribution, not stream-wide)", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_A", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_B", name: "toolB" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1' } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_stop", index: 0 })) gate.push(e);
+
+      // Late evidence for the already-stopped A.
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: ',"evil":true}' } })) gate.push(e);
+
+      // B continues and finishes completely normally, unaffected.
+      for (const e of adapter.push({ type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: '{"b":2}' } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_stop", index: 1 })) gate.push(e);
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+      expect(b.action).toBe("execute");
+      expect(expectDefined(gate.takeDecision(b.internalId)).value).toEqual({ b: 2 });
+    });
+
+    it("D. a delta for a NEVER-STARTED block index is NOT conflated with late evidence for an already-terminal block - existing unknown-before-start behavior (unconditional emission, phantom identity, coordinator no-op) is preserved unchanged", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_A", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1}' } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_stop", index: 0 })) gate.push(e);
+
+      // A delta for a DIFFERENT, never-started block index - not "late
+      // evidence for A", a genuinely distinct identity that simply never
+      // received a content_block_start. terminatedBlockIndices only ever
+      // contains 0 - index 5 is not in it, so this must NOT be attributed
+      // to A's TOOL_ARGUMENTS_AFTER_END path. Existing behavior (no
+      // before-start check in this adapter at all, unlike AiSdkStreamAdapter)
+      // is deliberately preserved unchanged here, not widened.
+      const events = adapter.push({ type: "content_block_delta", index: 5, delta: { type: "input_json_delta", partial_json: "{}" } });
+      expect(events.map((e) => e.type)).toEqual(["tool_call_arguments_delta"]); // unchanged pre-existing behavior
+      expect((events[0] as { callRef?: { sourceKey?: string } }).callRef?.sourceKey).toBe("content-block:5");
+      for (const e of events) gate.push(e);
+
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      const final = gate.finish();
+      // A's own clean, legitimate authority is unaffected by the unrelated
+      // never-started identity's delta; no phantom "block 5" call exists.
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).toBe("execute");
+      expect(expectDefined(gate.takeDecision(a.internalId)).value).toEqual({ a: 1 });
+      expect(final.decisions.some((d) => (d as { toolIndex?: number }).toolIndex === 5)).toBe(false);
+    });
+
+    it("duplicate content_block_stop for the same index: PHASE 7 - pre-fix this was authority-safe but silently tolerated (a harmless idempotent second tool_call_end, since handleCallEnd() only re-sets already-true booleans - it did not create or increase execution authority, but it also did not itself disqualify the call, so an otherwise-valid call could still execute once a later, genuine terminal arrived); now DUPLICATE_TOOL_END records the protocol anomaly and fails the real call closed", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "toolA" } })) gate.push(e);
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1}' } })) gate.push(e);
+      const firstStop = adapter.push({ type: "content_block_stop", index: 0 });
+      expect(firstStop.map((e) => e.type)).toEqual(["tool_call_end"]);
+      for (const e of firstStop) gate.push(e);
+
+      const secondStop = adapter.push({ type: "content_block_stop", index: 0 });
+      expect(secondStop.map((e) => e.type)).toEqual(["provider_diagnostic"]); // never a second tool_call_end
+      const diag = expectDefined(secondStop[0]);
+      expect((diag as { code?: string }).code).toBe(DUPLICATE_TOOL_END_DIAGNOSTIC_CODE);
+      expect((diag as { callRef?: { sourceKey?: string } }).callRef?.sourceKey).toBe("content-block:0");
+      for (const e of secondStop) gate.push(e);
+
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
+
+    it("PHASE 9: a block that never receives its own content_block_stop does not gain execution authority merely because message_delta terminates the stream and its JSON happens to be syntactically complete (E_STREAM_ENDED_WITH_OPEN_CALL forces reject/malformed - existing coordinator-level safety net, not adapter-specific)", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new AnthropicStreamAdapter();
+      for (const e of adapter.push({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "toolA" } })) gate.push(e);
+      // Syntactically COMPLETE already - but content_block_stop never fires.
+      for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1}' } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(a.action).not.toBe("execute");
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    });
   });
 });
 

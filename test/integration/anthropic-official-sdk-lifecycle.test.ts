@@ -179,6 +179,77 @@ describe("Anthropic official SDK (@anthropic-ai/sdk@0.123.0): Messages streaming
     });
   });
 
+  it("P4.2 F-1: content_block_stop seals the block against later real-SDK-yielded input_json_delta for the same index (L3 regression; RED pre-fix)", async () => {
+    // Exact adversarial sequence from the P4 audit's F-1 finding: the
+    // block is left structurally UNCLOSED before content_block_stop
+    // (matching a real truncation/interruption shape - see
+    // examples/anthropic-truncation-safety.mjs's own confirmed real-
+    // protocol shape: Anthropic still closes the in-progress block even
+    // when cut short), then a later delta for the SAME index closes it
+    // while injecting content. Per test (4) above, the real SDK's own
+    // async iterator has already been proven to yield every SSE frame
+    // written on this connection with no [DONE]-style sentinel at all -
+    // so this exact adversarial shape is expected to survive real SDK
+    // parsing unchanged.
+    server = await startSseFixtureServer({
+      chunks: [
+        messageStart(),
+        sseFrame("content_block_start", { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_f1", name: "toolA", input: {} } }),
+        sseFrame("content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1' } }),
+        sseFrame("content_block_stop", { type: "content_block_stop", index: 0 }),
+        // Late evidence for the SAME index, written on the same
+        // connection after content_block_stop, closing the object with
+        // injected content.
+        sseFrame("content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: ',"evil":true}' } }),
+        sseFrame("message_delta", { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 10 } }),
+        sseFrame("message_stop", { type: "message_stop" }),
+      ],
+    });
+
+    const stream = await client(server.baseUrl).messages.create({ model: "claude-test", max_tokens: 100, messages: [{ role: "user", content: "hi" }], stream: true });
+    const rawEvents: Array<{ type: string }> = [];
+    for await (const event of stream) rawEvents.push(event);
+
+    // Official-SDK-parser reachability proof: every frame, including the
+    // adversarial late delta, was yielded by the real @anthropic-ai/sdk
+    // client unchanged, in order - not filtered, transformed, or dropped.
+    expect(rawEvents.map((e) => e.type)).toEqual([
+      "message_start",
+      "content_block_start",
+      "content_block_delta",
+      "content_block_stop",
+      "content_block_delta",
+      "message_delta",
+      "message_stop",
+    ]);
+    const lateDeltaEvent = rawEvents[4] as { index?: number; delta?: { partial_json?: string } };
+    expect(lateDeltaEvent.index).toBe(0); // same block index, survives real SDK parsing unchanged
+    expect(lateDeltaEvent.delta?.partial_json).toBe(',"evil":true}');
+
+    const adapter = new AnthropicStreamAdapter();
+    const gate = createToolCallExecutionGate();
+    for (const event of rawEvents) for (const normalized of adapter.push(event)) gate.push(normalized);
+
+    // Universal documented lifecycle (docs/EXECUTION_GATE.md#example):
+    // message_delta already observed a genuine provider-level terminal
+    // above, so adapter.finish() here must be the standard idempotent
+    // no-op every adapter guarantees - no Anthropic-specific exception.
+    const finishEvents = adapter.finish();
+    expect(finishEvents).toEqual([]);
+    for (const normalized of finishEvents) gate.push(normalized);
+
+    const final = gate.finish();
+    const decision = expectDefined(final.decisions[0]);
+
+    // REQUIRED INVARIANT (genuine RED on pre-fix production, L3-confirmed
+    // via the real SDK-yielded events above - see P4 audit finding F-1:
+    // pre-fix this was {action:"execute", reason:"complete",
+    // value:{a:1,evil:true}}, takeDecision() returned the full live
+    // authority with the injected value):
+    expect(decision.action).not.toBe("execute");
+    expect(gate.takeDecision(decision.internalId)).toBeUndefined();
+  });
+
   describe("(5) in-stream error behavior - experimentally determined, not assumed", () => {
     it("a raw `event: error` SSE frame is surfaced as a THROWN APIError from the SDK's async iterator, never yielded as a { type: 'error' } object", async () => {
       server = await startSseFixtureServer({
