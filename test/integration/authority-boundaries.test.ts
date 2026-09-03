@@ -516,12 +516,21 @@ describe("remaining execution-authority boundaries — Phase 0 regressions", () 
   });
 
   it("C: explicit-index terminal reasons preserve length and cancellation", () => {
-    const length = new OpenAICompatibleStreamAdapter().push({
-      choices: [{ index: 0, finish_reason: "length" }],
-    });
-    const cancelled = new OpenAICompatibleStreamAdapter().push({
-      choices: [{ index: 0, finish_reason: "cancelled" }],
-    });
+    // choice.finish_reason is choice-local (see
+    // OpenAICompatibleStreamAdapter's class-level lifecycle-contract doc):
+    // it records the mapped reason but does not itself emit
+    // provider_stream_end. finish() closes the raw provider iterator and
+    // aggregates whatever choice-local reason was recorded onto the one
+    // real terminal event - which is what these two per-reason mappings
+    // are actually being checked against here.
+    const lengthAdapter = new OpenAICompatibleStreamAdapter();
+    lengthAdapter.push({ choices: [{ index: 0, finish_reason: "length" }] });
+    const length = lengthAdapter.finish();
+
+    const cancelledAdapter = new OpenAICompatibleStreamAdapter();
+    cancelledAdapter.push({ choices: [{ index: 0, finish_reason: "cancelled" }] });
+    const cancelled = cancelledAdapter.finish();
+
     expect(length.find((event) => event.type === "provider_stream_end")?.reason).toBe("length");
     expect(cancelled.find((event) => event.type === "provider_stream_end")?.reason).toBe("cancelled");
   });

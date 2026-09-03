@@ -199,8 +199,25 @@ const adapter = new AnthropicStreamAdapter();
 
 for (const rawEvent of anthropicSseEvents) {
   for (const normalized of adapter.push(rawEvent)) gate.push(normalized);
+
+  // Optional in-flight inspection - never required, never destructive, and
+  // never a substitute for the two finish() calls below (see the three-way
+  // distinction immediately after this example).
+  gate.snapshot();
 }
 
+// The caller has exhausted the raw provider evidence source - let the
+// adapter synthesize/finalize provider-stream termination if it hasn't
+// already. Call this for every adapter, always, even one whose push() may
+// already have observed a genuine provider-level terminal (e.g. Anthropic's
+// own message_delta/stop_reason, or OpenAI's Responses API
+// response.completed): every adapter's finish() is idempotent - it returns
+// no events at all once the stream has genuinely already ended - so this is
+// the one safe, universal pattern regardless of which provider adapter is
+// in use. There is no provider-specific exception to memorize.
+for (const normalized of adapter.finish()) gate.push(normalized);
+
+// Compute the final decisions - only now, AFTER adapter finalization above.
 const final = gate.finish();
 for (const observed of final.decisions) {
   const authority = gate.takeDecision(observed.internalId);
@@ -211,6 +228,59 @@ for (const observed of final.decisions) {
   }
 }
 ```
+
+Three different operations, two of them both named `finish()`, easy to
+conflate:
+
+- **`gate.snapshot()`** means *non-destructive in-flight inspection* - safe
+  to call at any point, as often as you like, including from inside the
+  `for await` loop before the raw provider evidence source is exhausted. It
+  never mutates gate state and never reports `action: "execute"` for any
+  call - see its own documented contract (`gate/types.ts`) for why a
+  positive decision is only ever reported once finalization has genuinely
+  happened.
+- **`adapter.finish()`** means *the caller has exhausted the raw provider
+  evidence source* - the `for await`/`for` loop over the provider's own raw
+  events has ended. It tells the **adapter** to synthesize/finalize
+  provider-stream termination if `push()` hasn't already emitted a genuine
+  one, and to close any tool call whose own evidence never got a chance to
+  report its own terminal. It normally returns zero or more
+  `NormalizedToolStreamEvent`s that must still be pushed into the gate, same
+  as every event from `push()`.
+- **`gate.finish()`** means *final decision computation, performed AFTER
+  adapter finalization* - not an in-flight snapshot API. It is replayable
+  once finalization has begun or completed (`finish()` is replayable
+  diagnostic state - see
+  [One-shot execution authority](#one-shot-execution-authority) below), but
+  calling it **before** `adapter.finish()` is a mistake, not merely a
+  redundant no-op: the coordinator's own `finish()` fallback synthesizes a
+  `reason: "unknown"` stream end for anything not yet genuinely terminated,
+  and the gate caches that fact on its *first* `finish()` call - a
+  premature call permanently pins the gate to that fallback, so the real,
+  later `adapter.finish()` event can no longer update it. Use
+  `gate.snapshot()`, never `gate.finish()`, for any inspection performed
+  before the raw provider evidence source is exhausted.
+
+Calling `adapter.finish()` before `gate.finish()` is required to reach a
+genuine `execute` decision reliably across every provider adapter - some
+adapters' `push()` can legitimately observe the whole provider stream ending
+on its own (a single `message_delta`, a Responses API `response.completed`),
+but the `OpenAICompatibleStreamAdapter` family (`OpenAICompatibleStreamAdapter`,
+`OpenAIStreamAdapter`'s plural `tool_calls` path, `OpenRouterStreamAdapter`)
+deliberately never does: a single choice's own `finish_reason` is
+choice-local evidence only, never proof the whole (possibly multi-choice)
+provider stream has ended - see [`COMPATIBILITY.md`](COMPATIBILITY.md) and
+that adapter's own class-level lifecycle-contract doc for why. Following the universal pattern
+above means never needing to know, per provider, which case applies.
+
+This is the public **low-level adapter + gate** lifecycle - composed
+yourself, for when you need the adapter or gate instance directly. It is
+distinct from the **high-level guard** lifecycle
+([`createAiSdkExecutionGuard()`](#high-level-guards) below), which owns its
+internal adapter entirely: a guard caller never holds an adapter reference
+at all, so it has nothing to call `finish()` on directly - `guard.push()`/
+`guard.finish()` already do the equivalent internally, on the guard's own
+two methods, not three.
 
 See `examples/anthropic-truncation-safety.mjs` and
 `examples/ai-sdk-execution-gate.mjs` for full runnable wire-shape versions

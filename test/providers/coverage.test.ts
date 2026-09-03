@@ -1001,9 +1001,28 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
   it("emits diagnostic on event after stream end", () => {
     const a = new OpenAICompatibleStreamAdapter();
     a.push({ choices: [{ index: 0, finish_reason: "tool_calls" }] });
+    // choice.finish_reason alone is choice-local and does not set the
+    // adapter's global `finished` state (see the class-level lifecycle
+    // doc) - an explicit finish() is what this W_EVENT_AFTER_STREAM_END
+    // guard actually gates on. Post-terminal evidence for a single
+    // already-terminal CHOICE without a global finish() is a distinct,
+    // separately-covered path (E_TOOL_ARGUMENTS_AFTER_END - see
+    // openai-compatible-choice-lifecycle.test.ts's own
+    // "CHOICE-LOCAL POST-TERMINAL EVIDENCE" group).
+    a.finish();
     const events = a.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] } }] });
     expect(events[0]?.type).toBe("provider_diagnostic");
     expect((events[0] as { code?: string })?.code).toBe("W_EVENT_AFTER_STREAM_END");
+  });
+
+  it("push(null) and push(undefined) do not throw - the malformed-raw-event guard runs before any property access on rawEvent", () => {
+    for (const raw of [null, undefined]) {
+      const a = new OpenAICompatibleStreamAdapter();
+      let events: readonly ReturnType<typeof a.push>[number][] = [];
+      expect(() => { events = a.push(raw); }, String(raw)).not.toThrow();
+      expect(events[0]?.type, String(raw)).toBe("provider_diagnostic");
+      expect((events[0] as { code?: string })?.code, String(raw)).toBe("E_PROVIDER_EVENT_MALFORMED");
+    }
   });
 
   it("handles tool_call with missing index", () => {
@@ -1026,12 +1045,18 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
   // --- Group 8: remaining security-relevant survivors specific to
   // OpenAI-Compatible.
   it("terminal mapping: finish_reason 'stop' maps to StreamEndReason 'complete' (authority-boundaries.test.ts's own terminal-reasons test covers 'length'/'cancelled' but not 'stop')", () => {
-    const events = new OpenAICompatibleStreamAdapter().push({ choices: [{ index: 0, finish_reason: "stop" }] });
+    // choice.finish_reason is choice-local; finish() aggregates it onto the
+    // one real provider_stream_end (see class-level lifecycle-contract doc).
+    const adapter = new OpenAICompatibleStreamAdapter();
+    adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
+    const events = adapter.finish();
     expect(events.find((e) => e.type === "provider_stream_end")?.reason).toBe("complete");
   });
 
   it("an UNRECOGNIZED finish_reason maps to 'unknown', not a mislabeled 'cancelled' (the trailing else-if's own comparison, checked at the raw normalized-event level)", () => {
-    const events = new OpenAICompatibleStreamAdapter().push({ choices: [{ index: 0, finish_reason: "content_filter" }] });
+    const adapter = new OpenAICompatibleStreamAdapter();
+    adapter.push({ choices: [{ index: 0, finish_reason: "content_filter" }] });
+    const events = adapter.finish();
     expect(events.find((e) => e.type === "provider_stream_end")?.reason).toBe("unknown");
   });
 
@@ -1112,6 +1137,7 @@ describe("OpenAICompatibleStreamAdapter — uncovered branches", () => {
   it("finish() is idempotent", () => {
     const a = new OpenAICompatibleStreamAdapter();
     a.push({ choices: [{ index: 0, finish_reason: "tool_calls" }] });
+    a.finish();
     const events = a.finish();
     expect(events).toHaveLength(0);
   });

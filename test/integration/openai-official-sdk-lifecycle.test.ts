@@ -362,6 +362,12 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     for await (const chunk of stream) {
       for (const normalized of adapter.push(chunk)) gate.push(normalized);
     }
+    // choice.finish_reason is choice-local (see
+    // OpenAICompatibleStreamAdapter's class-level lifecycle-contract doc,
+    // inherited unchanged by this delegating OpenAIStreamAdapter): the ONE
+    // provider_stream_end comes from finish(), called once the raw SDK
+    // iterator above is drained.
+    for (const normalized of adapter.finish()) gate.push(normalized);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.name).toBe("search");
@@ -416,6 +422,10 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     const adapter = new OpenAIStreamAdapter();
     const gate = createToolCallExecutionGate();
     for (const chunk of rawChunks) for (const normalized of adapter.push(chunk)) gate.push(normalized);
+    // The terminal chunk's own finish_reason only closes the call
+    // choice-locally; finish() (called once the raw SDK iterator above is
+    // fully drained) is what emits the real provider_stream_end.
+    for (const normalized of adapter.finish()) gate.push(normalized);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.name).toBe("search");
@@ -455,6 +465,9 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     const lateEvidence = rawChunks.slice(2); // the late chunk before [DONE]
 
     for (const chunk of legitimate) for (const normalized of adapter.push(chunk)) gate.push(normalized);
+    // A genuine, clean "execute" terminal requires finish() - the
+    // separate terminal chunk above only closes the call choice-locally.
+    for (const normalized of adapter.finish()) gate.push(normalized);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.action).toBe("execute");

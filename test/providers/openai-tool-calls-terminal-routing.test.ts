@@ -49,8 +49,18 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
       })) gate.push(e);
 
       const terminalEvents = adapter.push({ choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] });
-      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
+      // choice.finish_reason is choice-local: it closes the call
+      // (tool_call_end) but the ONE provider_stream_end for this adapter's
+      // lifetime now comes only from finish(), called once the caller has
+      // drained the raw provider iterator (see
+      // OpenAICompatibleStreamAdapter's class-level lifecycle-contract doc,
+      // which this delegating OpenAIStreamAdapter inherits unchanged).
+      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end"]);
       for (const e of terminalEvents) gate.push(e);
+
+      const finishEvents = adapter.finish();
+      expect(finishEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      for (const e of finishEvents) gate.push(e);
 
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
@@ -69,6 +79,9 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
       for (const e of adapter.push({
         choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_1", type: "function", function: { name: "search", arguments: '{"q":"test"}' } }] }, finish_reason: "tool_calls" }],
       })) gate.push(e);
+      // Same choice-local-vs-finish() distinction as group A above: the
+      // SAME-chunk finish_reason still only closes the call here.
+      for (const e of adapter.finish()) gate.push(e);
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
       expect(decision.action).toBe("execute");
@@ -98,18 +111,15 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
   describe("CHOICE ROUTING: the delegation predicate must not only inspect choices[0]", () => {
     it("a plural tool_calls delta in a NON-ZERO choice (choice 0 has no tool call) still routes to the compatible adapter and executes", () => {
       // Only choice 1 (the one carrying the tool call) ever reports
-      // finish_reason - this isolates the choice-index routing question
-      // from a separate, pre-existing, orthogonal defect this investigation
-      // also surfaced: OpenAICompatibleStreamAdapter emits one
-      // provider_stream_end PER finish_reason-bearing choice within a
-      // single chunk, so two choices terminating in the SAME chunk trips
-      // the coordinator's own post-terminal "event after stream end"
-      // global diagnostic and wrongly poisons every call, including
-      // choice 1's otherwise-valid one. Confirmed reproducible with
-      // OpenAICompatibleStreamAdapter alone (no involvement of this file's
-      // routing fix) - reported separately in the final report, not fixed
-      // here per the production-scope boundary (src/providers/openai-compatible.ts
-      // is out of scope for this patch).
+      // finish_reason - this isolates the choice-index routing question.
+      // (Originally also isolated a separate, pre-existing defect - two
+      // choices terminating in the same chunk each emitting their own
+      // premature provider_stream_end - from this test's own routing
+      // concern; that defect is now structurally impossible under
+      // OpenAICompatibleStreamAdapter's choice-local lifecycle redesign,
+      // since choice.finish_reason never emits provider_stream_end at all
+      // any more. Left isolated regardless: it keeps this test's failure
+      // mode unambiguous.)
       const gate = createToolCallExecutionGate();
       const adapter = new OpenAIStreamAdapter();
       for (const e of adapter.push({
@@ -119,6 +129,7 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
         ],
       })) gate.push(e);
       for (const e of adapter.push({ choices: [{ index: 1, delta: {}, finish_reason: "tool_calls" }] })) gate.push(e);
+      for (const e of adapter.finish()) gate.push(e);
 
       const final = gate.finish();
       const decision = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "search"));
@@ -322,6 +333,11 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
       const adapter = new OpenAIStreamAdapter();
       for (const e of adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_7", type: "function", function: { name: "pluralClean", arguments: '{"q":"test"}' } }] } }] })) gate.push(e);
       for (const e of adapter.push({ choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] })) gate.push(e);
+      // choice.finish_reason alone only closes the call; finish() is what
+      // actually terminates the stream (see the class-level lifecycle-
+      // contract doc) - needed here for a genuine, clean "execute" terminal
+      // to exist BEFORE the late evidence below.
+      for (const e of adapter.finish()) gate.push(e);
 
       // Real, unconsumed authority must exist BEFORE the late evidence -
       // read via finish()'s returned decisions, never takeDecision().

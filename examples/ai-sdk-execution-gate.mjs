@@ -14,6 +14,11 @@
 //   for await (const part of result.fullStream) {
 //     for (const normalized of adapter.push(part)) gate.push(normalized);
 //   }
+//   // The caller has exhausted fullStream - let the adapter finalize
+//   // provider-stream termination if push() hasn't already (every adapter's
+//   // finish() is idempotent, so this is always safe to call, regardless of
+//   // provider - see docs/EXECUTION_GATE.md#example).
+//   for (const normalized of adapter.finish()) gate.push(normalized);
 //   const final = gate.finish();
 //   for (const observed of final.decisions) {
 //     const authority = gate.takeDecision(observed.internalId);
@@ -42,6 +47,14 @@ function run(label, parts) {
     for (const normalized of adapter.push(part)) {
       gate.push(normalized);
     }
+  }
+
+  // Universal pattern: always call adapter.finish() once the raw event
+  // source is exhausted, even though AiSdkStreamAdapter's own push() will
+  // typically already have observed a genuine terminal via the "finish"
+  // part below - finish() is idempotent and returns nothing in that case.
+  for (const normalized of adapter.finish()) {
+    gate.push(normalized);
   }
 
   const { decisions } = gate.finish();

@@ -157,6 +157,11 @@ describe("Provider Safety Regressions", () => {
     for (const ev of adapter.push({ choices: [{ index: 0, delta: { reasoning: "thinking..." } }] })) gate.push(ev);
     for (const ev of adapter.push({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: "}" } }] } }] })) gate.push(ev);
     for (const ev of adapter.push({ choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] })) gate.push(ev);
+    // choice.finish_reason closes the call but is choice-local; the ONE
+    // provider_stream_end for this adapter's lifetime comes from finish(),
+    // called once the caller has drained the raw provider iterator - see
+    // OpenAICompatibleStreamAdapter's class-level lifecycle-contract doc.
+    for (const ev of adapter.finish()) gate.push(ev);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.action).toBe("execute");
