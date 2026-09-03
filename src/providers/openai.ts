@@ -54,6 +54,36 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   // Delegating tool_calls format to compatible adapter
   private compatibleAdapter = new OpenAICompatibleStreamAdapter();
   
+  // For the plural, new-style Chat Completions tool_calls format.
+  // Sticky stream-mode flag: once ANY chunk in this stream shows genuine
+  // plural tool_calls evidence (never inferred merely from finish_reason -
+  // see the "no prior plural tool call" regression), every later Chat
+  // Completions chunk continues through OpenAICompatibleStreamAdapter for
+  // the rest of the stream's lifetime, including a later chunk whose own
+  // delta carries no tool_calls at all - most commonly a separate
+  // empty-delta finish_reason terminal chunk (see
+  // test/integration/openai-official-sdk-lifecycle.test.ts for the exact
+  // shape openai@7.8.0's own SDK parser exposes for it). Before this flag
+  // existed, that terminal chunk failed the old per-chunk-only delegation
+  // check and fell through into the unrelated legacy function_call loop
+  // below, so the compatible adapter's own tracked call never received its
+  // tool_call_end (see test/providers/openai-tool-calls-terminal-routing.test.ts).
+  //
+  // Only ever set once this.hasLegacyFunctionCall is confirmed false for
+  // this stream - see push()'s own format-conflict check just above where
+  // this flag is read/written. A stream can only ever genuinely commit to
+  // ONE of the two Chat Completions tool-call shapes: conflicting evidence
+  // for the other format fails the whole stream closed instead of
+  // silently delegating to it (empirically confirmed necessary - a plural
+  // tool_calls chunk arriving after a legacy function_call had already
+  // started its own tracked call would otherwise delegate straight to
+  // OpenAICompatibleStreamAdapter, which has no knowledge of the outer
+  // adapter's legacy-tracked call and would happily track and correctly
+  // close the injected plural evidence as its own, fully independent,
+  // genuinely executable authority - see the "SYMMETRIC CASE" / "FORMAT-CONFLICT"
+  // regressions).
+  private hasCompatibleToolCalls = false;
+
   // For function_call (legacy)
   private hasLegacyFunctionCall = false;
   private legacySourceKey = "legacy-function-call";
@@ -248,8 +278,45 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
       return events;
     }
 
-    // Check if it's the standard tool_calls format
-    if (chunk.choices?.[0]?.delta?.tool_calls !== undefined) {
+    // This chunk's OWN evidence for each Chat Completions tool-call format,
+    // independent of any mode already committed to by an earlier chunk.
+    // Checked across every choice, not only choices[0]: a multi-choice
+    // (n>1) stream's tool call can legitimately live in a non-zero choice.
+    const hasPluralEvidence = Array.isArray(chunk.choices) && chunk.choices.some(choice => choice.delta?.tool_calls !== undefined);
+    const hasLegacyEvidence = Array.isArray(chunk.choices) && chunk.choices.some(choice => choice.delta?.function_call !== undefined);
+
+    // A stream can only ever genuinely be ONE Chat Completions tool-call
+    // format. Conflicting evidence - both shapes in the SAME chunk, or one
+    // format's evidence arriving after the OTHER was already committed to
+    // by an earlier chunk - must never silently pick a winner while
+    // letting the original, already-legitimate call keep its authority
+    // (that was the exact gap the earlier hasLegacyFunctionCall-only cross
+    // check left open - see the SYMMETRIC CASE / plural-then-singular
+    // regressions). It fails the WHOLE stream closed instead: same as
+    // every other meaningful evidence this method recognizes, there is no
+    // `if (this.finished) return` guard here, so this branch also runs -
+    // and correctly revokes an already-live, not-yet-consumed decision -
+    // when the conflicting evidence arrives AFTER a clean terminal already
+    // fired. That revocation is the coordinator's own isFinished protocol
+    // converting this second stream-end-shaped event into its sticky,
+    // stream-wide diagnostic (GHSA-3xpw-9694-2xxp) - this adapter does not
+    // track post-conflict state itself beyond the ordinary `finished` flag.
+    if ((hasPluralEvidence && hasLegacyEvidence) || (hasPluralEvidence && this.hasLegacyFunctionCall) || (hasLegacyEvidence && this.hasCompatibleToolCalls)) {
+      events.push({
+        type: "provider_stream_end",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        reason: "provider_error",
+        providerReason: "mixed_tool_call_formats",
+      });
+      this.finished = true;
+      return events;
+    }
+
+    if (hasPluralEvidence) {
+      this.hasCompatibleToolCalls = true;
+    }
+    if (this.hasCompatibleToolCalls) {
       // Delegate to OpenAICompatibleStreamAdapter
       const compatibleEvents = this.compatibleAdapter.push(rawEvent);
       // Map provider name to "openai"

@@ -370,38 +370,30 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     expect(authority.value).toEqual({ q: "test" });
   });
 
-  it("NEW OFFICIAL-SDK MISMATCH candidate: new-style tool_calls, SEPARATE empty-delta finish_reason chunk (OpenAI's standard real-world terminal-chunk shape) - the call is never closed, and a valid call is wrongly rejected", async () => {
-    // This is the standard, extremely well-documented real OpenAI
-    // Chat-Completions-with-tool_calls wire shape: the LAST chunk carries
+  it("new-style tool_calls with a separate empty-delta finish_reason chunk closes and executes", async () => {
+    // A separate empty-delta finish_reason terminal shape, accepted and
+    // exposed by the real openai@7.8.0 SDK parser in this deterministic
+    // fixture (proven below). This harness proves SDK-parser compatibility
+    // with the shape; it does not claim that every current live OpenAI
+    // model/request emits this exact sequence. The LAST chunk carries
     // `finish_reason` with an EMPTY `delta: {}` - no `tool_calls` key at
     // all on that specific chunk (openai@7.8.0's own
     // ChatCompletionChunk.Choice.Delta.tool_calls is typed optional,
     // consistent with this).
     //
-    // openai.ts's delegation gate is evaluated PER CHUNK:
-    //   if (chunk.choices?.[0]?.delta?.tool_calls !== undefined) { delegate }
-    // On this final chunk that condition is FALSE (no tool_calls key on
-    // THIS delta), so it is NOT delegated to OpenAICompatibleStreamAdapter.
-    // It instead falls through into openai.ts's own hand-rolled legacy
-    // function_call loop, which still reacts to `finish_reason` generically
-    // (choice.finish_reason != null) and emits a bare provider_stream_end -
-    // WITHOUT ever calling into the compatible adapter, so the tracked
-    // choice:0/tool-index:0 call never receives its tool_call_end.
-    // openai.ts's `finished` flag is now true, which also makes any later
-    // direct `finish()` call a no-op (its own top guard), so
-    // compatibleAdapter.finish()'s own (correct) closing logic is now
-    // unreachable too.
-    //
-    // coordinator.ts's handleStreamEnd() (verified directly, not assumed)
-    // then finds the call still status:"collecting" /
-    // argumentStreamClosed:false, raises E_STREAM_ENDED_WITH_OPEN_CALL
-    // (severity "error", attributed to the call), which forces
-    // outcome:"invalid" even though the JSON is complete and valid -
-    // exactly the same fail-open-into-fail-closed mechanism as the
-    // legacy-function_call bug fixed in 2f4f76f, but on OpenAI's CURRENT,
-    // primary, non-deprecated tool-calling format. NOT fixed here per the
-    // P2 production-code policy (src/** must stay untouched this phase) -
-    // reported as a NEW OFFICIAL-SDK MISMATCH for separate maintainer review.
+    // Formerly a NEW OFFICIAL-SDK MISMATCH (see fix/openai-tool-calls-terminal-routing):
+    // openai.ts's old delegation gate was evaluated PER CHUNK
+    // (`chunk.choices?.[0]?.delta?.tool_calls !== undefined`), so this exact
+    // terminal chunk fell through into the unrelated legacy function_call
+    // loop instead of reaching OpenAICompatibleStreamAdapter, leaving the
+    // tracked call's tool_call_end never emitted -
+    // coordinator.ts's handleStreamEnd() then raised
+    // E_STREAM_ENDED_WITH_OPEN_CALL and forced outcome:"invalid" even
+    // though the JSON was complete and valid. Fixed by a sticky
+    // `hasCompatibleToolCalls` stream-mode flag: once a genuine plural
+    // tool_calls delta is observed, every later Chat Completions chunk
+    // (including this empty-delta terminal one) continues through
+    // OpenAICompatibleStreamAdapter for the rest of the stream's lifetime.
     server = await startSseFixtureServer({
       chunks: [
         sseFrame(null, { id: "chatcmpl-tc2", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_abc2", type: "function", function: { name: "search", arguments: "" } }] }, finish_reason: null }] }),
@@ -426,10 +418,48 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     for (const chunk of rawChunks) for (const normalized of adapter.push(chunk)) gate.push(normalized);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
-    expect(decision.evidence.structurallyComplete).toBe(true); // the JSON itself is perfectly valid
-    // Observed (buggy) reality, not intended behavior - see the finding
-    // write-up above and in the P2 final report.
-    expect(decision.action).not.toBe("execute");
+    expect(decision.name).toBe("search");
+    expect(decision.evidence.structurallyComplete).toBe(true);
+    expect(decision.evidence.terminalConfirmed).toBe(true);
+    expect(decision.action).toBe("execute");
+    const authority = expectDefined(gate.takeDecision(decision.internalId));
+    expect(authority.value).toEqual({ q: "test" });
+    expect(gate.takeDecision(decision.internalId)).toBeUndefined();
+  });
+
+  it("new-style tool_calls, separate terminal chunk: post-terminal evidence arriving BEFORE [DONE] on the real SDK still reaches the coordinator and revokes unconsumed authority (P0 preserved end to end)", async () => {
+    // Chat Completions uses [DONE] as its true SDK-level stop sentinel (see
+    // the (C) contrast test above), but a chunk written AFTER the
+    // finish_reason terminal and BEFORE [DONE], on the same connection, is
+    // still real evidence the official SDK hands to userland - this proves
+    // the fix does not create a new GHSA-3xpw-9694-2xxp-class gap for the
+    // newly-corrected routing path.
+    server = await startSseFixtureServer({
+      chunks: [
+        sseFrame(null, { id: "chatcmpl-tc3", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "call_abc3", type: "function", function: { name: "search", arguments: '{"q":"test"}' } }] }, finish_reason: null }] }),
+        sseFrame(null, { id: "chatcmpl-tc3", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }] }),
+        // Late evidence: written after the terminal chunk, BEFORE [DONE].
+        sseFrame(null, { id: "chatcmpl-tc3", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '{"evil":true}' } }] }, finish_reason: null }] }),
+        sseFrame(null, "[DONE]"),
+      ],
+    });
+    const stream = await client(server.baseUrl).chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "user", content: "hi" }], stream: true });
+
+    const rawChunks: unknown[] = [];
+    for await (const chunk of stream) rawChunks.push(chunk);
+    expect(rawChunks).toHaveLength(3); // the late chunk before [DONE] IS yielded; [DONE] itself is not.
+
+    const adapter = new OpenAIStreamAdapter();
+    const gate = createToolCallExecutionGate();
+    const legitimate = rawChunks.slice(0, 2); // tool_calls delta + separate finish_reason terminal
+    const lateEvidence = rawChunks.slice(2); // the late chunk before [DONE]
+
+    for (const chunk of legitimate) for (const normalized of adapter.push(chunk)) gate.push(normalized);
+    const final = gate.finish();
+    const decision = expectDefined(final.decisions[0]);
+    expect(decision.action).toBe("execute");
+
+    for (const chunk of lateEvidence) for (const normalized of adapter.push(chunk)) gate.push(normalized);
     expect(gate.takeDecision(decision.internalId)).toBeUndefined();
   });
 });
