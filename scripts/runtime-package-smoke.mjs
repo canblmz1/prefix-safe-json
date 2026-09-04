@@ -152,12 +152,27 @@ const geminiAdapter = new GeminiStreamAdapter();
 const geminiGate = createToolCallExecutionGate(undefined, undefined, { write_file: schema });
 for (const event of geminiAdapter.push({
   candidates: [{
-    content: { parts: [{ functionCall: { name: "write_file", args: { path: "x", content: "y" } } }] },
+    index: 0,
+    content: { parts: [{ functionCall: { id: "runtime-smoke-call", name: "write_file", args: { path: "x", content: "y" } } }] },
     finishReason: "STOP",
   }],
 })) geminiGate.push(event);
+// Candidate-local finishReason (above) only closes that candidate - the
+// ONE provider-stream terminal comes solely from the adapter's own
+// finish(), which must be driven explicitly here just like a real caller
+// would at the end of the SSE stream.
+for (const event of geminiAdapter.finish({ reason: "complete" })) {
+  geminiGate.push(event);
+}
 const geminiDecision = geminiGate.finish().decisions[0];
-assert(geminiDecision?.reason === "projection_only", "Gemini projection received strict authority");
+assert(
+  geminiDecision?.action !== "execute",
+  "Gemini projection unexpectedly received execute authority",
+);
+assert(
+  geminiDecision?.reason === "projection_only",
+  `Gemini projection reason changed: ${geminiDecision?.reason}`,
+);
 
 const openAiAdapter = new OpenAICompatibleStreamAdapter();
 const openAiGate = createToolCallExecutionGate();

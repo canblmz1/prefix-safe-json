@@ -22,6 +22,11 @@
     "src/gate/decide.ts",
     "src/gate/gate.ts",
     "src/providers/ai-sdk.ts",
+    "src/providers/openai.ts",
+    "src/providers/anthropic.ts",
+    "src/providers/openrouter.ts",
+    "src/providers/openai-compatible.ts",
+    "src/providers/gemini.ts",
     "src/coordinator/coordinator.ts",
     "src/guard/provider-guard.ts",
     "src/guard/ai-sdk-execution-lock.ts"
