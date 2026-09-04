@@ -86,23 +86,29 @@ than treating `0.x` as a formality:
   is also, as of `0.4.3`, backed by real external production adoption —
   see `docs/CASE_STUDY_SANDBASE.md`. Currently: `createParser`,
   `createToolCallStreamCoordinator`, `createToolCallExecutionGate`,
-  `createAiSdkExecutionGuard`, `createAiSdkExecutionLock`,
-  `ToolInputValidator`/`ToolValidationResult`/`ToolValidatorEntry` and the
-  `prefix-safe-json/ajv`/`prefix-safe-json/standard-schema` adapters
-  (0.5.0), and their associated types. Breaking changes to these are
-  avoided pre-1.0 and would be called out prominently in `CHANGELOG.md`
-  if one became necessary.
+  `createAiSdkExecutionGuard`, `createAiSdkExecutionLock`, and their
+  associated types (including the pre-existing `toolSchemas`/`schemas`
+  raw-JSON-Schema registration option, unchanged in shape since before
+  0.5.0). Breaking changes to these are avoided pre-1.0 and would be
+  called out prominently in `CHANGELOG.md` if one became necessary.
 - **`@public (Experimental)`** — exported, usable, and tested, but may
   change without a major-version bump while the project is pre-1.0,
   typically because the underlying provider/SDK surface it targets is
   itself still evolving, or because the surface is new and has not yet
-  been proven against real usage. Currently: all six raw provider
-  adapters (`OpenAIStreamAdapter`, `OpenAICompatibleStreamAdapter`,
+  been proven against real external usage. Currently: all six raw
+  provider adapters (`OpenAIStreamAdapter`, `OpenAICompatibleStreamAdapter`,
   `AnthropicStreamAdapter`, `GeminiStreamAdapter`, `OpenRouterStreamAdapter`,
-  `AiSdkStreamAdapter`), and `prefix-safe-json/conformance` (0.5.0 - the
-  fixture format and runner shape may still change, see
-  `docs/CONFORMANCE.md`). Prefer the Stable high-level guard/gate API
-  where one exists for your use case.
+  `AiSdkStreamAdapter`); every 0.5.0 validation addition - the
+  `validators` registration option, `ToolInputValidator`/
+  `ToolValidationResult`, and the `prefix-safe-json/ajv`/
+  `prefix-safe-json/standard-schema` adapters (deliberately not marked
+  Stable pre-1.0, even though the underlying `toolSchemas`/`schemas`
+  behavior they sit alongside already is — see `docs/VALIDATION.md`); and
+  `prefix-safe-json/conformance` (the fixture format and runner shape may
+  still change, see `docs/CONFORMANCE.md`). Prefer the Stable high-level
+  guard/gate API where one exists for your use case; treat every
+  Experimental 0.5.0 addition as public experimentation, not yet a
+  stabilization commitment - see `docs/V1_CRITERIA.md`.
 - **Additive union members are not treated as breaking pre-1.0.** A new
   literal added to a public discriminated-union type (for example,
   `ExecutionReason`/`ToolCallState["status"]` gaining
