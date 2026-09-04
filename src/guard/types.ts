@@ -1,5 +1,5 @@
 import { StreamEndReason } from "../coordinator/protocol.js";
-import { CoordinatorLimits, ToolValidatorEntry } from "../coordinator/types.js";
+import { CoordinatorLimits, ToolInputValidator } from "../coordinator/types.js";
 import {
   ToolCallExecutionGateFinalResult,
   ExecutionDecision,
@@ -41,12 +41,19 @@ export interface ExecutionGuard<TRawEvent = unknown> {
 /** Options accepted by every high-level provider execution guard factory. */
 export interface ExecutionGuardOptions {
   /**
-   * Optional per-tool validation, keyed by tool name - same option
+   * Optional raw JSON Schema (draft-07) per tool name - same option
    * `createToolCallExecutionGate()`/`createToolCallStreamCoordinator()`
-   * accept as their third constructor argument. Each entry is either a
-   * `ToolInputValidator` or a raw JSON Schema (draft-07) object.
+   * accept as their third constructor argument. Unchanged pre-0.5 shape.
    */
-  schemas?: Record<string, ToolValidatorEntry>;
+  schemas?: Record<string, object>;
+
+  /**
+   * Optional {@link ToolInputValidator} per tool name - additive, 0.5.0+.
+   * A tool name present in both `schemas` and `validators` is a
+   * construction-time error; there is no structural discrimination or
+   * silent precedence between the two. See `docs/VALIDATION.md`.
+   */
+  validators?: Record<string, ToolInputValidator>;
 
   /** Coordinator-level limits (concurrent tool calls, tool name size, etc.). */
   limits?: Partial<CoordinatorLimits>;

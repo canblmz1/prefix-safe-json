@@ -5,6 +5,13 @@ import type { ToolInputValidator } from "../../src/validation/types.js";
 import { createAjvValidator } from "../../src/ajv.js";
 import { fromStandardSchema } from "../../src/standard-schema.js";
 
+const WRITE_FILE_SCHEMA = {
+  type: "object",
+  properties: { path: { type: "string" }, content: { type: "string" } },
+  required: ["path", "content"],
+  additionalProperties: false,
+};
+
 function runToolCall(
   coord: ReturnType<typeof createToolCallStreamCoordinator>,
   name: string,
@@ -23,71 +30,100 @@ function runToolCall(
   return coord.snapshot().calls[0];
 }
 
-describe("Validator independence: ToolInputValidator", () => {
-  it("accepts a hand-written ToolInputValidator directly, with no JSON Schema involved", () => {
+describe("Explicit schemas/validators split - no structural discrimination", () => {
+  it("schemas only: raw JSON Schema entries work exactly as before 0.5.0's hardening pass", () => {
+    const coord = createToolCallStreamCoordinator(undefined, undefined, { write_file: WRITE_FILE_SCHEMA });
+    expect(runToolCall(coord, "write_file", '{"path":"a.txt","content":"hi"}')?.schemaValid).toBe(true);
+    expect(runToolCall(createToolCallStreamCoordinator(undefined, undefined, { write_file: WRITE_FILE_SCHEMA }), "write_file", '{"path":"a.txt"}')?.schemaValid).toBe(false);
+  });
+
+  it("validators only: a ToolInputValidator registered via the validators option, with no schemas at all", () => {
+    const validator: ToolInputValidator = { validate: (v) => (typeof (v as { path?: unknown }).path === "string" ? { valid: true } : { valid: false }) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    expect(runToolCall(coord, "write_file", '{"path":"a.txt"}')?.schemaValid).toBe(true);
+  });
+
+  it("neither schemas nor validators: fully backward compatible, no validation performed", () => {
+    const coord = createToolCallStreamCoordinator();
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt","content":"hello"}');
+    expect(call?.schemaValid).toBeUndefined();
+    expect(call?.parser.executable).toBe(true);
+  });
+
+  it("different tools split across schemas and validators in the same construction", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: true }) };
+    const coord = createToolCallStreamCoordinator(
+      undefined,
+      undefined,
+      { tool_b: { type: "object", properties: { x: { type: "string" } }, required: ["x"] } },
+      { tool_a: validator },
+    );
+    expect(runToolCall(coord, "tool_a", "{}")?.schemaValid).toBe(true);
+    expect(runToolCall(createToolCallStreamCoordinator(undefined, undefined, { tool_b: { type: "object", properties: { x: { type: "string" } }, required: ["x"] } }, { tool_a: validator }), "tool_b", '{"x":1}')?.schemaValid).toBe(false);
+  });
+
+  it("the same tool name in both schemas and validators fails loudly and deterministically at construction, not silently resolved by precedence", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: true }) };
+    expect(() =>
+      createToolCallStreamCoordinator(undefined, undefined, { write_file: WRITE_FILE_SCHEMA }, { write_file: validator }),
+    ).toThrow(/registered in both "schemas" and "validators"/);
+  });
+
+  it("invalid validator configuration (a malformed schemas entry) still fails fast at construction, not mid-stream", () => {
+    expect(() =>
+      createToolCallStreamCoordinator(undefined, undefined, { bad_tool: { type: "not-a-real-json-schema-type" } }),
+    ).toThrow();
+  });
+
+  it("valid=false from a custom validator marks the call not executable and reports the validator's own error strings", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: false, errors: ["custom: nope", "custom: also nope"] }) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    expect(call?.parser.executable).toBe(true); // structurally complete - schema/validator failure is a separate, independent concern
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag).toBeDefined();
+    expect(diag?.message ?? "").toContain("custom: nope");
+    expect(diag?.message ?? "").toContain("custom: also nope");
+  });
+
+  it("valid=true from a custom validator marks the call executable", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: true }) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(true);
+    expect(call?.parser.executable).toBe(true);
+  });
+
+  it("a validator that throws fails that one call closed, without crashing the whole stream", () => {
     const validator: ToolInputValidator = {
-      validate(value) {
-        const v = value as { path?: unknown };
-        return typeof v.path === "string" ? { valid: true } : { valid: false, errors: ["path must be a string"] };
+      validate: () => {
+        throw new Error("boom: this validator is broken");
       },
     };
-    const coord = createToolCallStreamCoordinator(undefined, undefined, { write_file: validator });
-
-    const ok = runToolCall(coord, "write_file", '{"path":"a.txt"}');
-    expect(ok?.schemaValid).toBe(true);
-  });
-
-  it("reports a custom validator's own error strings verbatim on failure", () => {
-    const validator: ToolInputValidator = {
-      validate: () => ({ valid: false, errors: ["custom: nope", "custom: also nope"] }),
-    };
-    const coord = createToolCallStreamCoordinator(undefined, undefined, { write_file: validator });
-
-    runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    let call: ReturnType<typeof runToolCall> | undefined;
+    expect(() => {
+      call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(call?.schemaValid).toBe(false);
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
-    expect(diag?.message).toContain("custom: nope");
-    expect(diag?.message).toContain("custom: also nope");
+    expect(diag?.message ?? "").toContain("threw instead of returning a result");
+    expect(diag?.message ?? "").toContain("boom: this validator is broken");
   });
 
-  it("a caller-owned validator can appear alongside a raw JSON Schema entry in the same registration map", () => {
-    const validateFn: ToolInputValidator = { validate: () => ({ valid: true }) };
-    const schemas = {
-      tool_a: validateFn,
-      tool_b: { type: "object", properties: { x: { type: "string" } }, required: ["x"] },
-    };
-
-    expect(runToolCall(createToolCallStreamCoordinator(undefined, undefined, schemas), "tool_a", "{}")?.schemaValid).toBe(true);
-    expect(
-      runToolCall(createToolCallStreamCoordinator(undefined, undefined, schemas), "tool_b", '{"x":1}')?.schemaValid,
-    ).toBe(false);
-  });
-
-  it("a null toolSchemas entry is treated as a (malformed) schema, not misread as a validator", () => {
-    // TypeScript's own `object` type already excludes null, so a well-typed
-    // caller cannot hit this - the runtime guard is for JS callers or code
-    // that bypasses the type system. typeof null === "object" is JS's
-    // well-known quirk; the entry-detection guard's explicit `!== null`
-    // check exists specifically so this falls through to schema compilation
-    // instead of being mistaken for a ToolInputValidator (which would then
-    // throw a much more confusing "validate is not a function" error at
-    // call time instead of failing fast, here, at registration).
+  it("a null/non-object schemas entry still fails fast at construction (typeof null === \"object\" guarded correctly)", () => {
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: null as never })).toThrow();
-  });
-
-  it("a non-object toolSchemas entry (neither a validator nor a schema) still fails fast, not silently", () => {
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: "not a schema" as never })).toThrow();
-    expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: 42 as never })).toThrow();
   });
 });
 
-describe("Validator independence: prefix-safe-json/ajv", () => {
+describe("prefix-safe-json/ajv", () => {
   it("createAjvValidator() compiles a schema once, reusable across coordinators", () => {
-    const validator = createAjvValidator({ type: "object", required: ["x"] });
-
-    const first = createToolCallStreamCoordinator(undefined, undefined, { t: validator });
-    const second = createToolCallStreamCoordinator(undefined, undefined, { t: validator });
-
+    const validator = createAjvValidator({ type: "object", required: ["x"], properties: { x: { type: "number" } } });
+    const first = createToolCallStreamCoordinator(undefined, undefined, undefined, { t: validator });
     expect(runToolCall(first, "t", '{"x":1}')?.schemaValid).toBe(true);
+    const second = createToolCallStreamCoordinator(undefined, undefined, undefined, { t: validator });
     expect(runToolCall(second, "t", "{}")?.schemaValid).toBe(false);
   });
 
@@ -96,37 +132,37 @@ describe("Validator independence: prefix-safe-json/ajv", () => {
   });
 });
 
-describe("Validator independence: prefix-safe-json/standard-schema", () => {
+describe("prefix-safe-json/standard-schema", () => {
   function fakeStandardSchema(check: (value: unknown) => boolean) {
     return {
       "~standard": {
         validate: (value: unknown) =>
-          check(value)
-            ? { value }
-            : { issues: [{ message: "failed the fake check", path: ["path"] }] },
+          check(value) ? { value } : { issues: [{ message: "failed the fake check", path: ["path"] }] },
       },
     };
   }
 
   it("adapts a synchronous Standard Schema-shaped validator's success case", () => {
     const validator = fromStandardSchema(fakeStandardSchema((v) => typeof (v as { path?: unknown }).path === "string"));
-    const coord = createToolCallStreamCoordinator(undefined, undefined, { write_file: validator });
-
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
     expect(runToolCall(coord, "write_file", '{"path":"a.txt"}')?.schemaValid).toBe(true);
   });
 
   it("adapts a synchronous Standard Schema-shaped validator's failure case, formatting issues as strings", () => {
     const validator = fromStandardSchema(fakeStandardSchema(() => false));
-    const coord = createToolCallStreamCoordinator(undefined, undefined, { write_file: validator });
-
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
     runToolCall(coord, "write_file", "{}");
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
-    expect(diag?.message).toContain("path failed the fake check");
+    expect(diag?.message ?? "").toContain("path failed the fake check");
   });
 
-  it("throws a clear error for an async Standard Schema validator rather than silently mishandling it", () => {
+  it("an async Standard Schema validator fails loudly and closed: the adapter throws, the coordinator catches it as valid:false rather than crashing", () => {
     const asyncSchema = { "~standard": { validate: async () => ({ value: {} }) } };
     const validator = fromStandardSchema(asyncSchema);
     expect(() => validator.validate({})).toThrow(/synchronous/);
+
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
   });
 });

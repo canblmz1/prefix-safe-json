@@ -29,7 +29,7 @@ function formatIssue(issue: StandardSchemaResult["issues"] extends ReadonlyArray
 }
 
 /**
- * @public (Stable)
+ * @public (Experimental)
  * Wraps any Standard Schema (https://standardschema.dev)-compliant
  * validator - Zod 4+, Valibot, ArkType, and others already implement this
  * without any adapter of their own - as a {@link ToolInputValidator}. Adds

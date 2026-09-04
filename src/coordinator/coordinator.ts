@@ -1,6 +1,6 @@
 import { IncrementalJsonParser, ParserOptions } from "../types.js";
 import { createParser } from "../parser.js";
-import { resolveValidatorEntry, type ToolInputValidator, type ToolValidatorEntry } from "../validation/types.js";
+import { buildValidatorMap, type ToolInputValidator, type ToolValidationResult } from "../validation/types.js";
 import { NormalizedToolStreamEvent, ProviderName, StreamEndReason } from "./protocol.js";
 import {
   ToolCallStreamCoordinator,
@@ -77,35 +77,38 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
    *   underlying per-call IncrementalJsonParser (limits, repairs). Previously
    *   there was no way to pass the latter through at all; every parser the
    *   coordinator created was hardcoded to library defaults.
-   * @param toolSchemas Optional per-tool validation, keyed by tool name.
-   *   Each entry is either a {@link ToolInputValidator} or a raw JSON
-   *   Schema (draft-07) object - a schema value is detected structurally
-   *   (no `validate` method) and compiled through the same lazy Ajv
-   *   adapter `prefix-safe-json/ajv`'s `createAjvValidator()` uses
-   *   directly, so existing callers passing JSON Schema objects need no
-   *   code change. See `docs/VALIDATION.md`. When a call for a registered
-   *   tool reaches outcome "complete", its `stableValue` is validated.
-   *   Structural prefix-safety (no truncated/fabricated values) and
-   *   validator-reported validity are independent concerns — a value can
-   *   be genuinely complete and still not match what the tool declared it
-   *   needs (wrong type, missing required field the model never provided
-   *   at all). Both must hold for `executable` to be true. Entries are
-   *   resolved eagerly here so a malformed schema fails fast at
-   *   construction, not mid-stream.
+   * @param toolSchemas Optional raw JSON Schema (draft-07) per tool name,
+   *   compiled internally through `prefix-safe-json/ajv`'s
+   *   `createAjvValidator()`. This is the pre-0.5 option, unchanged in
+   *   shape - existing callers need no code change.
+   * @param validators Optional {@link ToolInputValidator} per tool name -
+   *   additive, 0.5.0+. Use this to plug in Zod, TypeBox, Valibot, a
+   *   Standard Schema-compliant validator, or a hand-written check, with no
+   *   forced dependency on this package's own validation stack. A tool name
+   *   present in both `toolSchemas` and `validators` is a construction-time
+   *   error - there is no structural discrimination or silent precedence
+   *   between the two; each tool's validation comes from exactly one
+   *   explicit source. See `docs/VALIDATION.md`.
+   *
+   *   When a call for a registered tool reaches outcome "complete", its
+   *   `stableValue` is validated. Structural prefix-safety (no
+   *   truncated/fabricated values) and validator-reported validity are
+   *   independent concerns — a value can be genuinely complete and still
+   *   not match what the tool declared it needs (wrong type, missing
+   *   required field the model never provided at all). Both must hold for
+   *   `executable` to be true. Entries are resolved eagerly here so a
+   *   malformed schema (or a misconfigured validator's constructor-time
+   *   setup) fails fast at construction, not mid-stream.
    */
   constructor(
     limits?: Partial<CoordinatorLimits>,
     parserOptions?: ParserOptions,
-    toolSchemas?: Record<string, ToolValidatorEntry>,
+    toolSchemas?: Record<string, object>,
+    validators?: Record<string, ToolInputValidator>,
   ) {
     this.limits = { ...DEFAULT_COORDINATOR_LIMITS, ...limits };
     this.parserOptions = parserOptions;
-    this.toolValidators = new Map();
-    if (toolSchemas) {
-      for (const [toolName, entry] of Object.entries(toolSchemas)) {
-        this.toolValidators.set(toolName, resolveValidatorEntry(entry));
-      }
-    }
+    this.toolValidators = buildValidatorMap(toolSchemas, validators);
   }
 
   push(event: NormalizedToolStreamEvent): CoordinatorPushResult {
@@ -428,9 +431,33 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     if (outcome === "complete" && call.name !== undefined) {
       const validator = this.toolValidators.get(call.name);
       if (validator) {
-        const result = validator.validate(res.stableValue);
-        call.schemaValid = result.valid;
-        if (!result.valid) {
+        // A validator that throws (e.g. a Standard Schema adapter refusing
+        // an async validator - see docs/VALIDATION.md) fails this one call
+        // closed rather than aborting the whole stream: caught here, not
+        // left to propagate out of push()/finish() and take every other
+        // in-flight call down with it.
+        let didThrow = false;
+        let thrown: unknown;
+        let result: ToolValidationResult | undefined;
+        try {
+          result = validator.validate(res.stableValue);
+        } catch (error) {
+          didThrow = true;
+          thrown = error;
+        }
+
+        if (didThrow) {
+          call.schemaValid = false;
+          this.addDiagnostic({
+            code: "E_SCHEMA_VALIDATION_FAILED",
+            severity: "error",
+            internalId: call.internalId,
+            message: `Validator for "${call.name}" threw instead of returning a result: ${
+              thrown instanceof Error ? thrown.message : String(thrown)
+            }`,
+          });
+        } else if (result && !result.valid) {
+          call.schemaValid = false;
           const errors = (result.errors ?? []).join("; ");
           this.addDiagnostic({
             code: "E_SCHEMA_VALIDATION_FAILED",
@@ -438,6 +465,8 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
             internalId: call.internalId,
             message: `Tool call arguments for "${call.name}" do not match its schema: ${errors || "unknown validation error"}`,
           });
+        } else if (result) {
+          call.schemaValid = result.valid;
         }
       }
     }
@@ -592,7 +621,8 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
 export function createToolCallStreamCoordinator(
   limits?: Partial<CoordinatorLimits>,
   parserOptions?: ParserOptions,
-  toolSchemas?: Record<string, ToolValidatorEntry>,
+  toolSchemas?: Record<string, object>,
+  validators?: Record<string, ToolInputValidator>,
 ): ToolCallStreamCoordinator {
-  return new DefaultToolCallStreamCoordinator(limits, parserOptions, toolSchemas);
+  return new DefaultToolCallStreamCoordinator(limits, parserOptions, toolSchemas, validators);
 }

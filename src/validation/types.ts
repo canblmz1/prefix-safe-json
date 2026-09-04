@@ -1,3 +1,5 @@
+import { createAjvValidator } from "./ajv-validator.js";
+
 /**
  * @public (Stable)
  * The result of validating one tool call's arguments. Structurally minimal
@@ -12,7 +14,7 @@ export type ToolValidationResult =
   | { readonly valid: false; readonly errors?: readonly string[] };
 
 /**
- * @public (Stable)
+ * @public (Experimental)
  * The validation boundary this package's execution-authority core depends
  * on. It is deliberately not `ajv`, `zod`, `typebox`, `valibot`, or any
  * other specific ecosystem's own type - implement this against whichever
@@ -25,10 +27,12 @@ export type ToolValidationResult =
  * still have to hold too. See `docs/EXECUTION_GATE.md`.
  *
  * Contract:
- * - `validate` runs synchronously and returns a result; it must not throw
- *   for a merely-invalid value (throwing is reserved for validator
- *   misconfiguration, mirroring how a malformed JSON Schema already fails
- *   fast at construction rather than mid-stream).
+ * - `validate` runs synchronously and returns a result. It may throw to
+ *   signal validator misconfiguration (mirroring how a malformed JSON
+ *   Schema already fails fast at construction rather than mid-stream); the
+ *   coordinator treats a thrown `validate()` as `valid: false` for that one
+ *   call rather than letting the exception abort the whole stream - see
+ *   `docs/VALIDATION.md#a-validator-that-throws`.
  * - `validate` must be deterministic and free of side effects - it is called
  *   with the call's already-parsed, already-complete `stableValue`, and its
  *   return value must depend only on that input.
@@ -38,45 +42,34 @@ export interface ToolInputValidator {
 }
 
 /**
- * @public (Stable)
- * A registered per-tool validator entry: either a `ToolInputValidator`
- * directly, or a JSON Schema (draft-07) object, kept for backwards
- * compatibility with the pre-0.5 `toolSchemas` shape. A raw JSON Schema
- * value is detected structurally (it has no `validate` method) and
- * compiled internally through the same lazy Ajv adapter `createAjvValidator`
- * (from `prefix-safe-json/ajv`) uses directly - existing callers passing
- * JSON Schema objects need no code change.
- */
-export type ToolValidatorEntry = ToolInputValidator | object;
-
-function hasValidateMethod(value: unknown): value is ToolInputValidator {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { validate?: unknown }).validate === "function"
-  );
-}
-
-/**
  * @internal
- * Normalizes one registered `ToolValidatorEntry` into a `ToolInputValidator`,
- * compiling a raw JSON Schema value through the lazy Ajv adapter on demand.
- * Kept out of the coordinator's own module scope so a caller who only ever
- * passes real `ToolInputValidator` instances never causes `ajv` to be
- * imported at all. Synchronous because the coordinator compiles schemas
- * eagerly at construction time - a malformed schema fails fast rather than
- * mid-stream - which requires a synchronous path; `ajv` is loaded via a
- * lazy, synchronous `require` (see `ajv-validator.ts`, which owns the
- * actual `createRequire` call) so this still only touches `ajv` when a raw
- * JSON Schema value is present.
+ * Builds the coordinator's internal per-tool validator map from the two
+ * explicit, separate registration options. There is no structural/duck-type
+ * discrimination anywhere in this path - `schemas` entries are always
+ * compiled as JSON Schema, `validators` entries are always used as-is, and
+ * a tool name present in both is a construction-time error rather than a
+ * silently-resolved precedence rule. See `docs/VALIDATION.md`.
  */
-export function resolveValidatorEntry(entry: ToolValidatorEntry): ToolInputValidator {
-  if (hasValidateMethod(entry)) return entry;
-  return createAjvValidatorSync(entry);
+export function buildValidatorMap(
+  schemas: Record<string, object> | undefined,
+  validators: Record<string, ToolInputValidator> | undefined,
+): Map<string, ToolInputValidator> {
+  const map = new Map<string, ToolInputValidator>();
+  if (schemas) {
+    for (const [toolName, schema] of Object.entries(schemas)) {
+      map.set(toolName, createAjvValidator(schema));
+    }
+  }
+  if (validators) {
+    for (const [toolName, validator] of Object.entries(validators)) {
+      if (map.has(toolName)) {
+        throw new Error(
+          `prefix-safe-json: tool ${JSON.stringify(toolName)} is registered in both "schemas" and ` +
+            `"validators" - a tool's validation must come from exactly one source. Remove one registration.`,
+        );
+      }
+      map.set(toolName, validator);
+    }
+  }
+  return map;
 }
-
-// Re-exported indirection so this module never has a static/top-level
-// dependency on ajv-validator.ts's own `createRequire` machinery - kept as
-// a plain function import (not `import type`) because it is genuinely
-// called, but the module it comes from performs no work at import time.
-import { createAjvValidator as createAjvValidatorSync } from "./ajv-validator.js";

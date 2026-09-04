@@ -59,7 +59,7 @@ export interface ToolCallState {
  */
 export type JsonSchemaLike = object;
 
-export type { ToolInputValidator, ToolValidationResult, ToolValidatorEntry } from "../validation/types.js";
+export type { ToolInputValidator, ToolValidationResult } from "../validation/types.js";
 
 export interface ToolCallCoordinatorSnapshot {
   readonly calls: readonly ToolCallState[];
