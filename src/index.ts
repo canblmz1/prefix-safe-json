@@ -68,6 +68,17 @@ export type {
   CoordinatorDiagnostic,
 } from "./coordinator/types.js";
 export type { NormalizedToolStreamEvent, ProviderName } from "./coordinator/protocol.js";
+
+/**
+ * @public (Stable)
+ * The validation boundary every `toolSchemas`/`schemas` option accepts one
+ * entry of, alongside a raw JSON Schema object for backwards compatibility.
+ * Implement this against whichever validator your project already uses -
+ * Zod, TypeBox, Valibot, a hand-written check, anything - with no forced
+ * dependency on this package's own validation stack. See
+ * `docs/VALIDATION.md`.
+ */
+export type { ToolInputValidator, ToolValidationResult, ToolValidatorEntry } from "./validation/types.js";
 /**
  * @public (Stable)
  * Diagnostic code a custom `ProviderStreamAdapter` can emit (as a

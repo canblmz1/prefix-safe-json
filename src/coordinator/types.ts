@@ -37,9 +37,9 @@ export interface ToolCallState {
     | "sdk_execution_observed";
 
   /**
-   * Result of validating `parser.stableValue` against the JSON Schema
+   * Result of validating `parser.stableValue` against the validator
    * registered for this call's tool name (see `toolSchemas` on
-   * `createToolCallStreamCoordinator`). `undefined` when no schema was
+   * `createToolCallStreamCoordinator`). `undefined` when no validator was
    * registered for this tool, or the call never reached a "complete"
    * outcome (there's nothing meaningful to validate). This is a *separate*
    * concern from `parser.executable` — that flag means "the data is
@@ -58,6 +58,8 @@ export interface ToolCallState {
  * on this package's own schema typings.
  */
 export type JsonSchemaLike = object;
+
+export type { ToolInputValidator, ToolValidationResult, ToolValidatorEntry } from "../validation/types.js";
 
 export interface ToolCallCoordinatorSnapshot {
   readonly calls: readonly ToolCallState[];

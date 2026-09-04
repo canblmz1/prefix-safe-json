@@ -1,5 +1,5 @@
 import { StreamEndReason } from "../coordinator/protocol.js";
-import { CoordinatorLimits, JsonSchemaLike } from "../coordinator/types.js";
+import { CoordinatorLimits, ToolValidatorEntry } from "../coordinator/types.js";
 import {
   ToolCallExecutionGateFinalResult,
   ExecutionDecision,
@@ -41,11 +41,12 @@ export interface ExecutionGuard<TRawEvent = unknown> {
 /** Options accepted by every high-level provider execution guard factory. */
 export interface ExecutionGuardOptions {
   /**
-   * Optional JSON Schema (draft-07) per tool name - same option
+   * Optional per-tool validation, keyed by tool name - same option
    * `createToolCallExecutionGate()`/`createToolCallStreamCoordinator()`
-   * accept as their third constructor argument.
+   * accept as their third constructor argument. Each entry is either a
+   * `ToolInputValidator` or a raw JSON Schema (draft-07) object.
    */
-  schemas?: Record<string, JsonSchemaLike>;
+  schemas?: Record<string, ToolValidatorEntry>;
 
   /** Coordinator-level limits (concurrent tool calls, tool name size, etc.). */
   limits?: Partial<CoordinatorLimits>;

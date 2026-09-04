@@ -12,9 +12,9 @@ import { createToolCallStreamCoordinator } from "../coordinator/coordinator.js";
 import {
   CoordinatorLimits,
   CoordinatorPushResult,
-  JsonSchemaLike,
   ToolCallCoordinatorEvent,
   ToolCallStreamCoordinator,
+  ToolValidatorEntry,
 } from "../coordinator/types.js";
 import { NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ParserOptions } from "../types.js";
@@ -44,7 +44,7 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
   constructor(
     limits?: Partial<CoordinatorLimits>,
     parserOptions?: ParserOptions,
-    toolSchemas?: Record<string, JsonSchemaLike>,
+    toolSchemas?: Record<string, ToolValidatorEntry>,
   ) {
     this.coordinator = createToolCallStreamCoordinator(limits, parserOptions, toolSchemas);
   }
@@ -161,7 +161,7 @@ class DefaultToolCallExecutionGate implements ToolCallExecutionGate {
 export function createToolCallExecutionGate(
   limits?: Partial<CoordinatorLimits>,
   parserOptions?: ParserOptions,
-  toolSchemas?: Record<string, JsonSchemaLike>,
+  toolSchemas?: Record<string, ToolValidatorEntry>,
 ): ToolCallExecutionGate {
   return new DefaultToolCallExecutionGate(limits, parserOptions, toolSchemas);
 }
