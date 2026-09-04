@@ -63,22 +63,12 @@ function hasValidateMethod(value: unknown): value is ToolInputValidator {
  * compiling a raw JSON Schema value through the lazy Ajv adapter on demand.
  * Kept out of the coordinator's own module scope so a caller who only ever
  * passes real `ToolInputValidator` instances never causes `ajv` to be
- * imported at all.
- */
-export async function resolveValidatorEntryAsync(entry: ToolValidatorEntry): Promise<ToolInputValidator> {
-  if (hasValidateMethod(entry)) return entry;
-  const { createAjvValidator } = await import("./ajv-validator.js");
-  return createAjvValidator(entry);
-}
-
-/**
- * @internal
- * Synchronous counterpart of {@link resolveValidatorEntryAsync}. The
- * coordinator compiles schemas eagerly at construction time so a malformed
- * schema fails fast rather than mid-stream, which requires a synchronous
- * path - `ajv` is loaded via a lazy, synchronous `require` (see
- * `ajv-validator.ts`, which owns the actual `createRequire` call) so this
- * still only touches `ajv` when a raw JSON Schema value is present.
+ * imported at all. Synchronous because the coordinator compiles schemas
+ * eagerly at construction time - a malformed schema fails fast rather than
+ * mid-stream - which requires a synchronous path; `ajv` is loaded via a
+ * lazy, synchronous `require` (see `ajv-validator.ts`, which owns the
+ * actual `createRequire` call) so this still only touches `ajv` when a raw
+ * JSON Schema value is present.
  */
 export function resolveValidatorEntry(entry: ToolValidatorEntry): ToolInputValidator {
   if (hasValidateMethod(entry)) return entry;

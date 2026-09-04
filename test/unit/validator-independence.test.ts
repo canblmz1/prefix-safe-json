@@ -61,6 +61,23 @@ describe("Validator independence: ToolInputValidator", () => {
       runToolCall(createToolCallStreamCoordinator(undefined, undefined, schemas), "tool_b", '{"x":1}')?.schemaValid,
     ).toBe(false);
   });
+
+  it("a null toolSchemas entry is treated as a (malformed) schema, not misread as a validator", () => {
+    // TypeScript's own `object` type already excludes null, so a well-typed
+    // caller cannot hit this - the runtime guard is for JS callers or code
+    // that bypasses the type system. typeof null === "object" is JS's
+    // well-known quirk; the entry-detection guard's explicit `!== null`
+    // check exists specifically so this falls through to schema compilation
+    // instead of being mistaken for a ToolInputValidator (which would then
+    // throw a much more confusing "validate is not a function" error at
+    // call time instead of failing fast, here, at registration).
+    expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: null as never })).toThrow();
+  });
+
+  it("a non-object toolSchemas entry (neither a validator nor a schema) still fails fast, not silently", () => {
+    expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: "not a schema" as never })).toThrow();
+    expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: 42 as never })).toThrow();
+  });
 });
 
 describe("Validator independence: prefix-safe-json/ajv", () => {
