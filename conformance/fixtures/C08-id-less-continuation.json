@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "C08-id-less-continuation",
+  "description": "Identity fields (toolCallId, toolIndex, name) are carried once on tool_call_start and never repeated on continuation deltas - only callRef.sourceKey is - matching how a real provider adapter emits these once it has resolved identity. Correlation must work from sourceKey alone.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "project": "continuedev/continue",
+    "note": "Generalizes the class of bug filed and fixed upstream: an id-less continuation fragment must still correlate to the right call, never fall back to array-position or get dropped."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":" },
+    { "type": "tool_call_arguments_delta", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 4, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "execute", "reason": "complete" }
+  ]
+}

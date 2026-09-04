@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "C02-truncated-invalid-json",
+  "description": "The stream ends mid-value: an open string never closes. The parser positively observes a raw truncation, independent of what the provider's own finish reason says.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tok" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "length" },
+    { "type": "provider_stream_end", "sequence": 4, "provider": "openai", "reason": "length" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "retry", "reason": "truncated" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "C14-malformed-json",
+  "description": "The accumulated arguments are a genuine content defect - a duplicate key - independent of how the stream ended. Retrying the identical input would not fix it.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\",\"city\":\"Osaka\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 4, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "malformed" }
+  ]
+}

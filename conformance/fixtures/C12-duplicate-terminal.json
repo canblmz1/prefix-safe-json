@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "C12-duplicate-terminal",
+  "description": "A provider adapter detects, from raw wire evidence, a second terminal signal for a call that already ended, and reports this explicitly as a provider_diagnostic (this detection happens in the adapter against raw provider events, not at this normalized layer - a bare duplicate tool_call_end with no such diagnostic is otherwise idempotent and does not by itself change an already-complete call's outcome). Once reported, the coordinator/gate must fail the call closed.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "note": "Models E_DUPLICATE_TOOL_END, emitted by every current provider adapter (OpenAI, Anthropic, Gemini, the AI SDK adapter) when raw evidence shows a genuine second terminal event for the same call."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_diagnostic", "sequence": 4, "provider": "openai", "code": "E_DUPLICATE_TOOL_END", "severity": "error", "callRef": { "sourceKey": "call:0" }, "message": "A second terminal event arrived for a call that already ended." },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "protocol_violation" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "id": "C04-unsafe-finish-length",
+  "description": "The stream stops abruptly for the whole response (max output tokens reached) while a call is still collecting arguments - the call never gets its own terminal event at all. This is the more common real-world shape of a length cutoff: the provider simply stops sending events, rather than sending an explicit unsafe reason on the call itself (see C03 for that variant). A call abandoned this way - never explicitly terminated at all, not even with a truncation signal - is a stronger anomaly than an acknowledged truncation and fails closed harder: reject, not retry.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "provider_stream_end", "sequence": 3, "provider": "openai", "reason": "length" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "malformed" }
+  ]
+}

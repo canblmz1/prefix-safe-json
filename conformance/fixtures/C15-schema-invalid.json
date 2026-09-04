@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "id": "C15-schema-invalid",
+  "description": "The arguments are structurally complete and unfabricated, but do not match the tool's own declared schema (missing required field). Prefix-safety and schema validity are independent checks - both must hold for execute.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "write_file" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"path\":\"a.txt\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 4, "provider": "openai", "reason": "complete" }
+  ],
+  "toolSchemas": {
+    "write_file": {
+      "type": "object",
+      "properties": { "path": { "type": "string" }, "content": { "type": "string" } },
+      "required": ["path", "content"]
+    }
+  },
+  "expected": [
+    { "name": "write_file", "action": "reject", "reason": "schema_invalid" }
+  ]
+}

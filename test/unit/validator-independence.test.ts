@@ -80,11 +80,13 @@ describe("Validator independence: prefix-safe-json/ajv", () => {
 });
 
 describe("Validator independence: prefix-safe-json/standard-schema", () => {
-  function fakeStandardSchema(check: (value: unknown) => boolean): { "~standard": { validate: (v: unknown) => unknown } } {
+  function fakeStandardSchema(check: (value: unknown) => boolean) {
     return {
       "~standard": {
         validate: (value: unknown) =>
-          check(value) ? { value } : { issues: [{ message: "failed the fake check", path: ["path"] }] },
+          check(value)
+            ? { value }
+            : { issues: [{ message: "failed the fake check", path: ["path"] }] },
       },
     };
   }

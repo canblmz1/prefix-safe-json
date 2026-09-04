@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "C07-parallel-calls",
+  "description": "Two tool calls stream concurrently, with their argument deltas interleaved chunk by chunk. Each call's evidence must stay isolated to its own identity and both must resolve independently and correctly.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_a", "name": "tool_a" },
+    { "type": "tool_call_start", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "toolIndex": 1, "toolCallId": "call_b", "name": "tool_b" },
+    { "type": "tool_call_arguments_delta", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"a\":" },
+    { "type": "tool_call_arguments_delta", "sequence": 4, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "delta": "{\"b\":" },
+    { "type": "tool_call_arguments_delta", "sequence": 5, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "1}" },
+    { "type": "tool_call_arguments_delta", "sequence": 6, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "delta": "2}" },
+    { "type": "tool_call_end", "sequence": 7, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "tool_call_end", "sequence": 8, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 9, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "tool_a", "action": "execute", "reason": "complete" },
+    { "name": "tool_b", "action": "execute", "reason": "complete" }
+  ]
+}

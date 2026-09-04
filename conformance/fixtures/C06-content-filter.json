@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "C06-content-filter",
+  "description": "The provider terminates the response for a content-policy reason. Content filtering fails the whole stream closed regardless of how complete any individual call's arguments looked.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_diagnostic", "sequence": 4, "provider": "openai", "code": "E_CONTENT_FILTERED", "severity": "error", "message": "Response terminated by content filter." },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "content_filtered" }
+  ]
+}

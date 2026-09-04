@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "C16-clean-multi-call",
+  "description": "Two tool calls stream sequentially - the first fully completes before the second starts - as distinct from C07's concurrently-interleaved calls. Both must resolve independently and correctly.",
+  "provenance": { "classification": "protocol-realistic" },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_a", "name": "tool_a" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"a\":1}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "tool_call_start", "sequence": 4, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "toolIndex": 1, "toolCallId": "call_b", "name": "tool_b" },
+    { "type": "tool_call_arguments_delta", "sequence": 5, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "delta": "{\"b\":2}" },
+    { "type": "tool_call_end", "sequence": 6, "provider": "openai", "callRef": { "sourceKey": "call:1" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 7, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "tool_a", "action": "execute", "reason": "complete" },
+    { "name": "tool_b", "action": "execute", "reason": "complete" }
+  ]
+}

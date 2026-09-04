@@ -39,6 +39,10 @@
     "./standard-schema": {
       "types": "./dist/standard-schema.d.ts",
       "import": "./dist/standard-schema.js"
+    },
+    "./conformance": {
+      "types": "./dist/conformance.d.ts",
+      "import": "./dist/conformance.js"
     }
   },
   "files": [
