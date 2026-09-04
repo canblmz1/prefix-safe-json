@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C01-clean-single-call",
   "description": "One tool call streams complete, well-formed arguments and the provider reports a normal completion.",
   "provenance": { "classification": "protocol-realistic" },

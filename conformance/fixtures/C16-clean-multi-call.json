@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C16-clean-multi-call",
   "description": "Two tool calls stream sequentially - the first fully completes before the second starts - as distinct from C07's concurrently-interleaved calls. Both must resolve independently and correctly.",
   "provenance": { "classification": "protocol-realistic" },

@@ -35,6 +35,12 @@ function matchDecision(
  * exactly as a provider adapter would produce them.
  */
 export function runToolCallIntegrityFixture(fixture: ConformanceFixture): ConformanceFixtureResult {
+  if (fixture.profile !== "normalized-gate") {
+    throw new Error(
+      `prefix-safe-json: fixture "${fixture.id}" declares profile ${JSON.stringify(fixture.profile)}, ` +
+        `which this runner does not support (only "normalized-gate" exists in v1). See docs/CONFORMANCE.md.`,
+    );
+  }
   const gate = createToolCallExecutionGate(undefined, undefined, fixture.toolSchemas);
   for (const event of fixture.events) gate.push(event);
   const { decisions } = gate.finish();

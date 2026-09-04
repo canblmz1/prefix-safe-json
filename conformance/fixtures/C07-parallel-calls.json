@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C07-parallel-calls",
   "description": "Two tool calls stream concurrently, with their argument deltas interleaved chunk by chunk. Each call's evidence must stay isolated to its own identity and both must resolve independently and correctly.",
   "provenance": { "classification": "protocol-realistic" },

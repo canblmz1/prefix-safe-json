@@ -47,6 +47,26 @@ export interface ConformanceExpectedCall {
 
 /**
  * @public (Experimental)
+ * Which conformance claim a fixture makes, made explicit rather than
+ * implied by the corpus's own name. `"normalized-gate"` is the only
+ * profile v1 defines:
+ *
+ * A `"normalized-gate"` fixture tests the coordinator/execution-gate's
+ * response to an already-normalized `NormalizedToolStreamEvent` sequence -
+ * identity correlation, lifecycle/terminal-state handling, and decision
+ * composition, entirely *after* a provider adapter has already produced
+ * that sequence. It does NOT test, and must never be described as
+ * testing, whether an adapter correctly derives that sequence (or a
+ * `provider_diagnostic` within it) from a specific provider's own raw
+ * wire format - that is provider-adapter conformance, a distinct,
+ * currently unwritten profile. See `docs/CONFORMANCE.md`'s "Provider-
+ * adapter conformance — future profile / not covered by normalized-gate
+ * v1" section for exactly what this excludes and why.
+ */
+export type ConformanceProfile = "normalized-gate";
+
+/**
+ * @public (Experimental)
  * A single, portable tool-call-integrity conformance fixture: a
  * provider-neutral normalized event sequence and the execution-authority
  * decision it must produce. Deliberately expressed in terms of
@@ -56,7 +76,8 @@ export interface ConformanceExpectedCall {
  * read or reuse. See `docs/CONFORMANCE.md`.
  */
 export interface ConformanceFixture {
-  readonly version: 1;
+  readonly schemaVersion: 1;
+  readonly profile: ConformanceProfile;
   readonly id: string;
   readonly description: string;
   readonly provenance: FixtureProvenance;

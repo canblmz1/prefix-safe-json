@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C02-truncated-invalid-json",
   "description": "The stream ends mid-value: an open string never closes. The parser positively observes a raw truncation, independent of what the provider's own finish reason says.",
   "provenance": { "classification": "protocol-realistic" },

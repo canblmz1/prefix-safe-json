@@ -1,11 +1,11 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C08-id-less-continuation",
-  "description": "Identity fields (toolCallId, toolIndex, name) are carried once on tool_call_start and never repeated on continuation deltas - only callRef.sourceKey is - matching how a real provider adapter emits these once it has resolved identity. Correlation must work from sourceKey alone.",
+  "description": "Tests the coordinator/gate's own identity correlation given an already-normalized event sequence where identity fields (toolCallId, toolIndex, name) are carried once on tool_call_start and never repeated on continuation deltas - only callRef.sourceKey is. This does NOT test whether any provider adapter correctly derives a stable sourceKey from a raw, id-less wire-format continuation fragment (e.g. OpenAI's index-only delta shape) - that derivation is a provider-adapter concern outside the normalized-gate profile, covered instead by this package's own internal corpus/provider-envelopes/ fixtures. Here, sourceKey continuity is simply given; the fixture only proves the gate correlates by it correctly once given.",
   "provenance": {
     "classification": "protocol-realistic",
-    "project": "continuedev/continue",
-    "note": "Generalizes the class of bug filed and fixed upstream: an id-less continuation fragment must still correlate to the right call, never fall back to array-position or get dropped."
+    "note": "Motivated by, but not a reproduction of, a real upstream bug class (continuedev/continue) where an id-less raw continuation fragment was mis-correlated at the adapter/accumulation layer. This fixture tests the analogous invariant one layer up, at the normalized-gate boundary this package owns."
   },
   "events": [
     { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },

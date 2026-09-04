@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C03-truncated-but-valid-json",
   "description": "The canonical 'unsafe finish reason' case: the JSON that arrived is syntactically complete and would parse cleanly, but the stream ended for a reason other than a genuine completion (length). Structural validity is not the same fact as confirmed completion - this fixture is the whole thesis of the package.",
   "provenance": {

@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C15-schema-invalid",
   "description": "The arguments are structurally complete and unfabricated, but do not match the tool's own declared schema (missing required field). Prefix-safety and schema validity are independent checks - both must hold for execute.",
   "provenance": { "classification": "protocol-realistic" },

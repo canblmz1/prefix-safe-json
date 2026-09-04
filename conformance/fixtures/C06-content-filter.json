@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C06-content-filter",
   "description": "The provider terminates the response for a content-policy reason. Content filtering fails the whole stream closed regardless of how complete any individual call's arguments looked.",
   "provenance": { "classification": "protocol-realistic" },

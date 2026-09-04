@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C09-conflicting-identity",
   "description": "A second tool_call_start arrives for a sourceKey that already has an active call - a genuine protocol anomaly, not a legitimate continuation. Must fail closed rather than silently merging or overwriting the first call's identity.",
   "provenance": { "classification": "synthetic-adversarial", "note": "No specific provider observed sending this; stresses a defensive invariant." },

@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
   "id": "C05-provider-error",
   "description": "The provider stream itself ends with a provider-side error, independent of how complete any individual call's arguments looked.",
   "provenance": { "classification": "protocol-realistic" },

@@ -2,10 +2,15 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Tool Call Integrity conformance fixture",
   "type": "object",
-  "required": ["version", "id", "description", "provenance", "events", "expected"],
+  "required": ["schemaVersion", "profile", "id", "description", "provenance", "events", "expected"],
   "additionalProperties": false,
   "properties": {
-    "version": { "type": "integer", "const": 1 },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "profile": {
+      "type": "string",
+      "const": "normalized-gate",
+      "description": "What this fixture proves. \"normalized-gate\" tests the coordinator/execution-gate's response to an already-normalized NormalizedToolStreamEvent sequence - never raw provider-wire parsing or adapter-level detection. See docs/CONFORMANCE.md."
+    },
     "id": { "type": "string", "pattern": "^C[0-9]+-[a-z0-9-]+$" },
     "description": { "type": "string" },
     "provenance": {
