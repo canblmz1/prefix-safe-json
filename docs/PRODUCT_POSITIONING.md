@@ -106,6 +106,28 @@ summary is drawn from.
   throughout the project's documentation are deliberate about this — see
   the security-language guidance embedded in `docs/THREAT_MODEL.md`.
 
+## Public API surface
+
+The README leads with exactly one high-level entry point
+(`createAiSdkExecutionGuard()` + `createAiSdkExecutionLock()`) on purpose.
+The rest of the public surface exists and is fully supported, but is not
+what a first-time reader should have to choose between:
+
+| Surface | Examples | Classification |
+| --- | --- | --- |
+| High-level guard | `createAiSdkExecutionGuard`, `createAiSdkExecutionLock` | **CORE** — the recommended entry point for AI SDK users |
+| Execution gate | `createToolCallExecutionGate` | **CORE** — the recommended entry point for every other provider |
+| Provider adapters | `OpenAIStreamAdapter`, `AnthropicStreamAdapter`, `GeminiStreamAdapter`, `OpenRouterStreamAdapter`, `OpenAICompatibleStreamAdapter`, `AiSdkStreamAdapter` | **INTEGRATION** — what the gate composes with per provider |
+| Validation adapters | `ToolInputValidator`, `prefix-safe-json/ajv`, `prefix-safe-json/standard-schema` | **INTEGRATION** — optional, bring-your-own-validator boundary |
+| Conformance | `prefix-safe-json/conformance` | **EXPERIMENTAL** — new in 0.5.0; the fixture format and runner shape may still change based on real usage, see `docs/CONFORMANCE.md` |
+| Coordinator | `createToolCallStreamCoordinator` | **LOW-LEVEL** — what the gate is built on; direct use is for callers who need coordinator-level state the gate doesn't expose |
+| Parser | `createParser` | **LOW-LEVEL** — what the coordinator is built on; direct use is for callers parsing something that isn't a tool call at all |
+
+Nothing here is LEGACY as of 0.5.0. This table exists to guide *discovery
+order*, not to override each export's own authoritative stability
+marker (`@public (Stable)` / `@public (Experimental)`) at its source
+location — conformance is the one new surface still marked Experimental.
+
 ## Reference implementation framing
 
 `prefix-safe-json` is the reference implementation of this boundary for
