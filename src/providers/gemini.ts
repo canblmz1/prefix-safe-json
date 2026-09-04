@@ -12,6 +12,14 @@ import {
 interface GeminiFunctionCall {
   name?: string;
   args?: unknown; // Gemini returns a structured value, not raw JSON argument evidence.
+  // P4.5: the official wire field. Confirmed directly against the installed
+  // `@google/genai@2.21.0` SDK's own `FunctionCall` type declaration
+  // ("Optional. The unique id of the function call. If populated, the
+  // client [is expected] to execute the `function_call` and return the
+  // response with the matching `id`.") - explicitly OPTIONAL, never
+  // assumed present. See the class-level doc comment for why this, not
+  // part array position, is the authoritative call identity when present.
+  id?: string;
 }
 
 interface GeminiPart {
@@ -136,6 +144,64 @@ function mapFinishReason(finishReason: string): StreamEndReason {
  * something for action==="execute". See the two-part epistemic
  * distinction in this program's own final report: CORRECTNESS/
  * architecture-consistency, never claimed as an execution-integrity fix.
+ *
+ * Call IDENTITY correction (P4.5, a genuine RED confirmed against real
+ * @google/genai@2.21.0-parsed chunks, not merely inferred): within one
+ * candidate, this adapter used to key each functionCall's own sourceKey by
+ * PART ARRAY POSITION (`candidate:{i}/part:{j}`). Each Gemini functionCall
+ * is object-level final delivery, never incrementally streamed (no
+ * position needs to stay stable WITHIN one call's own lifetime) - but
+ * array position is NOT stable ACROSS separate, unrelated calls delivered
+ * in separate chunks: two genuinely independent functionCalls (confirmed
+ * via the real SDK parser to carry distinct `id`s, distinct names, and
+ * distinct args) that happen to land at the same part-array-position in
+ * their own respective chunks were silently treated as the SAME call - the
+ * second's evidence colliding with and corrupting the first's
+ * already-closed identity (coordinator.ts's own E_DUPLICATE_TOOL_CALL_START
+ * plus a parser E_TRAILING_DATA), with the second call never surfacing as
+ * its own decision at all. This is the same class of identity-loss defect
+ * already found and fixed for candidate identity itself (P4.4) and for
+ * every other provider's own call/item/block identity this session - now
+ * closed at the function-call level too.
+ *
+ * Fixed by preferring the official wire field `functionCall.id` ("Optional.
+ * The unique id of the function call...") as the call identity when a
+ * valid non-empty string is present:
+ *   `candidate:{candidateIndex}/function-call-id:{id}`
+ * `id` is explicitly OPTIONAL per its own doc comment, and confirmed
+ * empirically (real SDK-parsed evidence) that the SDK passes through a
+ * functionCall with no `id` at all without complaint - never assumed
+ * present, never required, never a fail-closed precondition. When absent
+ * (or an empty string, treated identically to absent), this adapter falls
+ * back to a per-candidate, per-adapter-instance MONOTONIC OCCURRENCE
+ * COUNTER (`candidate:{candidateIndex}/function-call:{n}`) - deliberately
+ * NOT part array position: the counter is advanced by THIS adapter's own
+ * processing order, never by anything the provider could reorder or omit
+ * across chunks, so it remains genuinely unique for the adapter's whole
+ * lifetime regardless of where in a `parts[]` array a later, unrelated
+ * no-id call happens to land. This is real, forensically-traceable
+ * identity - never a claim of continuity between separate observations,
+ * and never a byte-level/positional reconstruction.
+ *
+ * A REPEATED identical `functionCall.id` under the same candidate (or a
+ * no-id counter value, which can never repeat by construction) is treated
+ * as late/duplicate evidence for the one already-delivered call that
+ * sourceKey names - exactly TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE's own
+ * existing meaning, reusing `candidateSourceKeys`'s own existing
+ * "every sourceKey ever started, never cleared" tracking rather than a new
+ * mechanism (see push()). Official Gemini semantics document no supported
+ * continuation/streaming mechanism for a single function call at all
+ * (`partialArgs`, `willContinue`, `FunctionCallingConfig.
+ * streamFunctionCallArguments` are all explicitly "not supported in Gemini
+ * API" per the installed SDK's own doc comments) - so a repeated id is
+ * never treated as a legitimate multi-chunk continuation of the same call,
+ * only as suspect duplicate evidence disqualifying the real call it names.
+ * A different `id` under a DIFFERENT candidate is never merged with this
+ * one: identity is candidate-scoped first, exactly as P4.4 already
+ * established - official semantics document `id` only as a response-
+ * correlation mechanism (implying uniqueness where populated) and never
+ * claim a cross-candidate-global uniqueness scope, so candidate-scoping
+ * remains the conservative, evidence-supported default.
  */
 export class GeminiStreamAdapter implements ProviderStreamAdapter<unknown> {
   readonly provider: ProviderName = "gemini";
@@ -164,6 +230,30 @@ export class GeminiStreamAdapter implements ProviderStreamAdapter<unknown> {
   // already-terminal candidate, so a diagnostic attached only to ITS OWN
   // sourceKey could sit forever unresolved and disqualify nothing real).
   private candidateSourceKeys: Map<number, Set<string>> = new Map();
+  // P4.5: candidateIndex -> how many no-`functionCall.id` calls have been
+  // observed under that candidate so far, in THIS adapter's own processing
+  // order. Never reset, only ever incremented immediately before use - the
+  // fallback call identity when `functionCall.id` is absent/empty. Advanced
+  // by local processing order, never by provider-controlled array
+  // position, so it cannot collide across chunks the way raw part index
+  // could (see the class-level doc comment).
+  private noIdFunctionCallCounters: Map<number, number> = new Map();
+
+  // P4.5: the real call identity for one functionCall observation under a
+  // known-valid candidateIndex. Prefers the official `functionCall.id`
+  // when it is a valid, non-empty string; otherwise advances and uses this
+  // candidate's own no-id occurrence counter. The two key shapes
+  // (`function-call-id:` vs `function-call:`) are deliberately distinct so
+  // an id-bearing call and a no-id call can never collide with each other
+  // even if a numeric id happened to look like a counter value.
+  private callSourceKey(candidateIndex: number, fc: GeminiFunctionCall): string {
+    if (typeof fc.id === "string" && fc.id.length > 0) {
+      return `candidate:${candidateIndex}/function-call-id:${fc.id}`;
+    }
+    const next = (this.noIdFunctionCallCounters.get(candidateIndex) ?? 0) + 1;
+    this.noIdFunctionCallCounters.set(candidateIndex, next);
+    return `candidate:${candidateIndex}/function-call:${next - 1}`;
+  }
 
   push(rawEvent: unknown): readonly NormalizedToolStreamEvent[] {
     // No `finished` early return here (Phase B.6) - see the identical fix
@@ -272,10 +362,14 @@ export class GeminiStreamAdapter implements ProviderStreamAdapter<unknown> {
         const candidateAlreadyTerminal = this.candidateTerminalReasons.has(candidateIndex);
 
         if (candidate.content && Array.isArray(candidate.content.parts)) {
-          for (const [partIndex, part] of candidate.content.parts.entries()) {
+          for (const part of candidate.content.parts) {
             if (part.functionCall) {
               const fc = part.functionCall;
-              const sourceKey = `candidate:${candidateIndex}/part:${partIndex}`;
+              // P4.5: real functionCall.id when present, never part array
+              // position - see the class-level doc comment and
+              // callSourceKey()'s own doc comment for the full rationale
+              // and evidence.
+              const sourceKey = this.callSourceKey(candidateIndex, fc);
 
               if (candidateAlreadyTerminal) {
                 // Phase B.5: exact attribution. Each Gemini part is
@@ -316,6 +410,36 @@ export class GeminiStreamAdapter implements ProviderStreamAdapter<unknown> {
                     message: `Tool call evidence for candidate ${candidateIndex} arrived after that candidate's own finishReason`,
                   });
                 }
+                continue;
+              }
+
+              // P4.5: this EXACT call (its own functionCall.id, or - for a
+              // no-id call - its own already-assigned counter value, which
+              // can never repeat by construction) was already delivered
+              // once before under this still-active candidate. Every real
+              // Gemini functionCall is object-level final delivery (see
+              // the class-level doc comment - no supported continuation
+              // mechanism exists), so a repeat of the SAME identity is
+              // late/duplicate evidence for that one already-closed call,
+              // never a legitimate multi-chunk continuation and never
+              // silently merged into it. Exact attribution: this reuses
+              // candidateSourceKeys's own existing "every sourceKey ever
+              // started, never cleared" tracking rather than a new
+              // mechanism - the disqualified call IS this sourceKey
+              // itself, so no "known vs forensic-only" split is needed
+              // here (unlike the candidate-already-terminal branch above,
+              // where the late evidence's own identity is never the thing
+              // being disqualified).
+              if (this.candidateSourceKeys.get(candidateIndex)?.has(sourceKey)) {
+                events.push({
+                  type: "provider_diagnostic",
+                  sequence: ++this.sequence,
+                  provider: this.provider,
+                  callRef: { sourceKey },
+                  code: TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+                  severity: "error",
+                  message: `Tool call evidence for candidate ${candidateIndex} repeats an already-delivered function call (${sourceKey}); call ${sourceKey} is disqualified`,
+                });
                 continue;
               }
 

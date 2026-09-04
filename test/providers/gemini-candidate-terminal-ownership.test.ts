@@ -56,8 +56,13 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
         ],
       });
       const sourceKeys = events.filter((e) => e.type === "tool_call_start").map((e) => (e.callRef as { sourceKey?: string })?.sourceKey);
-      expect(sourceKeys).toContain("candidate:1/part:0");
-      expect(sourceKeys).toContain("candidate:0/part:0");
+      // P4.5: real call identity is functionCall.id when present, else a
+      // per-candidate no-id occurrence counter - never part array
+      // position (see src/providers/gemini.ts's own class-level doc
+      // comment). Neither call here carries an id, so each gets its own
+      // candidate's first (0th) no-id occurrence.
+      expect(sourceKeys).toContain("candidate:1/function-call:0");
+      expect(sourceKeys).toContain("candidate:0/function-call:0");
     });
 
     it("candidate 0 finishes in chunk 1 (two real candidates present); candidate 1 - still active - arrives ALONE in chunk 2, at JS array position 0; candidate 1 remains candidate 1, no evidence is attributed to candidate 0", () => {
@@ -71,15 +76,18 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       });
       // Chunk 2: ONLY candidate index 1 - array position 0 - the exact
       // shape array-position identity could not have told apart from
-      // candidate 0. A leading text part gives the new functionCall its
-      // own part position, isolating candidate identity from the
-      // separate, unrelated part-level sourceKey-reuse concern a second
-      // same-part-index functionCall would also raise.
+      // candidate 0. A leading text part (harmless under P4.5 too - text
+      // parts never consume a no-id functionCall occurrence) keeps this
+      // test's own shape close to its original P4.4 form.
       const lateEvents = drive(adapter, gate, {
         candidates: [{ index: 1, content: { parts: [{ text: "continuing" }, { functionCall: { name: "toolB2", args: { more: true } } }] } } ],
       });
       const lateSourceKeys = lateEvents.map((e) => (e.callRef as { sourceKey?: string })?.sourceKey).filter(Boolean);
-      expect(lateSourceKeys).toContain("candidate:1/part:1");
+      // P4.5: "toolB" (chunk 1) was candidate 1's 0th no-id occurrence;
+      // "toolB2" (chunk 2, this late push) is candidate 1's 1st - the
+      // counter is per-candidate and advances across chunks by processing
+      // order, never by part array position.
+      expect(lateSourceKeys).toContain("candidate:1/function-call:1");
       expect(lateSourceKeys.some((k) => k?.startsWith("candidate:0/"))).toBe(false);
       expect(lateEvents.some((e) => e.code === TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE)).toBe(false);
 
@@ -184,7 +192,8 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       // Attributed to the REAL, already-tracked "collided" call's own
       // sourceKey - not a synthetic "candidate:0" identity that could
       // never resolve to it (Phase B.5's own principle, applied here too).
-      expect(dupEvents.every((e) => (e.callRef as { sourceKey?: string } | undefined)?.sourceKey === "candidate:0/part:0")).toBe(true);
+      // P4.5: "collided" is candidate 0's 0th no-id occurrence.
+      expect(dupEvents.every((e) => (e.callRef as { sourceKey?: string } | undefined)?.sourceKey === "candidate:0/function-call:0")).toBe(true);
       drive(adapter, gate, { candidates: [{ index: 1, finishReason: "STOP" }] });
       for (const e of adapter.finish()) gate.push(e);
 
@@ -252,8 +261,10 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
         candidates: [{ index: 0, content: { parts: [{ text: "x" }, { text: "y" }, { functionCall: { name: "tooLate", args: {} } }] } }],
       });
       const disqualifiedSourceKeys = lateEvents.map((e) => (e.callRef as { sourceKey?: string } | undefined)?.sourceKey);
-      expect(disqualifiedSourceKeys).toContain("candidate:0/part:0"); // "first"
-      expect(disqualifiedSourceKeys).toContain("candidate:0/part:1"); // "second"
+      // P4.5: "first" and "second" are candidate 0's 0th and 1st no-id
+      // occurrences respectively (counter order, not part position).
+      expect(disqualifiedSourceKeys).toContain("candidate:0/function-call:0"); // "first"
+      expect(disqualifiedSourceKeys).toContain("candidate:0/function-call:1"); // "second"
       expect(lateEvents).toHaveLength(2);
 
       for (const e of adapter.finish()) gate.push(e);
@@ -273,13 +284,17 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
       drive(adapter, gate, { candidates: [{ index: 1, content: { parts: [{ functionCall: { name: "sibling", args: {} } }] } }] });
 
-      // A leading non-functionCall part gives this late attempt its OWN
-      // would-be phantom identity ("candidate:0/part:1") that is
-      // DIFFERENT from the real, already-tracked call's own
-      // ("candidate:0/part:0") - so the assertion below can only pass via
-      // genuine real-sourceKey attribution, never by coincidentally
-      // matching what the "no real call exists" fallback would also have
-      // produced had the two identities happened to collide.
+      // P4.5: this late, no-id "tooLate" call's OWN freshly-computed
+      // identity would be candidate 0's 1st no-id occurrence
+      // ("candidate:0/function-call:1", since "toolA" already consumed
+      // the 0th) - DIFFERENT from the real, already-tracked "toolA" call's
+      // own ("candidate:0/function-call:0") - so the assertion below can
+      // only pass via genuine real-sourceKey attribution, never by
+      // coincidentally matching what the "no real call exists" fallback
+      // would also have produced had the two identities happened to
+      // collide. The leading text part is no longer load-bearing for this
+      // distinctness under P4.5 (the counter alone already guarantees it)
+      // but is kept for shape continuity with the P4.4 version of this test.
       const lateEvents = drive(adapter, gate, {
         candidates: [{ index: 0, content: { parts: [{ text: "late" }, { functionCall: { name: "tooLate", args: {} } }] } }],
       });
@@ -287,7 +302,7 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       expect(lateEvents[0]?.code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
       // Attributed to the REAL, already-tracked call's own sourceKey - not
       // a synthetic "candidate:0" identity that resolves to nothing.
-      expect(lateEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/part:0" });
+      expect(lateEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/function-call:0" });
 
       drive(adapter, gate, { candidates: [{ index: 1, finishReason: "STOP" }] });
       for (const e of adapter.finish()) gate.push(e);
@@ -316,7 +331,9 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       });
       expect(lateEvents.map((e) => e.type)).toEqual(["provider_diagnostic"]);
       expect(lateEvents[0]?.code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
-      expect(lateEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/part:0" });
+      // P4.5: candidate 0 never had a real tracked call, so "tooLate" gets
+      // its own forensic-only 0th no-id occurrence under candidate 0.
+      expect(lateEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/function-call:0" });
 
       drive(adapter, gate, { candidates: [{ index: 1, finishReason: "STOP" }] });
       for (const e of adapter.finish()) gate.push(e);
@@ -336,7 +353,8 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       const dupEvents = drive(adapter, gate, { candidates: [{ index: 0, finishReason: "MAX_TOKENS" }] });
       expect(dupEvents.map((e) => e.type)).toEqual(["provider_diagnostic"]);
       expect(dupEvents[0]?.code).toBe(DUPLICATE_TOOL_END_DIAGNOSTIC_CODE);
-      expect(dupEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/part:0" });
+      // P4.5: "toolA" is candidate 0's 0th no-id occurrence.
+      expect(dupEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/function-call:0" });
 
       drive(adapter, gate, { candidates: [{ index: 1, finishReason: "STOP" }] });
       for (const e of adapter.finish()) gate.push(e);
@@ -483,6 +501,142 @@ describe("GeminiStreamAdapter: Phase B candidate-local terminal ownership + Phas
       // whether the late evidence was itself further disqualifying) - the
       // epistemic boundary this whole fix respects.
       expect((a as { reason?: string }).reason).not.toBe("execute");
+    });
+  });
+
+  describe("P4.5 FUNCTION-CALL IDENTITY: real functionCall.id when present, a per-candidate no-id occurrence counter otherwise - never part array position", () => {
+    it("two DIFFERENT functionCall.id values at the SAME part-array-position, in separate chunks under the same candidate, never collide - was genuine RED pre-fix (E_DUPLICATE_TOOL_CALL_START + parser E_TRAILING_DATA, 'toolB' silently unrepresentable), captured via a throwaway probe before this fix was written", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "call-A", name: "toolA", args: { a: 1 } } }] } }] });
+      const chunk2Events = drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "call-B", name: "toolB", args: { b: 2 } } }] } }] });
+
+      expect(chunk2Events.map((e) => e.type)).toEqual(["tool_call_start", "provider_diagnostic", "tool_call_arguments_delta", "tool_call_end"]);
+      expect((chunk2Events[0]?.callRef as { sourceKey?: string } | undefined)?.sourceKey).toBe("candidate:0/function-call-id:call-B");
+
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      expect(final.decisions).toHaveLength(2); // "toolB" was NOT silently lost
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+      expect((a as { stableValue?: unknown }).stableValue).toEqual({ a: 1 }); // never corrupted by "toolB"'s bytes
+      expect((b as { stableValue?: unknown }).stableValue).toEqual({ b: 2 });
+      expect(a.coordinatorDiagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(false);
+      expect(b.coordinatorDiagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(false);
+      expect(a.parserDiagnostics.some((d) => d.code === "E_TRAILING_DATA")).toBe(false);
+      // Epistemic boundary: still never executable either way.
+      expect(a.action).not.toBe("execute");
+      expect(b.action).not.toBe("execute");
+    });
+
+    it("the same functionCall.id repeated under one candidate is late/duplicate evidence for the one already-delivered call it names - not a new call, not silently merged into it (official Gemini semantics document no supported continuation mechanism for a single function call: partialArgs/willContinue/streamFunctionCallArguments are all explicitly unsupported)", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "call-A", name: "toolA", args: { a: 1 } } }] } }] });
+      const dupEvents = drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "call-A", name: "toolA", args: { a: 1, extra: true } } }] } }] });
+
+      expect(dupEvents.map((e) => e.type)).toEqual(["provider_diagnostic"]);
+      expect(dupEvents[0]?.code).toBe(TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE);
+      expect(dupEvents[0]?.callRef).toEqual({ sourceKey: "candidate:0/function-call-id:call-A" });
+
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      expect(final.decisions).toHaveLength(1); // no second "toolA" call was ever created
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(gate.takeDecision(a.internalId)).toBeUndefined(); // disqualified by its own repeat
+    });
+
+    it("the SAME functionCall.id under DIFFERENT candidates never merges - identity is candidate-scoped first, exactly as P4.4 already established for candidate.index", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      const events = drive(adapter, gate, {
+        candidates: [
+          { index: 0, content: { parts: [{ functionCall: { id: "shared-id", name: "toolA", args: { a: 1 } } }] } },
+          { index: 1, content: { parts: [{ functionCall: { id: "shared-id", name: "toolB", args: { b: 2 } } }] } },
+        ],
+      });
+      const startSourceKeys = events.filter((e) => e.type === "tool_call_start").map((e) => (e.callRef as { sourceKey?: string } | undefined)?.sourceKey);
+      expect(startSourceKeys).toEqual(["candidate:0/function-call-id:shared-id", "candidate:1/function-call-id:shared-id"]);
+
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }, { index: 1, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      expect(final.decisions).toHaveLength(2); // both candidates' own calls exist independently
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+      expect((a as { stableValue?: unknown }).stableValue).toEqual({ a: 1 });
+      expect((b as { stableValue?: unknown }).stableValue).toEqual({ b: 2 });
+    });
+
+    it("two DIFFERENT no-id calls at the SAME part-array-position, in separate chunks under the same candidate, never collide either - the underlying defect was raw part-position reuse across chunks, not merely an unread id (missing-ID policy: a per-candidate occurrence counter, never positional reconstruction)", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "toolA", args: { a: 1 } } }] } }] });
+      const chunk2Events = drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "toolB", args: { b: 2 } } }] } }] });
+
+      expect((chunk2Events[0]?.callRef as { sourceKey?: string } | undefined)?.sourceKey).toBe("candidate:0/function-call:1");
+
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      expect(final.decisions).toHaveLength(2);
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+      expect(a.coordinatorDiagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(false);
+      expect(b.coordinatorDiagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(false);
+    });
+
+    it("an id-bearing call and a no-id call under the same candidate never collide even though their counters/values could coincidentally look alike - the two key shapes (function-call-id: vs function-call:) are namespaced apart", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      const events = drive(adapter, gate, {
+        candidates: [
+          { index: 0, content: { parts: [{ functionCall: { id: "0", name: "toolA", args: { a: 1 } } }] } },
+        ],
+      });
+      const chunk2Events = drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "toolB", args: { b: 2 } } }] } }] });
+
+      const key1 = (events.find((e) => e.type === "tool_call_start")?.callRef as { sourceKey?: string } | undefined)?.sourceKey;
+      const key2 = (chunk2Events.find((e) => e.type === "tool_call_start")?.callRef as { sourceKey?: string } | undefined)?.sourceKey;
+      expect(key1).toBe("candidate:0/function-call-id:0");
+      expect(key2).toBe("candidate:0/function-call:0"); // no-id counter starts at 0 independently of the id-bearing call
+      expect(key1).not.toBe(key2);
+
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      expect(final.decisions).toHaveLength(2);
+    });
+
+    it("an empty-string functionCall.id is treated as absent, not as a valid distinct identity - falls back to the no-id occurrence counter like a genuinely missing id would", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      const events = drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "", name: "toolA", args: { a: 1 } } }] } }] });
+      const sourceKey = (events.find((e) => e.type === "tool_call_start")?.callRef as { sourceKey?: string } | undefined)?.sourceKey;
+      expect(sourceKey).toBe("candidate:0/function-call:0");
+      expect(sourceKey).not.toContain("function-call-id:");
+    });
+
+    it("candidate.index remains authoritative and unaffected by this fix - an invalid/missing candidate index with an id-bearing functionCall still fails closed via INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE exactly as P4.4 already established", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      const events = drive(adapter, gate, { candidates: [{ content: { parts: [{ functionCall: { id: "call-A", name: "ambiguous", args: {} } }] } }] });
+      expect(events.map((e) => e.type)).toEqual(["provider_diagnostic"]);
+      expect(events[0]?.code).toBe(INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE);
+    });
+
+    it("Gemini remains unconditionally projection_only throughout every P4.5 scenario - never claimed or observed as execute authority", () => {
+      const gate = createToolCallExecutionGate();
+      const adapter = new GeminiStreamAdapter();
+      drive(adapter, gate, { candidates: [{ index: 0, content: { parts: [{ functionCall: { id: "call-A", name: "toolA", args: { a: 1 } } }] } }] });
+      drive(adapter, gate, { candidates: [{ index: 0, finishReason: "STOP" }] });
+      for (const e of adapter.finish()) gate.push(e);
+      const final = gate.finish();
+      const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+      expect(gate.takeDecision(a.internalId)).toBeUndefined();
+      expect((a as { reason?: string }).reason).toBe("projection_only");
     });
   });
 });
