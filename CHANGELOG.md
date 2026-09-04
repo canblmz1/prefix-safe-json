@@ -8,6 +8,97 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-09-04
+
+Execution-integrity and correctness hardening across provider-specific
+multi-choice, multi-candidate, and multi-call identity and terminal-
+ownership paths, plus a production dependency security resolution. Patch,
+not minor: no public export was added or changed, no
+`@public` method signature changed, and no new literal was added to any
+public discriminated-union type — the only kind of change this project's
+own pre-1.0 policy treats as minor-worthy (see
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md#versioning--stability-policy))
+— matching the classification this project already used for `0.4.3`, itself
+a security patch of comparable behavioral scope.
+
+### Security / execution integrity
+
+The fixes below harden related identity and terminal-ownership failure
+modes across provider-specific paths — some paths had independent
+choices/candidates/calls sharing or silently losing identity within one
+stream, others had evidence arriving after a choice/candidate/call's own
+terminal getting silently dropped instead of reaching the coordinator as
+disqualifying evidence. Neither failure mode is theoretical: where
+demonstrated, each was reproduced as a genuine pre-fix regression before
+being fixed — a real merged/misattributed value for the identity-sharing
+failure, or a real revocable-but-unrevoked `execute` authority for the
+dropped-evidence failure — not merely inferred, and not every path below
+demonstrated both.
+
+- **OpenAI**: tool-call stream routing hardened so `response.output_item`
+  events route to the correct call independent of interleaving.
+- **OpenAI-compatible** (OpenAI-compatible endpoints, OpenRouter): choice-
+  local terminal ownership for `n>1` streams — one choice's own
+  `finish_reason` no longer ends or misattributes a sibling choice's call.
+- **OpenAI Responses API**: item-local terminal sealing — late argument
+  evidence for an already-sealed `response.output_item` is rejected instead
+  of silently mutating or reopening it.
+- **Anthropic**: content-block-local terminal sealing, same guarantee as
+  above for `content_block_stop`/late `content_block_delta` evidence.
+- **OpenAI legacy `function_call`**: choice-scoped identity for `n>1`
+  streams (previously one fixed, global identity per stream — independent
+  choices' name/argument evidence could merge into a single value, and a
+  later choice's evidence could revoke an unrelated, already-legitimate
+  choice's authority). Includes a fix for late same-choice terminal
+  evidence arriving after the adapter's own global `finish()`: previously
+  silently dropped, never reaching the coordinator at all, which could
+  leave an already-computed but still-unconsumed `execute` decision
+  unrevoked by evidence that should have disqualified it.
+
+### Gemini correctness (defense in depth, not an execution-authority fix)
+
+Every Gemini tool call remains unconditionally `projection_only` before and
+after this release — `GeminiStreamAdapter` output has never been able to
+reach `execute` authority, and nothing below changes that. These are
+identity/correctness fixes, independently verified against the official
+`@google/genai` SDK's real parser rather than inferred:
+
+- Candidate identity now follows the provider's own `candidate.index`
+  field instead of array position within a chunk, which silently breaks
+  the moment a chunk omits an already-finished candidate or reorders
+  candidates.
+- Function-call identity now prefers the provider's own optional
+  `FunctionCall.id` when present, scoped under its candidate. A call
+  without one falls back to a per-candidate occurrence counter — never
+  array position within a chunk's `parts[]`, which the same class of
+  reordering/omission can equally break.
+- Candidate terminal ownership is local: one candidate's own
+  `finishReason` closes only that candidate until the stream itself is
+  exhausted, matching the scope-local terminal-ownership model used by
+  the other hardened provider paths in this release.
+
+### Official SDK regression coverage
+
+New deterministic regression tests drive real bytes through the official
+OpenAI, Anthropic, and Google GenAI (`@google/genai`, new devDependency)
+SDKs' own parsers over a local loopback fixture — proving selected
+regression shapes and relevant lifecycle evidence are reachable through
+actual SDK parsing behavior, rather than existing only as hand-built
+adapter objects. Not every bullet above carries its own dedicated
+official-SDK regression; this is parser-reachability evidence against a
+local fixture where it exists, never a live-provider or production-
+traffic claim.
+
+### Dependencies
+
+- **`fast-uri`** (transitive, via `ajv`) `3.1.5` → `3.1.7` — resolves
+  several disclosed high-severity advisories in `fast-uri`'s URI parsing
+  (host confusion and SSRF via percent-encoding/IPv6/IDN edge cases;
+  GHSA-5jgf-p345-68v8, GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf,
+  GHSA-jqff-g426-hqxp, GHSA-qw65-cvwx-89v3, GHSA-58mr-gqgx-xq4g). Lockfile-
+  only resolution within `ajv`'s own already-declared `^3.0.1` range — no
+  direct dependency added, no `ajv` version change.
+
 ## [0.4.4] - 2026-08-31
 
 Maintenance / release-infrastructure release. No runtime, public API, or
