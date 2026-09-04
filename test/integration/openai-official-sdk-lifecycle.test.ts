@@ -363,12 +363,109 @@ describe("OpenAI official SDK (openai@7.8.0): Chat Completions streaming, throug
     for await (const chunk of stream) {
       for (const normalized of adapter.push(chunk)) gate.push(normalized);
     }
+    // Universal documented lifecycle (P4.3): choice.finish_reason is now
+    // choice-local evidence only (see openai-compatible.ts's own
+    // class-level lifecycle-contract doc for why this is required even
+    // for the overwhelmingly common n=1 case) - adapter.finish() after
+    // raw SDK iterator exhaustion is what produces the real
+    // provider_stream_end, exactly like every other adapter in this
+    // library. No n=1 regression: same single decision, same value.
+    for (const normalized of adapter.finish()) gate.push(normalized);
     const final = gate.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.name).toBe("search");
     expect(decision.action).toBe("execute");
     const authority = expectDefined(gate.takeDecision(decision.internalId));
     expect(authority.value).toEqual({ q: "test" });
+  });
+
+  it("P4.3 E-1: legacy function_call from TWO DIFFERENT choices must never merge into one call/parser (L3 regression; RED pre-fix)", async () => {
+    // Exact adversarial sequence from the P4 audit's E-1 finding: choice 0
+    // and choice 1 each carry their own, independent legacy function_call
+    // evidence in the SAME chunk. n>1 + legacy function_call predates
+    // tools/tool_calls and is a real historical Chat Completions
+    // combination, not a fabricated shape - openai@7.8.0's own
+    // ChatCompletionChunk.Choice type still carries both `index` and the
+    // deprecated `function_call` field (see the SDK-type-exposure test
+    // above/below for this exact confirmation).
+    server = await startSseFixtureServer({
+      chunks: [
+        sseFrame(null, {
+          id: "chatcmpl-e1", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini",
+          choices: [
+            { index: 0, delta: { function_call: { name: "toolA", arguments: '{"a":1' } }, finish_reason: null },
+            { index: 1, delta: { function_call: { name: "toolB", arguments: ',"evil":true}' } }, finish_reason: null },
+          ],
+        }),
+        sseFrame(null, { id: "chatcmpl-e1", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }),
+        sseFrame(null, { id: "chatcmpl-e1", object: "chat.completion.chunk", created: 1, model: "gpt-4o-mini", choices: [{ index: 1, delta: {}, finish_reason: "stop" }] }),
+        sseFrame(null, "[DONE]"),
+      ],
+    });
+
+    const stream = await client(server.baseUrl).chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "user", content: "hi" }], stream: true });
+    const rawChunks: unknown[] = [];
+    for await (const chunk of stream) rawChunks.push(chunk);
+
+    // Official-SDK-parser reachability proof: the real SDK yielded both
+    // choices' independent function_call evidence, unchanged, in the same
+    // chunk object.
+    const firstChunk = rawChunks[0] as { choices: Array<{ index: number; delta: { function_call?: { name?: string; arguments?: string } } }> };
+    expect(firstChunk.choices).toHaveLength(2);
+    expect(firstChunk.choices[0]?.index).toBe(0);
+    expect(firstChunk.choices[0]?.delta.function_call?.name).toBe("toolA");
+    expect(firstChunk.choices[0]?.delta.function_call?.arguments).toBe('{"a":1');
+    expect(firstChunk.choices[1]?.index).toBe(1);
+    expect(firstChunk.choices[1]?.delta.function_call?.name).toBe("toolB");
+    expect(firstChunk.choices[1]?.delta.function_call?.arguments).toBe(',"evil":true}');
+
+    const adapter = new OpenAIStreamAdapter();
+    const gate = createToolCallExecutionGate();
+    for (const chunk of rawChunks) for (const normalized of adapter.push(chunk)) gate.push(normalized);
+
+    // Universal documented lifecycle.
+    for (const normalized of adapter.finish()) gate.push(normalized);
+
+    const final = gate.finish();
+
+    // REQUIRED INVARIANT (genuine RED on pre-fix production, L3-confirmed
+    // via the real SDK-yielded events above - see P4 audit finding E-1.
+    // Pre-fix, driving this exact sequence - including each choice's own,
+    // separately-arriving finish_reason - through the full documented
+    // lifecycle produced exactly ONE merged decision:
+    // {name:"toolAtoolB", action:"reject", reason:"protocol_violation"},
+    // takeDecision() undefined. This is a DIFFERENT symptom of the same
+    // shared-identity root cause than the simpler single-finish_reason
+    // reproduction (see test/providers/__scratch-legacy-n-gt-1.test.ts,
+    // P4 audit evidence, unmodified): here, choice 1's OWN separately
+    // arriving finish_reason - after choice 0's already emitted a real,
+    // premature, shared provider_stream_end - becomes a SECOND
+    // provider_stream_end the coordinator's own isFinished protocol
+    // detects and poisons the merged call with, rather than the plain
+    // "toolAtoolB" call reaching a clean execute. Either way, the single,
+    // required invariant this test exists to prove already fails here:
+    // two independent choices' evidence must never collapse into ONE
+    // decision at all.):
+    expect(final.decisions).toHaveLength(2);
+    const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
+    const b = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolB"));
+    // Judged SOLELY on each choice's OWN evidence, isolated: A's own bytes
+    // ('{"a":1', deliberately left unclosed - matching the adversarial
+    // shape) never get "completed" by B's injected suffix, so A correctly
+    // stays non-executable on its own genuine incompleteness - not on the
+    // merged/injected value. B's own bytes alone (',"evil":true}') are not
+    // valid JSON as a standalone document either. The critical proof is
+    // not that either one specifically executes, but that there is no
+    // name concatenation ("toolAtoolB"), no argument concatenation
+    // ({a:1,evil:true}), and no cross-choice authority of any kind -
+    // confirmed by the two independent decisions above and both takes
+    // below.
+    expect(a.name).toBe("toolA");
+    expect(b.name).toBe("toolB");
+    expect(a.action).not.toBe("execute");
+    expect(b.action).not.toBe("execute");
+    expect(gate.takeDecision(a.internalId)).toBeUndefined();
+    expect(gate.takeDecision(b.internalId)).toBeUndefined();
   });
 
   it("Legacy singular function_call: SDK types DO expose this shape at openai@7.8.0 (the field survives real SDK parsing) - the harness proves parser support, not that current live models still emit it", async () => {

@@ -19,6 +19,7 @@ import { describe, it, expect } from "vitest";
 import { OpenAIStreamAdapter } from "../../src/providers/openai.js";
 import { createToolCallExecutionGate } from "../../src/gate/gate.js";
 import { expectDefined } from "../utils/expect-defined.js";
+import { DUPLICATE_TOOL_END_DIAGNOSTIC_CODE } from "../../src/coordinator/diagnostic-codes.js";
 
 function pushAll(adapter: OpenAIStreamAdapter, gate: ReturnType<typeof createToolCallExecutionGate>, raws: readonly unknown[]) {
   for (const raw of raws) {
@@ -47,6 +48,10 @@ describe("OpenAIStreamAdapter legacy singular function_call: termination must cl
         validCallChunk,
         { choices: [{ index: 0, finish_reason: "stop" }] },
       ]);
+      // P4.3: choice.finish_reason is choice-local only now - the ONE real
+      // provider_stream_end comes from adapter.finish(), per the universal
+      // documented lifecycle every adapter in this library shares.
+      for (const event of adapter.finish()) gate.push(event);
       const final = gate.finish();
       // Ground truth, always true regardless of the bug: a call exists,
       // with valid JSON argument evidence, and terminal evidence was
@@ -144,24 +149,28 @@ describe("OpenAIStreamAdapter legacy singular function_call: termination must cl
   });
 
   describe("The new tool_call_end must only fire for a genuinely open legacy call - never spuriously, never duplicated", () => {
-    it("a finish_reason chunk with NO prior function_call ever seen emits no spurious tool_call_end for a call that was never started", () => {
+    it("a finish_reason chunk with NO prior function_call ever seen emits nothing (P4.3: no provider_stream_end from push() at all anymore - choice.finish_reason is choice-local only) for a call that was never started", () => {
       const adapter = new OpenAIStreamAdapter();
       const events = adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
-      expect(events.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      expect(events).toEqual([]);
     });
 
-    it("a second, duplicate finish_reason chunk after the first already closed the call does not emit a second tool_call_end", () => {
+    it("a second, duplicate finish_reason chunk after the first already closed the call: P4.3 now hardens this via DUPLICATE_TOOL_END_DIAGNOSTIC_CODE (choice-local, exact attribution), not a silently-repeated provider_stream_end - never a second tool_call_end either way", () => {
       const adapter = new OpenAIStreamAdapter();
       adapter.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: "{}" } } }] });
-      adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
+      const firstClose = adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
+      expect(firstClose.map((e) => e.type)).toEqual(["tool_call_end"]);
       const secondEvents = adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
       // Still forwarded (post-terminal evidence must reach the coordinator -
-      // GHSA-3xpw-9694-2xxp), but as provider_stream_end only, no duplicate
-      // tool_call_end for a call already closed on the first pass.
-      expect(secondEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      // GHSA-3xpw-9694-2xxp), but as a choice-local protocol-violation
+      // diagnostic, never a duplicate tool_call_end and never a
+      // provider_stream_end (push() no longer emits one for the legacy
+      // path at all - see the universal-lifecycle regressions).
+      expect(secondEvents.map((e) => e.type)).toEqual(["provider_diagnostic"]);
+      expect((secondEvents[0] as { code?: string }).code).toBe(DUPLICATE_TOOL_END_DIAGNOSTIC_CODE);
     });
 
-    it("a late finish_reason chunk arriving after a direct finish() already closed the call does not emit a second tool_call_end", () => {
+    it("a late finish_reason chunk arriving after a direct finish() already closed the call does not emit a second tool_call_end - but is NOT silently dropped either (P0 blocker fix)", () => {
       // The mirror case of the one above, for the OTHER real close path:
       // finish() must also clear the open flag it consumes, or a
       // subsequent push() (still forwarded per GHSA-3xpw-9694-2xxp) would
@@ -169,8 +178,23 @@ describe("OpenAIStreamAdapter legacy singular function_call: termination must cl
       const adapter = new OpenAIStreamAdapter();
       adapter.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: "{}" } } }] });
       adapter.finish({ reason: "complete" });
+      // P4.3: this late finish_reason is not "alreadyTerminal" from this
+      // choice's own perspective (finish() closed the call without ever
+      // touching legacyChoiceTerminalReasons - only push()'s own
+      // choice.finish_reason handling does that), and legacyChoiceOpen was
+      // correctly cleared by finish() above, so no normal tool_call_end
+      // fires. Post-blocker-fix, this is NOT the same as returning []:
+      // this.finished is already true and this exact choice had prior
+      // tracked activity, so push() now emits a
+      // DUPLICATE_TOOL_END_DIAGNOSTIC_CODE provider_diagnostic instead -
+      // see the dedicated "P0 BLOCKER FIX" describe block in
+      // openai-legacy-choice-identity.test.ts for the full RED/GREEN
+      // regression this was found and fixed against (a late finish_reason
+      // here used to vanish entirely, leaving an already-computed,
+      // unconsumed execute decision silently un-revocable).
       const lateEvents = adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
-      expect(lateEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      expect(lateEvents.map((e) => e.type)).toEqual(["provider_diagnostic"]);
+      expect((lateEvents[0] as { code?: string })?.code).toBe(DUPLICATE_TOOL_END_DIAGNOSTIC_CODE);
     });
   });
 
@@ -182,6 +206,9 @@ describe("OpenAIStreamAdapter legacy singular function_call: termination must cl
         validCallChunk,
         { choices: [{ index: 0, finish_reason: "stop" }] },
       ]);
+      // Universal documented lifecycle: the ONE real provider_stream_end
+      // comes from adapter.finish() now.
+      for (const event of adapter.finish()) gate.push(event);
       // Real, unconsumed authority must exist BEFORE the late evidence -
       // read via finish()'s returned decisions, never takeDecision(), which
       // would consume it and make the second half of this test meaningless.
@@ -197,15 +224,17 @@ describe("OpenAIStreamAdapter legacy singular function_call: termination must cl
   });
 
   describe("Idempotency", () => {
-    it("finish() called after finish_reason already terminated the stream does not emit duplicate call-end/authority-changing evidence", () => {
+    it("P4.3: choice.finish_reason alone no longer terminates the stream (choice-local only) - adapter.finish() afterward is the ONE real, required provider_stream_end call, not a no-op; it still never duplicates the tool_call_end already emitted choice-locally", () => {
       const adapter = new OpenAIStreamAdapter();
       const firstEvents: unknown[] = [];
       for (const raw of [validCallChunk, { choices: [{ index: 0, finish_reason: "stop" }] }]) {
         firstEvents.push(...adapter.push(raw));
       }
       const secondEvents = adapter.finish({ reason: "complete" });
-      expect(secondEvents).toHaveLength(0);
+      expect(secondEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
       expect(firstEvents.filter((e) => (e as { type?: string }).type === "tool_call_end")).toHaveLength(1);
+      // A further, direct finish() call IS the genuine no-op.
+      expect(adapter.finish({ reason: "complete" })).toHaveLength(0);
     });
 
     it("finish() called twice directly does not emit duplicate call-end/authority-changing evidence", () => {

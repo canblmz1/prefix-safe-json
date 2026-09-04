@@ -266,7 +266,8 @@ genuine `execute` decision reliably across every provider adapter - some
 adapters' `push()` can legitimately observe the whole provider stream ending
 on its own (a single `message_delta`, a Responses API `response.completed`),
 but the `OpenAICompatibleStreamAdapter` family (`OpenAICompatibleStreamAdapter`,
-`OpenAIStreamAdapter`'s plural `tool_calls` path, `OpenRouterStreamAdapter`)
+`OpenAIStreamAdapter` (both its plural `tool_calls` path and its legacy
+singular `function_call` path), `OpenRouterStreamAdapter`)
 deliberately never does: a single choice's own `finish_reason` is
 choice-local evidence only, never proof the whole (possibly multi-choice)
 provider stream has ended - see [`COMPATIBILITY.md`](COMPATIBILITY.md) and

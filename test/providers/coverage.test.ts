@@ -960,23 +960,61 @@ describe("OpenAIStreamAdapter — Responses API", () => {
   });
 
   it("handles legacy function_call finish_reason cancelled", () => {
+    // P4.3: a bare finish_reason DOES record this choice's own terminal
+    // reason internally (legacyChoiceTerminalReasons) even with no prior
+    // function_call evidence for it - production always records a valid
+    // choice's finish_reason, regardless of whether a call was ever
+    // started for it (see the "no prior function_call ever seen"
+    // regression in openai-legacy-function-call-termination.test.ts,
+    // which is about push()'s own RETURN VALUE being empty - no call to
+    // close - not about internal recording). What real call evidence is
+    // actually needed for here is hasLegacyFunctionCall: with NO
+    // function_call evidence anywhere in the stream it stays false, so
+    // finish()'s own branch-selection routes through the
+    // compatible-delegation branch instead of ever reading this
+    // recorded reason via aggregateLegacyTermination - making the
+    // recording genuinely dead in that scenario. Pushing real evidence
+    // first here is what makes finish() actually read it, and the
+    // stream-wide reason (only ever produced by finish(), never by
+    // push() itself post-P4.3) must be read from finish()'s own
+    // aggregation, not from push()'s return value.
     const a = new OpenAIStreamAdapter();
-    const events = a.push({ choices: [{ index: 0, finish_reason: "cancelled" }] });
+    a.push({ choices: [{ index: 0, delta: { function_call: { name: "search" } } }] });
+    a.push({ choices: [{ index: 0, finish_reason: "cancelled" }] });
+    const events = a.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("cancelled");
   });
 
   it("an UNRECOGNIZED legacy finish_reason maps to 'unknown', not a mislabeled 'cancelled' (the trailing else-if's own comparison, checked at the raw normalized-event level)", () => {
+    // P4.3: see the comment on the "cancelled" case above - this choice's
+    // own recorded reason is set internally regardless of prior evidence;
+    // prior real function_call evidence is what's actually required, so
+    // hasLegacyFunctionCall is true and finish() reads this recorded
+    // reason via aggregateLegacyTermination instead of taking the
+    // compatible-delegation branch. The aggregated stream-wide reason is
+    // only ever observable via finish().
     const a = new OpenAIStreamAdapter();
-    const events = a.push({ choices: [{ index: 0, finish_reason: "content_filter" }] });
+    a.push({ choices: [{ index: 0, delta: { function_call: { name: "search" } } }] });
+    a.push({ choices: [{ index: 0, finish_reason: "content_filter" }] });
+    const events = a.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("unknown");
   });
 
   it("handles legacy function_call finish_reason stop/function_call/tool_calls/length", () => {
+    // P4.3: see the comment on the "cancelled" case above - this choice's
+    // own recorded reason is set internally regardless of prior evidence;
+    // prior real function_call evidence is what's actually required, so
+    // hasLegacyFunctionCall is true and finish() reads this recorded
+    // reason via aggregateLegacyTermination instead of taking the
+    // compatible-delegation branch. The aggregated stream-wide reason is
+    // only ever observable via finish().
     for (const [finish_reason, expected] of [["stop", "complete"], ["function_call", "complete"], ["tool_calls", "complete"], ["length", "length"]] as const) {
       const a = new OpenAIStreamAdapter();
-      const events = a.push({ choices: [{ index: 0, finish_reason }] });
+      a.push({ choices: [{ index: 0, delta: { function_call: { name: "search" } } }] });
+      a.push({ choices: [{ index: 0, finish_reason }] });
+      const events = a.finish();
       const end = events.find((e) => e.type === "provider_stream_end");
       expect((end as { reason?: string })?.reason, `finish_reason ${finish_reason}`).toBe(expected);
     }
@@ -1069,7 +1107,10 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     // the fixed legacy sourceKey, not compatible-forwarding's
     // "choice:N/tool-index:N" shape (compare scenario 2 above).
     expect(finishEvents.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
-    expect((finishEvents[0] as { callRef?: { sourceKey?: string } })?.callRef?.sourceKey).toBe("legacy-function-call");
+    // P4.3: the fixed global "legacy-function-call" sourceKey was replaced
+    // by a choice-scoped "legacy-choice:{choiceIndex}" identity (E-1) - see
+    // the class-level doc comment on OpenAIStreamAdapter.
+    expect((finishEvents[0] as { callRef?: { sourceKey?: string } })?.callRef?.sourceKey).toBe("legacy-choice:0");
     for (const e of finishEvents) gate.push(e);
     const decision = expectDefined(gate.finish().decisions[0]);
     expect(decision.action).toBe("execute");
@@ -1108,7 +1149,19 @@ describe("OpenAIStreamAdapter — Responses API", () => {
     ["OpenAI: error-type event", () => new OpenAIStreamAdapter(), (a) => { a.push({ type: "error" }); }],
     ["OpenAI: response.failed", () => new OpenAIStreamAdapter(), (a) => { a.push({ type: "response.failed", response: { error: { code: "x" } } }); }],
     ["OpenAI: response.incomplete", () => new OpenAIStreamAdapter(), (a) => { a.push({ type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } } }); }],
-    ["OpenAI: legacy finish_reason", () => new OpenAIStreamAdapter(), (a) => { a.push({ choices: [{ index: 0, finish_reason: "stop" }] }); }],
+    // P4.3: no "OpenAI: legacy finish_reason" row here anymore. Pre-fix,
+    // a bare choices[].finish_reason chunk incorrectly set this adapter's
+    // OWN `this.finished = true` directly from push() - exactly the
+    // unsafe "first choice to finish ends the whole stream" defect this
+    // fix removes (see the class-level doc comment on OpenAIStreamAdapter
+    // and OpenAICompatibleStreamAdapter's own, earlier lifecycle-contract
+    // doc). Post-fix, a choice's own finish_reason never sets `finished`
+    // by itself - only finish() does - so this trigger no longer belongs
+    // in this table at all: it is now covered by the "Idempotency" tests
+    // in openai-legacy-function-call-termination.test.ts, which correctly
+    // assert the OPPOSITE - that the first finish() call after a bare
+    // finish_reason is the genuine, non-empty synthesis, and only a
+    // SECOND finish() call is the real no-op.
   ];
 
   it.each(finishedFlagCases)("after %s fires, a subsequent finish() call is idempotent (produces nothing)", (_label, makeAdapter, trigger) => {

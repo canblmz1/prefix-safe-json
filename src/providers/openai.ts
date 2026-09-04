@@ -4,6 +4,9 @@ import { OpenAICompatibleStreamAdapter } from "./openai-compatible.js";
 import {
   CONTENT_FILTERED_DIAGNOSTIC_CODE,
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+  INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 interface OpenAIFunctionCallDelta {
@@ -12,11 +15,38 @@ interface OpenAIFunctionCallDelta {
 }
 
 interface OpenAIChoice {
+  // P4.3: required for legacy function_call choice-scoping - the
+  // underlying Chat Completions choices[]/index wire structure is
+  // identical between the plural and legacy singular tool-call shapes.
+  index?: number;
   delta?: {
     function_call?: OpenAIFunctionCallDelta;
     tool_calls?: unknown;
   };
   finish_reason?: string | null;
+}
+
+// Reason priority for aggregating legacy per-choice terminal reasons into
+// the ONE stream-wide reason, at adapter.finish() time. Mirrors
+// OpenAICompatibleStreamAdapter's own REASON_PRIORITY exactly (same
+// values, same order, same "worst wins" semantics: provider_error
+// strongest, complete weakest) - duplicated locally rather than
+// cross-imported so this file's production scope stays self-contained
+// (P4.3: src/providers/openai.ts only, openai-compatible.ts unmodified).
+const LEGACY_REASON_PRIORITY: readonly StreamEndReason[] = [
+  "provider_error",
+  "unknown",
+  "network_error",
+  "length",
+  "cancelled",
+  "complete",
+];
+
+function mapLegacyFinishReason(providerReason: string): StreamEndReason {
+  if (providerReason === "stop" || providerReason === "function_call" || providerReason === "tool_calls") return "complete";
+  if (providerReason === "length") return "length";
+  if (providerReason === "cancelled") return "cancelled";
+  return "unknown";
 }
 
 export interface OpenAIEvent {
@@ -87,17 +117,36 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   // regressions).
   private hasCompatibleToolCalls = false;
 
-  // For function_call (legacy)
+  // For function_call (legacy). P4.3: choice-scoped identity and terminal
+  // ownership - the pre-existing design used ONE fixed, global sourceKey
+  // ("legacy-function-call") for every choice, so a genuine n>1 stream's
+  // independent per-choice function_call evidence could merge into one
+  // parser/identity (cross-choice argument/name injection - E-1), and a
+  // later, entirely separate choice's evidence could collide with and
+  // poison an earlier, already-legitimate choice's call (E-2). Ports the
+  // SAME choice-local architecture already proven for the plural path in
+  // OpenAICompatibleStreamAdapter (see that file's own class-level
+  // lifecycle-contract doc) onto this legacy singular wire shape, which
+  // has no array of tool_calls to key off - so per-choice state is
+  // tracked directly here instead of delegating.
+  //
+  // hasLegacyFunctionCall keeps its ORIGINAL meaning unchanged: "has ANY
+  // choice in this stream ever shown legacy function_call evidence" -
+  // still used by the mixed-format conflict check above and by finish()'s
+  // own branch-selection between this path and compatibleAdapter's.
   private hasLegacyFunctionCall = false;
-  private legacySourceKey = "legacy-function-call";
-  // Distinct from hasLegacyFunctionCall, which must stay true forever once
-  // set (finish()'s own branch-selection depends on it) - this instead
-  // tracks whether the one legacy call currently has an open argument
-  // stream that still needs its own tool_call_end before the provider
-  // stream terminates, mirroring OpenAICompatibleStreamAdapter's
-  // knownSourceKeys (cleared once closed, re-set only by a genuine new
-  // start - which the legacy singular format never has more than one of).
-  private legacyCallOpen = false;
+  // choiceIndex -> is THAT choice's own legacy call's argument stream
+  // currently open (started, not yet closed by ITS OWN finish_reason).
+  private legacyChoiceOpen: Map<number, boolean> = new Map();
+  // choiceIndex -> that choice's own first-recorded terminal StreamEndReason.
+  // Never overwritten once set for a given choice - see Phase 10 handling
+  // below. Read by finish() to aggregate one stream-wide reason.
+  private legacyChoiceTerminalReasons: Map<number, StreamEndReason> = new Map();
+  // The same choices' own RAW (pre-normalization) finish_reason strings,
+  // keyed identically - observability only, mirrored onto the aggregated
+  // provider_stream_end's own providerReason (see decide.ts's own doc
+  // comment: "never consulted by the decision logic itself").
+  private legacyChoiceTerminalProviderReasons: Map<number, string> = new Map();
   
   // For Responses API
   private accumulatedArguments = new Map<string, string>();
@@ -375,77 +424,228 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
       return compatibleEvents.map(e => ({ ...e, provider: this.provider, sequence: ++this.sequence }));
     }
 
-    // Handle legacy function_call format
+    // Handle legacy function_call format (P4.3: choice-scoped - see the
+    // field-level doc comments above for the full rationale).
     if (Array.isArray(chunk.choices)) {
+      // Duplicate-index detection within one chunk - mirrors
+      // OpenAICompatibleStreamAdapter's own choiceCounts pre-pass exactly,
+      // reused because the underlying choices[]/index wire structure is
+      // identical between plural and legacy singular tool-call shapes.
+      const choiceCounts = new Map<number, number>();
       for (const choice of chunk.choices) {
+        if (Number.isInteger(choice.index) && (choice.index as number) >= 0) {
+          const choiceIndex = choice.index as number;
+          choiceCounts.set(choiceIndex, (choiceCounts.get(choiceIndex) ?? 0) + 1);
+        }
+      }
+
+      for (const choice of chunk.choices) {
+        // Choice-index validity (Phase 5): a legacy function_call-bearing
+        // choice with no trustworthy explicit index must never be
+        // silently assumed to be choice 0 - global, unattributable, fails
+        // the whole stream closed rather than guessing (same fail-closed
+        // posture INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE already has for
+        // the plural path - reused rather than inventing a new code,
+        // since the identity ambiguity it represents is identical here).
+        // A finish_reason-only choice (no function_call evidence at all)
+        // with an invalid index carries no legacy identity to protect and
+        // is simply skipped, not diagnosed - out of this fix's scope.
+        if (!Number.isInteger(choice.index) || (choice.index as number) < 0) {
+          if (choice.delta?.function_call) {
+            events.push({
+              type: "provider_diagnostic",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              code: INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: "legacy function_call choice.index is missing, non-integer, or negative; choice identity is ambiguous",
+            });
+          }
+          continue;
+        }
+        const choiceIndex = choice.index as number;
+
+        if ((choiceCounts.get(choiceIndex) ?? 0) > 1) {
+          if (choice.delta?.function_call) {
+            events.push({
+              type: "provider_diagnostic",
+              sequence: ++this.sequence,
+              provider: this.provider,
+              callRef: { sourceKey: `legacy-choice:${choiceIndex}` },
+              code: DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: `choice.index ${choiceIndex} is duplicated in one provider event`,
+            });
+          }
+          continue;
+        }
+
+        const sourceKey = `legacy-choice:${choiceIndex}`;
+
         if (choice.delta?.function_call) {
           const fc = choice.delta.function_call;
-          if (!this.hasLegacyFunctionCall) {
-            this.hasLegacyFunctionCall = true;
-            this.legacyCallOpen = true;
+          const isKnownChoice = this.legacyChoiceOpen.has(choiceIndex);
+          // Choice-local post-terminal evidence: this exact choice's
+          // legacy call was already closed (its own finish_reason, or a
+          // direct adapter.finish() force-close). Guards BOTH the
+          // call-start path below AND the name/arguments-delta path -
+          // `isKnownChoice` alone (the original, insufficient check) only
+          // ever distinguished "genuinely new call" from "continuing
+          // call," never "continuing an OPEN call" from "evidence for an
+          // already-CLOSED one," which would otherwise let a late
+          // argument/name delta silently mutate (and, if left
+          // structurally unclosed at close time, silently CLOSE) an
+          // already-ended choice's value with no record of the anomaly -
+          // the same class of gap already hardened for OpenAI Responses
+          // (P4.1) and Anthropic (P4.2). Same diagnostic code those two
+          // use for materially identical semantics.
+          if (isKnownChoice && this.legacyChoiceOpen.get(choiceIndex) === false) {
             events.push({
-              type: "tool_call_start",
+              type: "provider_diagnostic",
               sequence: ++this.sequence,
               provider: this.provider,
-              callRef: { sourceKey: this.legacySourceKey },
-              toolIndex: 0,
-              name: fc.name,
+              callRef: { sourceKey },
+              code: TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: `Tool call evidence for choice ${choiceIndex} arrived after that choice's own finish_reason`,
             });
-          } else if (fc.name) {
-            events.push({
-              type: "tool_call_name_delta",
-              sequence: ++this.sequence,
-              provider: this.provider,
-              callRef: { sourceKey: this.legacySourceKey },
-              delta: fc.name,
-            });
-          }
-          
-          if (fc.arguments) {
-            events.push({
-              type: "tool_call_arguments_delta",
-              sequence: ++this.sequence,
-              provider: this.provider,
-              callRef: { sourceKey: this.legacySourceKey },
-              delta: fc.arguments,
-            });
+          } else {
+            if (!isKnownChoice) {
+              this.hasLegacyFunctionCall = true;
+              this.legacyChoiceOpen.set(choiceIndex, true);
+              events.push({
+                type: "tool_call_start",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                toolIndex: choiceIndex,
+                name: fc.name,
+              });
+            } else if (fc.name) {
+              events.push({
+                type: "tool_call_name_delta",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                delta: fc.name,
+              });
+            }
+
+            if (fc.arguments) {
+              events.push({
+                type: "tool_call_arguments_delta",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                delta: fc.arguments,
+              });
+            }
           }
         }
-        
-        if (choice.finish_reason != null) {
-          let reason: StreamEndReason = "unknown";
-          if (choice.finish_reason === "stop" || choice.finish_reason === "function_call" || choice.finish_reason === "tool_calls") {
-            reason = "complete";
-          } else if (choice.finish_reason === "length") {
-            reason = "length";
-          } else if (choice.finish_reason === "cancelled") {
-            reason = "cancelled";
-          }
 
-          if (this.legacyCallOpen) {
+        if (choice.finish_reason != null) {
+          const alreadyTerminal = this.legacyChoiceTerminalReasons.has(choiceIndex);
+          if (alreadyTerminal) {
+            // Duplicate/conflicting terminal for the SAME choice (Phase
+            // 10): never silently overwrite the first-recorded reason.
+            // Exactly DUPLICATE_TOOL_END_DIAGNOSTIC_CODE's own documented
+            // meaning ("more than one end part for the same call") - this
+            // choice's own finish_reason IS what closes its legacy call,
+            // so a second one is genuinely a repeated end signal for that
+            // same call. Attributed to this choice's own real sourceKey
+            // only: exact attribution is possible here, so per this
+            // fix's own design this stays choice-local and does not
+            // poison unrelated sibling choices - distinct from the
+            // separate, already-approved stream-wide design used for the
+            // analogous plural-path anomaly in openai-compatible.ts.
             events.push({
-              type: "tool_call_end",
+              type: "provider_diagnostic",
               sequence: ++this.sequence,
               provider: this.provider,
-              callRef: { sourceKey: this.legacySourceKey },
-              reason,
-              providerReason: choice.finish_reason,
+              callRef: { sourceKey },
+              code: DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+              severity: "error",
+              message: `choice ${choiceIndex} received a second finish_reason ("${choice.finish_reason}") after already terminating`,
             });
-            this.legacyCallOpen = false;
-          }
+          } else if (this.finished) {
+            // Post-blocker-fix: this choice was already closed by a PRIOR
+            // adapter.finish() call - force-closed via that method's own
+            // loop, which never touches legacyChoiceTerminalReasons (only
+            // legacyChoiceOpen - see finish()) - so `alreadyTerminal` above
+            // is false even though the adapter has already globally
+            // terminated. The ORIGINAL bug: silently recording this
+            // reason and returning nothing meant this late, recognized
+            // terminal evidence never reached the coordinator at all -
+            // not even as a diagnostic - so an already-computed, still-
+            // UNCONSUMED execute decision could never be revoked by it.
+            // Exactly the class of gap this file's own push() doc comment
+            // already promises never to reintroduce ("No `finished` early
+            // return here: silently dropping every event after the first
+            // terminal meant ... an already-decided call's authority
+            // could never be revoked by it").
+            //
+            // Reuses DUPLICATE_TOOL_END_DIAGNOSTIC_CODE rather than
+            // inventing a new mechanism: this choice's call already has
+            // an end (finish()'s own synthetic close), so a further,
+            // later terminal for the SAME choice is genuinely a second
+            // end signal for that same call - semantically identical to
+            // the in-stream duplicate-finish_reason case above. No new
+            // security mechanism is implemented here: coordinator.ts's
+            // own push() unconditionally converts ANY event arriving
+            // after its OWN isFinished flag into a sticky, stream-wide
+            // AUTHORITY_PROTOCOL_VIOLATION_CODES diagnostic
+            // (EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE, or
+            // TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE for a genuinely
+            // conflicting provider_stream_end) regardless of this event's
+            // own code - this only needs to stop being silence. Never
+            // reopens/modifies legacyChoiceOpen/legacyChoiceTerminalReasons
+            // (that state is frozen the moment finish() ran) and never
+            // emits a second normal tool_call_end, which would look like
+            // ordinary in-stream evidence rather than a flagged anomaly.
+            //
+            // Only emitted when this exact choice had prior tracked
+            // activity (legacyChoiceOpen.has) - a finish_reason for a
+            // choice index that was never referenced at all carries no
+            // existing authority to protect, and is left exactly as
+            // before (silently ignored, matching the invalid-index
+            // choice's own "no identity to protect" design elsewhere in
+            // this file).
+            if (this.legacyChoiceOpen.has(choiceIndex)) {
+              events.push({
+                type: "provider_diagnostic",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                code: DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+                severity: "error",
+                message: `choice ${choiceIndex} received a finish_reason ("${choice.finish_reason}") after the adapter had already globally terminated via finish()`,
+              });
+            }
+          } else {
+            const reason = mapLegacyFinishReason(choice.finish_reason);
+            this.legacyChoiceTerminalReasons.set(choiceIndex, reason);
+            this.legacyChoiceTerminalProviderReasons.set(choiceIndex, choice.finish_reason);
 
-          events.push({
-            type: "provider_stream_end",
-            sequence: ++this.sequence,
-            provider: this.provider,
-            reason,
-            providerReason: choice.finish_reason,
-          });
-          this.finished = true;
+            if (this.legacyChoiceOpen.get(choiceIndex)) {
+              events.push({
+                type: "tool_call_end",
+                sequence: ++this.sequence,
+                provider: this.provider,
+                callRef: { sourceKey },
+                reason,
+                providerReason: choice.finish_reason,
+              });
+              this.legacyChoiceOpen.set(choiceIndex, false);
+            }
+            // No provider_stream_end here, and `this.finished` stays
+            // false: this choice finishing is not, by itself, proof the
+            // whole provider stream (which may still have other choices
+            // actively generating) has ended. See finish().
+          }
         }
       }
     }
-    
+
     return events;
   }
 
@@ -459,25 +659,72 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
     }
 
     const events: NormalizedToolStreamEvent[] = [];
-    if (this.legacyCallOpen) {
-      events.push({
-        type: "tool_call_end",
-        sequence: ++this.sequence,
-        provider: this.provider,
-        callRef: { sourceKey: this.legacySourceKey },
-        reason: meta?.reason ?? "unknown",
-        providerReason: meta?.providerReason,
-      });
-      this.legacyCallOpen = false;
+    // Close any legacy choice whose call never got a chance to report its
+    // own finish_reason at all before the caller's raw iterator ended.
+    // Marks each one closed (mirrors OpenAICompatibleStreamAdapter's own
+    // `openSet.clear()` in its analogous finish() loop) - without this, a
+    // stray later push() for the SAME choice (still reachable: there is
+    // deliberately no top-of-push() `finished` guard, see GHSA-3xpw-9694-
+    // 2xxp) would find `legacyChoiceOpen` still true and emit a SECOND,
+    // spurious tool_call_end for a call this adapter already closed here.
+    for (const [choiceIndex, open] of this.legacyChoiceOpen.entries()) {
+      if (open) {
+        events.push({
+          type: "tool_call_end",
+          sequence: ++this.sequence,
+          provider: this.provider,
+          callRef: { sourceKey: `legacy-choice:${choiceIndex}` },
+          reason: meta?.reason ?? "unknown",
+          providerReason: meta?.providerReason,
+        });
+        this.legacyChoiceOpen.set(choiceIndex, false);
+      }
     }
 
+    const { reason, providerReason } = this.aggregateLegacyTermination(meta?.reason, meta?.providerReason);
     events.push({
       type: "provider_stream_end",
       sequence: ++this.sequence,
       provider: this.provider,
-      reason: meta?.reason ?? "unknown",
-      providerReason: meta?.providerReason,
+      reason,
+      providerReason,
     });
     return events;
+  }
+
+  // One stream-wide StreamEndReason from every legacy choice-local reason
+  // recorded so far, plus any caller-supplied override - "complete" only
+  // if every single one of them was "complete". Mirrors
+  // OpenAICompatibleStreamAdapter's own aggregateTermination() exactly
+  // (see LEGACY_REASON_PRIORITY above for why it is duplicated locally
+  // rather than cross-imported).
+  private aggregateLegacyTermination(
+    callerReason?: StreamEndReason,
+    callerProviderReason?: string,
+  ): { reason: StreamEndReason; providerReason?: string } {
+    let worst: StreamEndReason | undefined;
+    let worstRank = Infinity;
+    let worstProviderReason: string | undefined;
+
+    for (const [choiceIndex, candidate] of this.legacyChoiceTerminalReasons.entries()) {
+      const rank = LEGACY_REASON_PRIORITY.indexOf(candidate);
+      if (rank !== -1 && rank < worstRank) {
+        worst = candidate;
+        worstRank = rank;
+        worstProviderReason = this.legacyChoiceTerminalProviderReasons.get(choiceIndex);
+      }
+    }
+
+    if (callerReason !== undefined) {
+      const rank = LEGACY_REASON_PRIORITY.indexOf(callerReason);
+      if (rank !== -1 && rank < worstRank) {
+        worst = callerReason;
+        worstRank = rank;
+        worstProviderReason = callerProviderReason;
+      }
+    }
+
+    if (worst === undefined) return { reason: "unknown", providerReason: callerProviderReason };
+    return { reason: worst, providerReason: worstProviderReason };
   }
 }

@@ -856,12 +856,27 @@ describe("OpenAICompatibleStreamAdapter: corrected choice/provider-stream lifecy
       expect(decision.action).toBe("execute");
     });
 
-    it("legacy singular function_call behavior (2f4f76f) is completely unchanged: push(finish_reason) still closes and emits provider_stream_end directly", () => {
+    it("P4.3: legacy singular function_call behavior is NO LONGER the 2f4f76f direct-terminal shortcut - it now follows the SAME choice-local lifecycle as the plural tool_calls case above: push(finish_reason) emits tool_call_end only, and a separate adapter.finish() produces the provider_stream_end", () => {
+      // Pre-P4.3, a choice's own legacy finish_reason directly ended the
+      // WHOLE provider stream (this adapter's global `finished`), exactly
+      // the "first choice to finish wrongly ends every choice" defect
+      // OpenAICompatibleStreamAdapter's own class-level doc comment
+      // describes for the plural path (see the sibling test immediately
+      // above) - fatal for a genuine n>1 legacy stream, since a SECOND,
+      // still-open choice's independent function_call evidence could
+      // never be reached (E-1/E-2). P4.3 ports the identical choice-local
+      // fix onto the legacy path: this choice's finish_reason now closes
+      // only its own call, and the ONE stream-wide provider_stream_end
+      // comes solely from adapter.finish().
       const gate = createToolCallExecutionGate();
       const adapter = new OpenAIStreamAdapter();
       drive(adapter, gate, { choices: [{ index: 0, delta: { function_call: { name: "search", arguments: '{"q":"test"}' } } }] });
       const terminalEvents = drive(adapter, gate, { choices: [{ index: 0, finish_reason: "stop" }] });
-      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
+      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end"]);
+
+      const finishEvents = adapter.finish({ reason: "complete" });
+      expect(finishEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      for (const e of finishEvents) gate.push(e);
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
       expect(decision.action).toBe("execute");

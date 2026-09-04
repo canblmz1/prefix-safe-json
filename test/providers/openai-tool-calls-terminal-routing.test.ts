@@ -152,16 +152,25 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
       expect(decision.action).toBe("execute");
     });
 
-    it("legacy singular function_call + separate finish_reason remains on the legacy path (2f4f76f behavior unaffected) - never routed to the compatible adapter", () => {
+    it("legacy singular function_call + separate finish_reason remains on the legacy path (P4.3 choice-scoped successor to 2f4f76f) - never routed to the compatible adapter", () => {
       const gate = createToolCallExecutionGate();
       const adapter = new OpenAIStreamAdapter();
       for (const e of adapter.push({ choices: [{ index: 0, delta: { function_call: { name: "search", arguments: '{"q":"test"}' } } }] })) gate.push(e);
       const terminalEvents = adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] });
-      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end", "provider_stream_end"]);
-      // The fixed legacy sourceKey - not "choice:0/tool-index:0" - proves
-      // this stayed on the legacy-synthesis path, not the compatible one.
-      expect((terminalEvents[0] as { callRef?: { sourceKey?: string } })?.callRef?.sourceKey).toBe("legacy-function-call");
+      // P4.3: choice.finish_reason now closes only its own choice
+      // (tool_call_end) - it no longer also ends the whole stream
+      // (provider_stream_end) directly; that is adapter.finish()'s job
+      // alone (see the class-level lifecycle-contract doc).
+      expect(terminalEvents.map((e) => e.type)).toEqual(["tool_call_end"]);
+      // The choice-scoped legacy sourceKey (P4.3: "legacy-choice:{index}",
+      // replacing the old fixed "legacy-function-call") - still not
+      // "choice:0/tool-index:0" - proves this stayed on the legacy-
+      // synthesis path, not the compatible one.
+      expect((terminalEvents[0] as { callRef?: { sourceKey?: string } })?.callRef?.sourceKey).toBe("legacy-choice:0");
       for (const e of terminalEvents) gate.push(e);
+      const finishEvents = adapter.finish({ reason: "complete" });
+      expect(finishEvents.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      for (const e of finishEvents) gate.push(e);
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
       expect(decision.action).toBe("execute");
@@ -170,9 +179,17 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
     });
 
     it("a bare finish_reason chunk with NO prior plural tool_calls evidence never synthesizes a phantom compatible tool_call_end (the sticky flag requires real prior evidence, never inferred from finish_reason alone)", () => {
+      // P4.3: this chunk also carries no prior LEGACY evidence for choice 0
+      // either, so the legacy fallback records a terminal reason for
+      // aggregation but has no open call of its own to close and does not
+      // itself emit any event - unlike the pre-P4.3 behavior this test
+      // originally captured, where ANY finish_reason (even with zero prior
+      // evidence of any kind) directly ended the whole stream. See the
+      // identical "no prior function_call ever seen" regression in
+      // openai-legacy-function-call-termination.test.ts.
       const adapter = new OpenAIStreamAdapter();
       const events = adapter.push({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
-      expect(events.map((e) => e.type)).toEqual(["provider_stream_end"]);
+      expect(events).toEqual([]);
     });
 
     it("truncated plural tool_calls arguments (separate terminal chunk) remain non-executable", () => {
@@ -355,6 +372,11 @@ describe("OpenAIStreamAdapter: plural tool_calls terminal routing", () => {
       const adapter = new OpenAIStreamAdapter();
       for (const e of adapter.push({ choices: [{ index: 0, delta: { function_call: { name: "legacyClean", arguments: '{"q":"test"}' } } }] })) gate.push(e);
       for (const e of adapter.push({ choices: [{ index: 0, finish_reason: "stop" }] })) gate.push(e);
+      // choice.finish_reason alone only closes the call; finish() is what
+      // actually terminates the stream (P4.3 choice-local lifecycle,
+      // mirroring the plural case above) - needed here for a genuine,
+      // clean "execute" terminal to exist BEFORE the late evidence below.
+      for (const e of adapter.finish()) gate.push(e);
 
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
