@@ -136,8 +136,8 @@ describe("Provider Safety Regressions", () => {
     // become a live execute() authority.
     const gate = createToolCallExecutionGate();
     const adapter = new GeminiStreamAdapter();
-    for (const ev of adapter.push({ candidates: [{ content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] })) gate.push(ev);
-    for (const ev of adapter.push({ candidates: [{ content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] })) gate.push(ev);
+    for (const ev of adapter.push({ candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] })) gate.push(ev);
+    for (const ev of adapter.push({ candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] })) gate.push(ev);
     const final = gate.finish({ reason: "complete" });
     const decision = expectDefined(final.decisions[0]);
     expect(decision.action).toBe("reject");

@@ -265,14 +265,16 @@ Calling `adapter.finish()` before `gate.finish()` is required to reach a
 genuine `execute` decision reliably across every provider adapter - some
 adapters' `push()` can legitimately observe the whole provider stream ending
 on its own (a single `message_delta`, a Responses API `response.completed`),
-but the `OpenAICompatibleStreamAdapter` family (`OpenAICompatibleStreamAdapter`,
-`OpenAIStreamAdapter` (both its plural `tool_calls` path and its legacy
-singular `function_call` path), `OpenRouterStreamAdapter`)
-deliberately never does: a single choice's own `finish_reason` is
-choice-local evidence only, never proof the whole (possibly multi-choice)
+but every adapter with a genuine per-choice/per-candidate shape deliberately
+never does: `OpenAICompatibleStreamAdapter`, `OpenAIStreamAdapter` (both its
+plural `tool_calls` path and its legacy singular `function_call` path),
+`OpenRouterStreamAdapter`, and `GeminiStreamAdapter` all treat one
+choice's/candidate's own `finish_reason`/`finishReason` as choice-local
+evidence only, never proof the whole (possibly multi-choice/multi-candidate)
 provider stream has ended - see [`COMPATIBILITY.md`](COMPATIBILITY.md) and
-that adapter's own class-level lifecycle-contract doc for why. Following the universal pattern
-above means never needing to know, per provider, which case applies.
+each adapter's own class-level lifecycle-contract doc for why. Following the
+universal pattern above means never needing to know, per provider, which
+case applies.
 
 This is the public **low-level adapter + gate** lifecycle - composed
 yourself, for when you need the adapter or gate instance directly. It is

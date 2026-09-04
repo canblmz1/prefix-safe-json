@@ -27,6 +27,7 @@ describe("remaining execution-authority boundaries — Phase 0 regressions", () 
 
     for (const event of adapter.push({
       candidates: [{
+        index: 0,
         content: {
           parts: [{
             functionCall: {
@@ -138,6 +139,7 @@ describe("remaining execution-authority boundaries — Phase 0 regressions", () 
     expect(() => {
       for (const event of adapter.push({
         candidates: [{
+          index: 0,
           content: { parts: [{ functionCall: { name: "write_file", args: circular } }] },
           finishReason: "STOP",
         }],
@@ -153,6 +155,7 @@ describe("remaining execution-authority boundaries — Phase 0 regressions", () 
     const adapter = new GeminiStreamAdapter();
     const events = adapter.push({
       candidates: [{
+        index: 0,
         content: { parts: [{ functionCall: { name: "f", args: () => undefined } }] },
         finishReason: "STOP",
       }],

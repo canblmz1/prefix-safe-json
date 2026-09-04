@@ -6,7 +6,7 @@
   "provider": "gemini",
   "input": {
     "encoding": "utf8-text",
-    "data": "{\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"foo\",\"args\":{\"d\":0}}}]}}]}"
+    "data": "{\"candidates\":[{\"content\":{\"parts\":[{\"functionCall\":{\"name\":\"foo\",\"args\":{\"d\":0}}}]},\"index\":0}]}"
   },
   "stream": {
     "endReason": "complete",

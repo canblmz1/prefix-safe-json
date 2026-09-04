@@ -326,54 +326,74 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
   });
 
   it("handles candidate with MAX_TOKENS finishReason", () => {
+    // Phase B: candidate.finishReason is candidate-local now (does not
+    // itself emit provider_stream_end) - the ONE real terminal comes from
+    // adapter.finish(), per the universal documented lifecycle every
+    // adapter in this library shares. Phase B.2: candidate identity is the
+    // real wire candidate.index, never array position - an explicit index
+    // is required even for this single-candidate case (no positional
+    // fallback - see the class-level doc comment on GeminiStreamAdapter).
     const g = new GeminiStreamAdapter();
-    const events = g.push({
-      candidates: [{ finishReason: "MAX_TOKENS" }],
-    });
+    g.push({ candidates: [{ index: 0, finishReason: "MAX_TOKENS" }] });
+    const events = g.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("length");
   });
 
   it("handles candidate with SAFETY finishReason", () => {
     const g = new GeminiStreamAdapter();
-    const events = g.push({
-      candidates: [{ finishReason: "SAFETY" }],
-    });
+    g.push({ candidates: [{ index: 0, finishReason: "SAFETY" }] });
+    const events = g.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("cancelled");
   });
 
   it("handles candidate with RECITATION finishReason", () => {
     const g = new GeminiStreamAdapter();
-    const events = g.push({
-      candidates: [{ finishReason: "RECITATION" }],
-    });
+    g.push({ candidates: [{ index: 0, finishReason: "RECITATION" }] });
+    const events = g.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("cancelled");
   });
 
   it("handles candidate with OTHER finishReason", () => {
     const g = new GeminiStreamAdapter();
-    const events = g.push({
-      candidates: [{ finishReason: "OTHER" }],
-    });
+    g.push({ candidates: [{ index: 0, finishReason: "OTHER" }] });
+    const events = g.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("cancelled");
   });
 
   it("handles candidate with unknown finishReason", () => {
     const g = new GeminiStreamAdapter();
-    const events = g.push({
-      candidates: [{ finishReason: "SOMETHING_NEW" }],
-    });
+    g.push({ candidates: [{ index: 0, finishReason: "SOMETHING_NEW" }] });
+    const events = g.finish();
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.reason).toBe("unknown");
   });
+
+  // Phase B.7: the official @google/genai@2.21.0 FinishReason enum is
+  // considerably larger than the four values this adapter explicitly
+  // recognizes. Every one of these newer/rarer, genuinely unsafe reasons
+  // must fall through to "unknown" - non-executable - never accidentally
+  // aggregate to "complete".
+  it.each(["MALFORMED_FUNCTION_CALL", "UNEXPECTED_TOOL_CALL", "PROHIBITED_CONTENT", "BLOCKLIST"])(
+    "an unrecognized-but-real official finishReason ('%s') maps to 'unknown', never 'complete'",
+    (finishReason) => {
+      const g = new GeminiStreamAdapter();
+      g.push({ candidates: [{ index: 0, finishReason }] });
+      const events = g.finish();
+      const end = events.find((e) => e.type === "provider_stream_end");
+      expect((end as { reason?: string })?.reason, finishReason).toBe("unknown");
+      expect((end as { reason?: string })?.reason, finishReason).not.toBe("complete");
+    },
+  );
 
   it("handles functionCall without args", () => {
     const g = new GeminiStreamAdapter();
     const events = g.push({
       candidates: [{
+        index: 0,
         content: { parts: [{ functionCall: { name: "my_tool" } }] },
       }],
     });
@@ -407,7 +427,7 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
     for (const fc of [{ name: "f", args: { a: 1 } }, { name: "f" }]) {
       const gate = createToolCallExecutionGate();
       const adapter = new GeminiStreamAdapter();
-      for (const e of adapter.push({ candidates: [{ content: { parts: [{ functionCall: fc }] } }] })) gate.push(e);
+      for (const e of adapter.push({ candidates: [{ index: 0, content: { parts: [{ functionCall: fc }] } }] })) gate.push(e);
       for (const e of adapter.finish({ reason: "complete" })) gate.push(e);
       const final = gate.finish();
       const decision = expectDefined(final.decisions[0]);
@@ -448,11 +468,22 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
     expect(gate.finish().decisions).toHaveLength(0);
   });
 
-  it("ignores events after finished", () => {
+  it("Phase B: a duplicate finishReason for the SAME candidate is no longer silently ignored - a bare finishReason no longer sets the adapter globally 'finished' at all, so this is now genuine choice-local duplicate-terminal hardening (DUPLICATE_TOOL_END_DIAGNOSTIC_CODE), not a top-of-push() finished guard no-op", () => {
     const g = new GeminiStreamAdapter();
-    g.push({ candidates: [{ finishReason: "STOP" }] });
-    const events = g.push({ candidates: [{ finishReason: "STOP" }] });
-    expect(events).toHaveLength(0);
+    const first = g.push({ candidates: [{ index: 0, finishReason: "STOP" }] });
+    expect(first).toEqual([]); // records candidate 0's own reason, nothing to close, no event
+    const events = g.push({ candidates: [{ index: 0, finishReason: "STOP" }] });
+    expect(events.map((e) => e.type)).toEqual(["provider_diagnostic"]);
+    expect((events[0] as { code?: string })?.code).toBe(DUPLICATE_TOOL_END_DIAGNOSTIC_CODE);
+  });
+
+  it("Phase B.6: the top-of-push() `finished` guard is REMOVED - late, post-adapter.finish() evidence is no longer silently dropped at the adapter boundary (future-proofing/architectural consistency; no live executable authority is threatened, since no Gemini call can ever reach 'execute' regardless - see the class-level doc comment)", () => {
+    const g = new GeminiStreamAdapter();
+    g.push({ candidates: [{ index: 0, finishReason: "STOP" }] });
+    g.finish();
+    const events = g.push({ candidates: [{ index: 0, finishReason: "STOP" }] });
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.map((e) => e.type)).toEqual(["provider_diagnostic"]);
   });
 
   it("finish() returns stream_end event", () => {
@@ -463,11 +494,14 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
     expect((end as { reason?: string })?.reason).toBe("network_error");
   });
 
-  it("finish() is idempotent", () => {
+  it("Phase B: adapter.finish() after a candidate-local finishReason is the ONE real, required provider_stream_end call, not a no-op - a further, direct finish() call IS the genuine no-op", () => {
     const g = new GeminiStreamAdapter();
-    g.push({ candidates: [{ finishReason: "STOP" }] });
-    const events = g.finish();
-    expect(events).toHaveLength(0);
+    g.push({ candidates: [{ index: 0, finishReason: "STOP" }] });
+    const first = g.finish();
+    expect(first.map((e) => e.type)).toEqual(["provider_stream_end"]);
+    expect((first[0] as { reason?: string })?.reason).toBe("complete");
+    const second = g.finish();
+    expect(second).toHaveLength(0);
   });
 
   it("finish() with no arguments at all does not throw and defaults reason to 'unknown'", () => {
@@ -479,7 +513,7 @@ describe("GeminiStreamAdapter — uncovered branches", () => {
   it("sequence numbers are strictly increasing across a realistic multi-branch stream (public contract: NormalizedEventBase.sequence is documented as a 'deterministic sequence number')", () => {
     const g = new GeminiStreamAdapter();
     const events = [
-      ...g.push({ candidates: [{ content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] }),
+      ...g.push({ candidates: [{ index: 0, content: { parts: [{ functionCall: { name: "f", args: { a: 1 } } }] } }] }),
       ...g.finish({ reason: "complete" }),
     ];
     for (let i = 1; i < events.length; i++) {
