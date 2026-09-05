@@ -428,6 +428,15 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     // Schema validation is a separate concern from structural
     // prefix-safety: only meaningful once the value is genuinely complete,
     // and only for tools with a registered schema.
+    //
+    // Stryker disable next-line ConditionalExpression: `call.name !==
+    // undefined` cannot observably differ from `true` here - the outcome
+    // assignment above already forces outcome to "invalid" whenever
+    // call.name is undefined, so reaching outcome === "complete" already
+    // guarantees call.name is defined. This conjunct exists for TypeScript's
+    // type narrowing (removing it is a real compile error at
+    // `this.toolValidators.get(call.name)` below, verified directly), not
+    // as an independently reachable runtime branch.
     if (outcome === "complete" && call.name !== undefined) {
       const validator = this.toolValidators.get(call.name);
       if (validator) {

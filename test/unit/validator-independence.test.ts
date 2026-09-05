@@ -83,8 +83,17 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
     expect(call?.parser.executable).toBe(true); // structurally complete - schema/validator failure is a separate, independent concern
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
     expect(diag).toBeDefined();
-    expect(diag?.message ?? "").toContain("custom: nope");
-    expect(diag?.message ?? "").toContain("custom: also nope");
+    // Exact match, not just substring containment: a weakened condition on
+    // this branch (e.g. matching any non-true result rather than
+    // specifically valid===false) would misroute a genuine {valid:false}
+    // result into the "malformed result" branch instead - whose message
+    // also happens to contain these same substrings via JSON.stringify,
+    // so only pinning the full message (and its "do not match its schema"
+    // prefix specifically) actually distinguishes the two branches.
+    expect(diag?.message).toBe(
+      'Tool call arguments for "write_file" do not match its schema: custom: nope; custom: also nope',
+    );
+    expect(diag?.severity).toBe("error");
   });
 
   it("valid=true from a custom validator marks the call executable", () => {
@@ -110,6 +119,7 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
     expect(diag?.message ?? "").toContain("threw instead of returning a result");
     expect(diag?.message ?? "").toContain("boom: this validator is broken");
+    expect(diag?.severity).toBe("error");
   });
 
   it("a validator that returns a malformed result (neither {valid:true} nor {valid:false,...}) fails that one call closed", () => {
@@ -123,6 +133,7 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
     expect(call?.parser.executable).toBe(true); // structurally complete - the malformed *validator* result is the only reason this rejects
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
     expect(diag?.message ?? "").toContain("returned a malformed result");
+    expect(diag?.severity).toBe("error");
   });
 
   it("a null/non-object schemas entry still fails fast at construction (typeof null === \"object\" guarded correctly)", () => {
