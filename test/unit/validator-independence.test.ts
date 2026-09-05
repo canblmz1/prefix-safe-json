@@ -204,6 +204,14 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
       }).toThrow(/is not a valid ToolInputValidator/);
       expect(coordinatorConstructed).toBe(false);
     });
+
+    it("the error message names the exact invalid value received, not a placeholder", () => {
+      expect(() =>
+        createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: { validate: 1 } as unknown as ToolInputValidator }),
+      ).toThrow(
+        'prefix-safe-json: validators["write_file"] is not a valid ToolInputValidator - expected an object with a "validate" function, received: {"validate":1}',
+      );
+    });
   });
 });
 
@@ -258,6 +266,29 @@ describe("prefix-safe-json/ajv", () => {
     // just presence of *an* error) is what actually pins that fallback down.
     const missingRequired = validator.validate({});
     expect(missingRequired).toEqual({ valid: false, errors: ["<root> must have required property 'x'"] });
+  });
+
+  it("the shared `schemas` path (buildSharedAjvValidators) ALSO compiles with allErrors:true - not just standalone createAjvValidator()", () => {
+    // The allErrors/strict tests above only exercise createAjvValidator()'s
+    // own Ajv construction. schemas/toolSchemas goes through a SEPARATE
+    // internal Ajv construction (buildSharedAjvValidators) - this was a real,
+    // separate gap until this test existed.
+    const coord = createToolCallStreamCoordinator(undefined, undefined, {
+      t: { type: "object", required: ["a", "b"], properties: { a: { type: "string" }, b: { type: "string" } } },
+    });
+    const call = runToolCall(coord, "t", "{}");
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message).toContain("must have required property 'a'");
+    expect(diag?.message).toContain("must have required property 'b'");
+  });
+
+  it("the shared `schemas` path ALSO compiles with strict:false - an unrecognized/vendor keyword schema compiles instead of throwing", () => {
+    expect(() =>
+      createToolCallStreamCoordinator(undefined, undefined, {
+        t: { type: "object", properties: { x: { type: "string" } }, "x-vendor-extension": true },
+      }),
+    ).not.toThrow();
   });
 
   it("PRE-0.5 COMPATIBILITY: schemas registered together in one `schemas` object can still $ref each other via a shared $id registry", () => {
@@ -356,6 +387,20 @@ describe("prefix-safe-json/standard-schema", () => {
 
     it("a schema with no ~standard property at all is a construction error", () => {
       expect(() => fromStandardSchema({} as never)).toThrow(/requires an object with a "~standard" property/);
+    });
+
+    it("a null ~standard is rejected the same as any other non-object", () => {
+      expect(() => fromStandardSchema({ "~standard": null } as never)).toThrow(
+        /requires schema\["~standard"\] to be an object/,
+      );
+    });
+
+    it("the construction error names the exact invalid value received, not a placeholder", () => {
+      expect(() =>
+        fromStandardSchema({ "~standard": { version: 2, vendor: "v", validate: () => ({}) } } as never),
+      ).toThrow(
+        'prefix-safe-json: fromStandardSchema() only supports Standard Schema v1 (schema["~standard"].version === 1). Received version: number 2.',
+      );
     });
   });
 
@@ -475,6 +520,17 @@ describe("prefix-safe-json/standard-schema", () => {
   it("an issue with no path formats as \"<root> <message>\" instead of crashing (path is documented as optional)", () => {
     const validator = fromStandardSchema({
       "~standard": { version: 1, vendor: "test-vendor", validate: () => ({ issues: [{ message: "whole value is invalid" }] }) },
+    });
+    expect(validator.validate({})).toEqual({ valid: false, errors: ["<root> whole value is invalid"] });
+  });
+
+  it("an issue with an explicitly empty path array (present, zero-length - not omitted) also formats as \"<root> <message>\"", () => {
+    // Distinct from "no path" above: `path: []` is present, unlike an
+    // omitted path, and pins path.length > 0 specifically (as opposed to
+    // e.g. a weakened `>= 0` check, which would try [].join(".") = "" and
+    // produce " <message>" instead of "<root> <message>").
+    const validator = fromStandardSchema({
+      "~standard": { version: 1, vendor: "test-vendor", validate: () => ({ issues: [{ message: "whole value is invalid", path: [] }] }) },
     });
     expect(validator.validate({})).toEqual({ valid: false, errors: ["<root> whole value is invalid"] });
   });
