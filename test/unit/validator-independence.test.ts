@@ -212,6 +212,14 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
         'prefix-safe-json: validators["write_file"] is not a valid ToolInputValidator - expected an object with a "validate" function, received: {"validate":1}',
       );
     });
+
+    it("the error message also names a primitive invalid value correctly (not the object-shaped branch)", () => {
+      expect(() =>
+        createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: false as unknown as ToolInputValidator }),
+      ).toThrow(
+        'prefix-safe-json: validators["write_file"] is not a valid ToolInputValidator - expected an object with a "validate" function, received: boolean false',
+      );
+    });
   });
 });
 
@@ -378,15 +386,20 @@ describe("prefix-safe-json/standard-schema", () => {
     it("non-function validate is a construction error", () => {
       expect(() =>
         fromStandardSchema({ "~standard": { version: 1, vendor: "v", validate: "nope" } } as never),
-      ).toThrow(/validate to be a function/);
+      ).toThrow(
+        'prefix-safe-json: fromStandardSchema() requires schema["~standard"].validate to be a function. Received: string nope',
+      );
     });
 
     it("a non-object schema (e.g. a bare validate function with no ~standard) is a construction error", () => {
       expect(() => fromStandardSchema((() => {}) as never)).toThrow(/requires an object with a "~standard" property/);
     });
 
-    it("a schema with no ~standard property at all is a construction error", () => {
-      expect(() => fromStandardSchema({} as never)).toThrow(/requires an object with a "~standard" property/);
+    it("a schema with no ~standard property at all is a construction error, naming the exact value received", () => {
+      expect(() => fromStandardSchema({} as never)).toThrow(
+        'prefix-safe-json: fromStandardSchema() requires an object with a "~standard" property ' +
+          "(the Standard Schema v1 interface - see https://standardschema.dev). Received: {}",
+      );
     });
 
     it("a null ~standard is rejected the same as any other non-object", () => {
@@ -449,9 +462,12 @@ describe("prefix-safe-json/standard-schema", () => {
       expect(() => validator.validate({})).toThrow(/not a\s+Standard Schema SuccessResult or FailureResult/);
     });
 
-    it("a non-array `issues` field is malformed and fails closed", () => {
+    it("a non-array `issues` field is malformed and fails closed, naming the exact value received", () => {
       const validator = fromStandardSchema(schemaReturning(() => ({ issues: "not an array" })));
-      expect(() => validator.validate({})).toThrow(/non-array `issues`/);
+      expect(() => validator.validate({})).toThrow(
+        "prefix-safe-json: fromStandardSchema()'s wrapped validator returned a non-array `issues` field, " +
+          "which is not a valid Standard Schema FailureResult. Received: string not an array",
+      );
     });
 
     it("an empty issues array is treated the same way through the full coordinator, not just the raw adapter", () => {
