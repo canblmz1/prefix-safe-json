@@ -70,6 +70,12 @@ A fixture is one JSON file (schema: `conformance/schema/fixture.schema.json`):
 }
 ```
 
+- **`schemaVersion`** is mandatory and must be `1` - the only version this
+  runner supports. The runner checks this at runtime (not just via the
+  TypeScript type, which a fixture read from a JSON file on disk never
+  passes through) and throws a clear compatibility error for any other
+  value, including a missing one. No schema-migration machinery exists;
+  v1 only.
 - **`profile`** is mandatory and must be `"normalized-gate"` in v1 - the
   runner throws a clear error for any other value rather than silently
   running a fixture whose claim it doesn't recognize.

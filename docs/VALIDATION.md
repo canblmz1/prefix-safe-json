@@ -133,10 +133,25 @@ same as a thrown exception: `schemaValid: false`, with an
 value received. There is no silent path where an unrecognized result
 shape gets treated as if no validator had run at all.
 
+### A malformed `validators[toolName]` registration
+
+The same fail-closed principle applies one level up, at registration:
+`validators[toolName]` is checked at construction time (non-null,
+an object, `validate` a function) and throws a specific, deterministic
+error if it isn't - `null`, `undefined`, `false`, `0`, `""`, `{}`, and
+`{ validate: <non-function> }` are all rejected. This matters because
+`ToolInputValidator` is a TypeScript interface, not a runtime guarantee,
+for a plain-JavaScript caller or an `as`-cast: without this check, a
+registered `null` validator would be indistinguishable at runtime from
+"no validator was ever registered for this tool" - the coordinator's own
+internal `if (validator) { ... }` lookup is a truthiness check, and
+`null` is falsy. An explicitly registered malformed validator must never
+silently degrade into "this tool has no validation at all."
+
 ## Standard Schema
 
-[Standard Schema](https://standardschema.dev) is a shared interface Zod
-4+, Valibot, ArkType, and others already implement. `prefix-safe-json`
+[Standard Schema v1](https://standardschema.dev) is a shared interface
+Zod 4+, Valibot, ArkType, and others already implement. `prefix-safe-json`
 ships a small adapter for it that adds no dependency on
 `@standard-schema/spec` or any specific library:
 
@@ -150,7 +165,7 @@ const gate = createToolCallExecutionGate(undefined, undefined, undefined, {
 ```
 
 **Precise compatibility claim: compatible with *synchronous* Standard
-Schema validators only.** This is not universal Standard Schema
+Schema v1 validators only.** This is not universal Standard Schema
 compatibility - the execution gate's decision path is synchronous by
 design, and Standard Schema's own `validate()` is permitted to return a
 `Promise`. When it does, `fromStandardSchema()`'s own adapter throws
@@ -158,6 +173,77 @@ immediately with a clear message naming the problem, which the
 coordinator then converts into the same fail-closed `valid: false`
 outcome described above ("A validator that throws") - never a silently
 awaited or ignored Promise, and never a hang.
+
+### Construction-time v1 shape validation
+
+`fromStandardSchema(schema)` checks `schema["~standard"]` at construction
+time - `version === 1`, `vendor` a string, `validate` a function - and
+throws synchronously and specifically if any of those don't hold, rather
+than accepting an arbitrary object and failing confusingly later,
+mid-stream. This is a real runtime check, not just a TypeScript type,
+for the same reason every other validation boundary in this package is:
+a plain-JavaScript caller (or a `.d.ts`-less dependency) can hand this
+function anything.
+
+### Result semantics (exact v1 contract, not an approximation)
+
+Standard Schema v1 defines the result union precisely:
+
+```ts
+type SuccessResult<Output> = { value: Output; issues?: undefined };
+type FailureResult = { issues: ReadonlyArray<Issue> };
+```
+
+`fromStandardSchema()`'s adapter follows this exactly, not a looser
+reading of it:
+
+- A present `issues` field (any array, **including an empty one**) is
+  always a `FailureResult` - `{ issues: [] }` is **invalid**, never
+  treated as success. An empty issues array is still evidence the
+  validator explicitly returned a failure shape, distinct from omitting
+  `issues` entirely.
+- Success requires `issues` to be genuinely absent/`undefined` **and**
+  a `value` key present on the result. `{}` - neither field present -
+  is not success; it's a malformed result, and fails closed the same way
+  a validator that returns `undefined`/`null` does (see above).
+- A `null` result, a primitive result (string/number/boolean), or a
+  non-array `issues` field are all malformed for the same reason and
+  fail the same way - a thrown, specific error the coordinator's outer
+  catch converts into `schemaValid: false`.
+
+None of this is weakened because TypeScript's own types would normally
+prevent these values at the call site that constructs the schema object
+- a real Standard Schema vendor library's own `validate()` return value
+is still checked at runtime here, the same as everywhere else in this
+package's validation boundary.
+
+### Issue path formatting
+
+A Standard Schema v1 issue's `path` entries are
+`ReadonlyArray<PropertyKey | { key: PropertyKey }>` - either a bare
+`PropertyKey` (string/number/symbol) or the official `PathSegment` object
+form. Both are formatted correctly (the object form renders its `.key`,
+never a bare `String()` of the object itself, which would otherwise
+produce `"[object Object]"`).
+
+### The Standard Schema transformation boundary
+
+`fromStandardSchema()` uses the Standard Schema result only as
+**validation evidence** - `valid: true`/`valid: false`, nothing else. It
+does **not** substitute Standard Schema's returned/transformed
+`SuccessResult.value` into the tool-call arguments that actually reach
+`takeDecision()`/execution. `prefix-safe-json` owns execution authority,
+not schema transformation: a schema that coerces, defaults, or otherwise
+transforms its input on success will see that transformation reflected
+in its own `SuccessResult.value`, but the coordinator's `stableValue` -
+what a caller's own code actually receives and executes against - stays
+exactly what the provider stream produced, byte for byte. Callers whose
+schemas perform coercion/defaulting/transformation must perform their
+normal parsing/transformation step themselves, before the side effect,
+or provide a `ToolInputValidator` directly whose acceptance semantics
+match the arguments they actually execute. This adapter is not, and does
+not claim to be, a replacement for a project's normal parsing/
+transformation pipeline.
 
 ## JSON Schema / Ajv
 
@@ -188,6 +274,25 @@ because it has real, concrete DX value on its own - compiling one
 validator once and reusing it across multiple coordinators/gates, or
 constructing one directly to pass through the `validators` option
 alongside genuinely custom validators for other tools.
+
+### Shared-instance compatibility for `toolSchemas`/`schemas`
+
+Every schema in **one** `toolSchemas`/`schemas` object, on **one**
+construction call, is compiled through a single shared Ajv instance -
+matching pre-0.5 behavior exactly, where the coordinator held one `Ajv`
+and compiled every registered schema through it. This means schemas
+registered together can `$ref` one another via a shared `$id` registry
+(verified directly: two schemas, one with `$id: "address"`, the other
+`{"$ref": "address"}`, compile and validate correctly when registered
+together).
+
+This is a **different, narrower** internal path than calling
+`createAjvValidator(schema)` once per schema yourself: each standalone
+call there gets its own, separate Ajv instance (by design - see its own
+doc comment), so schemas compiled through two separate
+`createAjvValidator()` calls cannot `$ref` each other. If your schemas
+need to reference one another, register them together via `toolSchemas`/
+`schemas` rather than compiling each one individually.
 
 ### Ajv loading
 
@@ -233,3 +338,9 @@ schema (or a validator that throws while being registered - not to be
 confused with throwing during `validate()`, both fail closed but at
 different times) fails at construction time, not mid-stream, matching the
 parser's own fail-fast philosophy.
+
+A `schemas`/`validators` name collision is checked **before** any schema
+is compiled, so a colliding tool name is always reported as a collision -
+deterministically, even when that same tool's `schemas` entry also
+happens to be malformed JSON Schema. Compilation order does not decide
+which error a caller sees for a tool with two independent problems.
