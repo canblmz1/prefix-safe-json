@@ -121,6 +121,18 @@ every other in-flight call in the same stream. This is deliberate: one
 misconfigured or buggy validator should not take down processing for
 calls it was never registered for.
 
+### A validator that returns a malformed result
+
+`validate()` is typed to return exactly `{valid: true}` or `{valid:
+false, errors?}` - but that is a compile-time guarantee, not a runtime
+one, for a validator implemented in plain JavaScript or violating its
+own declared type. If `validate()` returns anything else without
+throwing (`undefined`, `null`, `{}`, ...), the coordinator treats it the
+same as a thrown exception: `schemaValid: false`, with an
+`E_SCHEMA_VALIDATION_FAILED` diagnostic naming the actual malformed
+value received. There is no silent path where an unrecognized result
+shape gets treated as if no validator had run at all.
+
 ## Standard Schema
 
 [Standard Schema](https://standardschema.dev) is a shared interface Zod
