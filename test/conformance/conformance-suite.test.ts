@@ -54,6 +54,32 @@ describe("Tool Call Integrity conformance corpus", () => {
 });
 
 describe("runToolCallIntegrityFixture - runner mechanics (not corpus content)", () => {
+  it("schemaVersion 1 is supported", () => {
+    const fixture: unknown = { ...cleanCallFixture("schema-version-1", "t"), schemaVersion: 1 };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).not.toThrow();
+  });
+
+  it("schemaVersion 0 is rejected", () => {
+    const fixture: unknown = { ...cleanCallFixture("schema-version-0", "t"), schemaVersion: 0 };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).toThrow(/schemaVersion 0/);
+  });
+
+  it("schemaVersion 2 is rejected", () => {
+    const fixture: unknown = { ...cleanCallFixture("schema-version-2", "t"), schemaVersion: 2 };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).toThrow(/schemaVersion 2/);
+  });
+
+  it("a missing schemaVersion is rejected", () => {
+    const fixture = { ...cleanCallFixture("schema-version-missing", "t") } as Record<string, unknown>;
+    delete fixture.schemaVersion;
+    expect(() => runToolCallIntegrityFixture(fixture as unknown as ConformanceFixture)).toThrow(/schemaVersion/);
+  });
+
+  it("schemaVersion is checked before profile - a fixture wrong in both reports the schemaVersion problem", () => {
+    const fixture: unknown = { ...cleanCallFixture("both-wrong", "t"), schemaVersion: 99, profile: "future-profile" };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).toThrow(/schemaVersion 99/);
+  });
+
   it('throws for any profile other than "normalized-gate" instead of silently running an unrecognized claim', () => {
     const fixture = { ...cleanCallFixture("bad-profile", "t"), profile: "future-profile" as never };
     expect(() => runToolCallIntegrityFixture(fixture)).toThrow(/does not support/);
