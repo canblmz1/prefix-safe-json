@@ -17,9 +17,9 @@ export default defineConfig({
       // Set to exactly 95 on every metric to faithfully enforce RELEASE.md's
       // documented "Verify Code Coverage (`npm run test:coverage`) >= 95%"
       // bar - not a headroom-padded number invented independently of that
-      // policy. All four metrics clear this today (99.03% stmt / 95.66%
-      // branch / 98.81% funcs / 99.03% lines), branches with the thinnest
-      // margin (~0.66 points). Confirmed empirically (not assumed) that
+      // policy. All four metrics clear this today (99.50% stmt / 96.98%
+      // branch / 98.99% funcs / 99.50% lines), branches with the thinnest
+      // margin (~1.98 points). Confirmed empirically (not assumed) that
       // Vitest's threshold check passes when the 2-decimal-rounded actual
       // value is >= the threshold, so 95 here means exactly ">=95%",
       // matching RELEASE.md's own wording with no adjustment needed - unlike
@@ -37,7 +37,18 @@ export default defineConfig({
         "**/scripts/**",
         "**/examples/**",
         "**/test/**",
-        "**/types.ts",
+        // Not a blanket "**/types.ts" (as this used to be): every types.ts
+        // in the project was pure type/interface declarations when that
+        // pattern was written, but src/validation/types.ts no longer is -
+        // it now holds real runtime logic (buildValidatorMap and its
+        // validation helpers), which a blanket pattern would silently drop
+        // from every coverage number below without any signal that it
+        // happened. Named explicitly per remaining type-only file instead.
+        "src/types.ts",
+        "**/coordinator/types.ts",
+        "**/gate/types.ts",
+        "**/guard/types.ts",
+        "**/conformance/types.ts",
         "**/protocol.ts",
         "**/adapter.ts",
         "**/events.ts",
