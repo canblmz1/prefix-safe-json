@@ -136,6 +136,19 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
     expect(diag?.severity).toBe("error");
   });
 
+  it("a validator that returns a truthy but non-conforming object (no boolean valid field) also fails closed, not routed to the valid=false branch", () => {
+    // {} is truthy - unlike undefined, this specifically exercises whether
+    // the valid===false check is doing real, exact work, or whether a
+    // weakened check (e.g. "any truthy result not already valid===true")
+    // would misroute it into the wrong branch with the wrong message.
+    const validator = { validate: () => ({}) as unknown } as ToolInputValidator;
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message).toBe('Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: {}');
+  });
+
   it("a null/non-object schemas entry still fails fast at construction (typeof null === \"object\" guarded correctly)", () => {
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: null as never })).toThrow();
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: "not a schema" as never })).toThrow();
@@ -153,6 +166,28 @@ describe("prefix-safe-json/ajv", () => {
 
   it("createAjvValidator() throws synchronously on a malformed schema", () => {
     expect(() => createAjvValidator({ type: "not-a-real-type" })).toThrow();
+  });
+
+  it("compiles with allErrors:true - a value violating two required fields reports both, not just the first", () => {
+    const validator = createAjvValidator({
+      type: "object",
+      required: ["a", "b"],
+      properties: { a: { type: "string" }, b: { type: "string" } },
+    });
+    const result = validator.validate({});
+    expect(result.valid).toBe(false);
+    const errors = (result as { valid: false; errors?: readonly string[] }).errors ?? [];
+    expect(errors).toHaveLength(2);
+  });
+
+  it("compiles with strict:false - a schema using an unrecognized/vendor keyword compiles instead of throwing", () => {
+    // Ajv's own default (strict mode) rejects this exact schema at compile
+    // time with "strict mode: unknown keyword" - verified directly. This
+    // pins down that createAjvValidator() deliberately opts out of strict
+    // mode, not just that it happens to accept ordinary schemas.
+    expect(() =>
+      createAjvValidator({ type: "object", properties: { x: { type: "string" } }, "x-vendor-extension": true }),
+    ).not.toThrow();
   });
 
   it("validate() on an invalid value returns exactly {valid:false, errors} with real Ajv message text, not a placeholder", () => {
