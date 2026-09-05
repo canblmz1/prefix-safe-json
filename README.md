@@ -240,17 +240,20 @@ finish-reason mapping: [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 ### Bring your own validator
 
 Schema/validator checking is optional and validator-agnostic — plug in
-Zod, TypeBox, Valibot, a Standard Schema-compliant validator, a
-hand-written check, or a raw JSON Schema object (backwards compatible,
-compiled through an isolated, lazily-loaded Ajv adapter):
+Zod, TypeBox, Valibot, a Standard Schema-compliant validator, or a
+hand-written check via the separate `validators` option, alongside or
+instead of a raw JSON Schema object via the pre-existing `toolSchemas`/
+`schemas` option (statically compiled through Ajv):
 
 ```typescript
-const gate = createToolCallExecutionGate(undefined, undefined, {
+const gate = createToolCallExecutionGate(undefined, undefined, undefined, {
   write_file: { validate: (v) => WriteFileSchema.safeParse(v).success ? { valid: true } : { valid: false } },
 });
 ```
 
-No forced dependency on any specific validation ecosystem. See
+A tool name may be registered in `toolSchemas`/`schemas` or in `validators`,
+never both — registering both throws at construction time. No forced
+dependency on any specific validation ecosystem. See
 [`docs/VALIDATION.md`](docs/VALIDATION.md).
 
 ## Conformance
