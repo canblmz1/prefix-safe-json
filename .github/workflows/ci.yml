@@ -339,7 +339,7 @@ jobs:
           const ajvValidator: ToolInputValidator = createAjvValidator({ type: "object" });
 
           const standardValidator: ToolInputValidator = fromStandardSchema({
-            "~standard": { validate: (value: unknown) => ({ value }) },
+            "~standard": { version: 1, vendor: "ci-smoke", validate: (value: unknown) => ({ value }) },
           });
 
           const fixture: ConformanceFixture = {
