@@ -32,7 +32,8 @@
     "src/guard/ai-sdk-execution-lock.ts",
     "src/validation/types.ts",
     "src/validation/ajv-validator.ts",
-    "src/validation/standard-schema-validator.ts"
+    "src/validation/standard-schema-validator.ts",
+    "src/conformance/runner.ts"
   ],
   "timeoutMS": 10000,
   "timeoutFactor": 2
