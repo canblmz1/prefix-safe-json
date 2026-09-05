@@ -33,6 +33,51 @@ const SDK_EXECUTION_OBSERVED_CODES: ReadonlySet<string> = new Set([
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 ]);
 
+/**
+ * @internal
+ * Runtime shape check for what `validator.validate()` actually returned.
+ * `ToolInputValidator` is a TypeScript interface, not a runtime guarantee -
+ * `result && result.valid === true/false` alone is not a safe discriminator:
+ * an array is `typeof "object"` and could carry an incidental `.valid`
+ * property; a function can too (`fn.valid = true` is legal JS), and
+ * `typeof fn !== "object"` is what actually excludes it here. Also rejects
+ * internally contradictory shapes a conforming implementation never
+ * produces: `valid: true` alongside a defined `errors` field, or
+ * `valid: false` with an `errors` field that is anything other than absent
+ * or a `string[]` - a bare string or a non-string array would otherwise
+ * reach `(result.errors ?? []).join("; ")` below, which throws on a string
+ * (no `.join`) and silently stringifies non-string elements on an array.
+ */
+function isWellFormedValidationResult(result: unknown): result is ToolValidationResult {
+  if (typeof result !== "object" || result === null || Array.isArray(result)) return false;
+  const value = result as { valid?: unknown; errors?: unknown };
+  if (value.valid === true) return value.errors === undefined;
+  if (value.valid === false) {
+    if (value.errors === undefined) return true;
+    return Array.isArray(value.errors) && value.errors.every((e) => typeof e === "string");
+  }
+  return false;
+}
+
+/**
+ * @internal
+ * Describes an arbitrary, possibly-malformed validator result for a
+ * diagnostic message without ever throwing. A circular object or a value
+ * containing a BigInt both make `JSON.stringify` throw - a diagnostic
+ * describing *why* a result was rejected must never itself crash the
+ * stream it exists to fail closed.
+ */
+function describeMalformedResult(value: unknown): string {
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return Object.prototype.toString.call(value);
+    }
+  }
+  return `${typeof value} ${String(value)}`;
+}
+
 class CoordinatorCallState {
   readonly internalId: string;
   readonly provider: ProviderName;
@@ -447,7 +492,12 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
         // in-flight call down with it.
         let didThrow = false;
         let thrown: unknown;
-        let result: ToolValidationResult | undefined;
+        // Deliberately `unknown`, not `ToolValidationResult` - the interface
+        // declares validate()'s return type, but a plain-JS implementation
+        // (or an `as`-cast) can hand back anything at runtime, and this
+        // value is trusted no further than any other external input until
+        // isWellFormedValidationResult() below actually proves the shape.
+        let result: unknown;
         try {
           result = validator.validate(res.stableValue);
         } catch (error) {
@@ -465,9 +515,9 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
               thrown instanceof Error ? thrown.message : String(thrown)
             }`,
           });
-        } else if (result && result.valid === true) {
+        } else if (isWellFormedValidationResult(result) && result.valid === true) {
           call.schemaValid = true;
-        } else if (result && result.valid === false) {
+        } else if (isWellFormedValidationResult(result) && result.valid === false) {
           call.schemaValid = false;
           const errors = (result.errors ?? []).join("; ");
           this.addDiagnostic({
@@ -479,20 +529,23 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
         } else {
           // A conforming ToolInputValidator never reaches here - validate()
           // is typed to return exactly {valid: true} or {valid: false,
-          // ...}. This branch exists for the one case the type system
-          // cannot prevent: a validator that does not honor its own
-          // contract at runtime (returns undefined/null/some other shape
-          // without throwing). Fails closed the same as a thrown error -
-          // the alternative (falling through with schemaValid left unset)
-          // would let executable's `call.schemaValid !== false` check treat
-          // an unproven, malformed validator result as if no validator had
-          // run at all.
+          // ...}. This branch exists for every shape the type system cannot
+          // prevent at runtime: undefined/null, an array, a function
+          // (including one with an incidental `.valid` property), a
+          // non-boolean `valid`, `valid: true` alongside a defined `errors`
+          // field, or `valid: false` with `errors` that isn't absent or a
+          // plain `string[]` - see isWellFormedValidationResult() above.
+          // Fails closed the same as a thrown error - the alternative
+          // (falling through with schemaValid left unset) would let
+          // executable's `call.schemaValid !== false` check treat an
+          // unproven, malformed validator result as if no validator had run
+          // at all.
           call.schemaValid = false;
           this.addDiagnostic({
             code: "E_SCHEMA_VALIDATION_FAILED",
             severity: "error",
             internalId: call.internalId,
-            message: `Validator for "${call.name}" returned a malformed result instead of {valid: true} or {valid: false, ...}: ${JSON.stringify(result)}`,
+            message: `Validator for "${call.name}" returned a malformed result instead of {valid: true} or {valid: false, ...}: ${describeMalformedResult(result)}`,
           });
         }
       }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createToolCallStreamCoordinator } from "../../src/coordinator/coordinator.js";
+import { createToolCallExecutionGate } from "../../src/gate/gate.js";
 import type { NormalizedToolStreamEvent } from "../../src/coordinator/protocol.js";
 import type { ToolInputValidator } from "../../src/validation/types.js";
 import { createAjvValidator } from "../../src/ajv.js";
@@ -28,6 +29,19 @@ function runToolCall(
   coord.push({ type: "tool_call_end", callRef: ref, reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
   coord.push({ type: "provider_stream_end", reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
   return coord.snapshot().calls[0];
+}
+
+function runToolCallOnGate(
+  gate: ReturnType<typeof createToolCallExecutionGate>,
+  name: string,
+  argsJson: string,
+) {
+  const ref = { sourceKey: "call-0" };
+  gate.push({ type: "tool_call_start", callRef: ref, name, provider: "openai" } as unknown as NormalizedToolStreamEvent);
+  gate.push({ type: "tool_call_arguments_delta", callRef: ref, delta: argsJson, provider: "openai" } as unknown as NormalizedToolStreamEvent);
+  gate.push({ type: "tool_call_end", callRef: ref, reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
+  gate.push({ type: "provider_stream_end", reason: "complete", provider: "openai" } as unknown as NormalizedToolStreamEvent);
+  return gate.finish().decisions[0];
 }
 
 describe("Explicit schemas/validators split - no structural discrimination", () => {
@@ -220,6 +234,174 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
         'prefix-safe-json: validators["write_file"] is not a valid ToolInputValidator - expected an object with a "validate" function, received: boolean false',
       );
     });
+  });
+});
+
+describe("validator RESULT runtime shape gate (result && result.valid alone is not a safe discriminator)", () => {
+  // Every case here is a validator that does NOT throw - it returns a
+  // value that superficially might satisfy `result && result.valid ===
+  // true/false` for a naive check, but is not a genuine ToolValidationResult.
+  // All must fail closed: schemaValid: false, and - proven via the real
+  // gate, not just the coordinator - takeDecision() must return undefined
+  // (the call is never an ExecuteDecision).
+
+  it("an array result fails closed, even one with an incidental .valid=true property", () => {
+    const arrayResult = [] as unknown as { valid: boolean };
+    arrayResult.valid = true;
+    const validator: ToolInputValidator = { validate: () => arrayResult as never };
+    const gate = createToolCallExecutionGate(undefined, undefined, undefined, { write_file: validator });
+    const decision = runToolCallOnGate(gate, "write_file", '{"path":"a.txt"}');
+    expect(decision?.action).not.toBe("execute");
+    expect(decision?.reason).toBe("schema_invalid");
+    expect(gate.takeDecision(decision?.internalId ?? "missing")).toBeUndefined();
+  });
+
+  it("a function result fails closed, even one with an incidental .valid=true property", () => {
+    const fnResult = (() => {}) as unknown as { valid: boolean };
+    fnResult.valid = true;
+    const validator: ToolInputValidator = { validate: () => fnResult as never };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message ?? "").toContain("returned a malformed result");
+  });
+
+  it("valid:true alongside a defined errors field is contradictory and fails closed", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: true, errors: ["should not be here"] } as never) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+  });
+
+  it("valid:false with errors as a bare string (not string[]) fails closed instead of crashing on .join()", () => {
+    // Before this gate existed, (result.errors ?? []).join("; ") would
+    // throw "errors.join is not a function" on a bare string - a crash in
+    // the validator-result-handling path itself, not a controlled failure.
+    const validator: ToolInputValidator = { validate: () => ({ valid: false, errors: "a plain string, not an array" } as never) };
+    const gate = createToolCallExecutionGate(undefined, undefined, undefined, { write_file: validator });
+    let decision: ReturnType<typeof runToolCallOnGate> | undefined;
+    expect(() => {
+      decision = runToolCallOnGate(gate, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(decision?.action).not.toBe("execute");
+    expect(gate.takeDecision(decision?.internalId ?? "missing")).toBeUndefined();
+  });
+
+  it("valid:false with a non-string array errors field fails closed (exact message, not the schema-mismatch branch)", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: false, errors: [1, 2, 3] } as never) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    // Exact match, not substring: a weakened "every element is a string"
+    // check (e.g. .some() instead of .every(), or a callback that always
+    // returns true) would still leave schemaValid false here (result.valid
+    // is already false either way) - only pinning the message distinguishes
+    // "malformed" from "do not match its schema" with garbage error text.
+    expect(diag?.message).toBe(
+      'Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: {"valid":false,"errors":[1,2,3]}',
+    );
+  });
+
+  it("valid:false with a MIXED string/non-string errors array fails closed (distinguishes .every from .some)", () => {
+    // An all-non-string array like [1,2,3] cannot distinguish .every(isString)
+    // from .some(isString) - both are false either way. A mix where exactly
+    // one element is a real string is what actually pins .every() down.
+    const validator: ToolInputValidator = { validate: () => ({ valid: false, errors: ["a real error", 42] } as never) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message).toBe(
+      'Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: {"valid":false,"errors":["a real error",42]}',
+    );
+  });
+
+  it("valid:false with errors absent is accepted (the documented, common case), with the exact fallback error text", () => {
+    const validator: ToolInputValidator = { validate: () => ({ valid: false }) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    const call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    // Exact match: (result.errors ?? []).join("; ") producing "" is what
+    // triggers the "unknown validation error" fallback text specifically -
+    // a substring check on "do not match its schema" alone cannot tell this
+    // apart from a mutant that replaces the [] fallback (or the fallback
+    // text itself) with something else, since errors is absent either way.
+    expect(diag?.message).toBe('Tool call arguments for "write_file" do not match its schema: unknown validation error');
+  });
+
+  it("a circular object result fails closed WITHOUT the diagnostic message itself throwing", () => {
+    const circular: Record<string, unknown> = { note: "circular" };
+    circular.self = circular;
+    const validator: ToolInputValidator = { validate: () => circular as never };
+    const gate = createToolCallExecutionGate(undefined, undefined, undefined, { write_file: validator });
+    let decision: ReturnType<typeof runToolCallOnGate> | undefined;
+    expect(() => {
+      decision = runToolCallOnGate(gate, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(decision?.action).not.toBe("execute");
+    expect(gate.takeDecision(decision?.internalId ?? "missing")).toBeUndefined();
+    const diag = gate.finish().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    // Exact match: a catch block that swallows the JSON.stringify failure
+    // without its own fallback (still never throwing, but losing the
+    // description) would leave the message ending in "undefined" instead of
+    // the real Object.prototype.toString.call() fallback text - both are
+    // equally crash-free, so only pinning the exact text distinguishes them.
+    expect(diag?.message).toBe(
+      'Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: [object Object]',
+    );
+  });
+
+  it("a BigInt-bearing object result fails closed WITHOUT the diagnostic message itself throwing", () => {
+    // JSON.stringify throws on a BigInt anywhere in the structure (unlike a
+    // circular reference, this is a hard type error, not a traversal one) -
+    // the diagnostic-formatting fallback must catch this too.
+    const validator: ToolInputValidator = { validate: () => ({ notValid: true, big: 10n } as never) };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    let call: ReturnType<typeof runToolCall> | undefined;
+    expect(() => {
+      call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message).toBe(
+      'Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: [object Object]',
+    );
+  });
+
+  it("a bare BigInt result (not even an object) fails closed without throwing, using the primitive fallback format", () => {
+    const validator: ToolInputValidator = { validate: () => 10n as never };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    let call: ReturnType<typeof runToolCall> | undefined;
+    expect(() => {
+      call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(call?.schemaValid).toBe(false);
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    // Exact match: a bare BigInt is typeof "bigint", not "object" - it must
+    // take the primitive fallback (`${typeof value} ${String(value)}`), not
+    // the JSON.stringify-then-catch path. Forcing the object branch would
+    // also not crash (still caught), but would produce "[object BigInt]"
+    // instead - only the exact string tells these two safe-but-different
+    // paths apart.
+    expect(diag?.message).toBe(
+      'Validator for "write_file" returned a malformed result instead of {valid: true} or {valid: false, ...}: bigint 10',
+    );
+  });
+
+  it("a null result fails closed without crashing on `.valid` access", () => {
+    // typeof null === "object", so only the explicit `=== null` check (not
+    // the typeof check alone) keeps this from reaching `value.valid` on a
+    // null reference, which would throw "Cannot read properties of null".
+    const validator: ToolInputValidator = { validate: () => null as never };
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    let call: ReturnType<typeof runToolCall> | undefined;
+    expect(() => {
+      call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(call?.schemaValid).toBe(false);
   });
 });
 
