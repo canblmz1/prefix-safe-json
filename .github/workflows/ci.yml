@@ -320,11 +320,46 @@ jobs:
           const many: LockedAiSdkTools<{ tool: RawTool }> = { tool: single };
           console.log(many.tool.needsApproval);
           EOF
+          cat > /tmp/consumer-ts/smoke-validation.ts <<'EOF'
+          // Covers the three 0.5.0 subpath exports (all Experimental) that
+          // smoke.ts/smoke-lock.ts above don't touch - proves their .d.ts
+          // files resolve under strict/NodeNext from the real packed
+          // tarball, not just from this repository's own tsconfig paths.
+          import { createAjvValidator } from "prefix-safe-json/ajv";
+          import { fromStandardSchema } from "prefix-safe-json/standard-schema";
+          import {
+            runToolCallIntegrityFixture,
+            runToolCallIntegritySuite,
+            type ConformanceFixture,
+            type ConformanceFixtureResult,
+            type ConformanceSuiteResult,
+          } from "prefix-safe-json/conformance";
+          import type { ToolInputValidator } from "prefix-safe-json";
 
-      - name: TS clean-room smoke — compile both against the built .d.ts (Stable + Experimental)
+          const ajvValidator: ToolInputValidator = createAjvValidator({ type: "object" });
+
+          const standardValidator: ToolInputValidator = fromStandardSchema({
+            "~standard": { validate: (value: unknown) => ({ value }) },
+          });
+
+          const fixture: ConformanceFixture = {
+            schemaVersion: 1,
+            profile: "normalized-gate",
+            id: "ts-package-smoke",
+            description: "type-check only, never executed",
+            provenance: { classification: "synthetic-adversarial" },
+            events: [],
+            expected: [],
+          };
+          const fixtureResult: ConformanceFixtureResult = runToolCallIntegrityFixture(fixture);
+          const suiteResult: ConformanceSuiteResult = runToolCallIntegritySuite([fixture]);
+          console.log(typeof ajvValidator.validate, typeof standardValidator.validate, fixtureResult.pass, suiteResult.pass);
+          EOF
+
+      - name: TS clean-room smoke — compile all three against the built .d.ts (Stable + Experimental)
         run: |
           cat > /tmp/consumer-ts/tsconfig.json <<'EOF'
-          { "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true }, "include": ["smoke.ts", "smoke-lock.ts"] }
+          { "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true }, "include": ["smoke.ts", "smoke-lock.ts", "smoke-validation.ts"] }
           EOF
           cd /tmp/consumer-ts && ./node_modules/.bin/tsc --noEmit -p tsconfig.json && echo "TS package smoke: OK"
 
