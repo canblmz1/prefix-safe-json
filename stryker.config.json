@@ -29,7 +29,10 @@
     "src/providers/gemini.ts",
     "src/coordinator/coordinator.ts",
     "src/guard/provider-guard.ts",
-    "src/guard/ai-sdk-execution-lock.ts"
+    "src/guard/ai-sdk-execution-lock.ts",
+    "src/validation/types.ts",
+    "src/validation/ajv-validator.ts",
+    "src/validation/standard-schema-validator.ts"
   ],
   "timeoutMS": 10000,
   "timeoutFactor": 2
