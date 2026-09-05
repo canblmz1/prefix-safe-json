@@ -235,9 +235,11 @@ does **not** substitute Standard Schema's returned/transformed
 `takeDecision()`/execution. `prefix-safe-json` owns execution authority,
 not schema transformation: a schema that coerces, defaults, or otherwise
 transforms its input on success will see that transformation reflected
-in its own `SuccessResult.value`, but the coordinator's `stableValue` -
-what a caller's own code actually receives and executes against - stays
-exactly what the provider stream produced, byte for byte. Callers whose
+in its own `SuccessResult.value` - but `fromStandardSchema()` never
+replaces the coordinator's original parsed `stableValue` with that
+returned/transformed `SuccessResult.value`. What a caller's own code
+actually receives and executes against remains the coordinator's own
+parsed value, exactly as it was before validation ran. Callers whose
 schemas perform coercion/defaulting/transformation must perform their
 normal parsing/transformation step themselves, before the side effect,
 or provide a `ToolInputValidator` directly whose acceptance semantics
