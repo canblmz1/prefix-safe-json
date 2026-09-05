@@ -1,7 +1,7 @@
-import { createAjvValidator } from "./ajv-validator.js";
+import { buildSharedAjvValidators } from "./ajv-validator.js";
 
 /**
- * @public (Stable)
+ * @public (Experimental)
  * The result of validating one tool call's arguments. Structurally minimal
  * on purpose: `errors`, when present, are already-formatted human-readable
  * strings, not ecosystem-specific issue objects (Zod issues, Ajv errors,
@@ -43,29 +43,81 @@ export interface ToolInputValidator {
 
 /**
  * @internal
+ * Runtime shape check for a `validators[toolName]` entry. `ToolInputValidator`
+ * is a TypeScript interface, not a runtime guarantee - a plain-JavaScript
+ * caller (or a `as never`/`as ToolInputValidator` cast) can hand this
+ * anything. An explicitly *registered* malformed validator must never be
+ * silently equivalent to "no validator registered": `coordinator.ts`'s
+ * `if (validator) { ... }` truthiness check would otherwise skip a `null`/
+ * `undefined`/`false`/`0`/`""` entry entirely, letting the call execute
+ * with zero diagnostic - the same class of fail-open gap already closed for
+ * a validator that returns a malformed *result* (see
+ * `docs/VALIDATION.md#a-validator-that-returns-a-malformed-result`). This
+ * check exists so that gap cannot reopen one level up, at registration time.
+ */
+function isToolInputValidatorShaped(value: unknown): value is ToolInputValidator {
+  return typeof value === "object" && value !== null && typeof (value as { validate?: unknown }).validate === "function";
+}
+
+function describeInvalidValidator(value: unknown): string {
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return Object.prototype.toString.call(value);
+    }
+  }
+  return `${typeof value} ${String(value)}`;
+}
+
+/**
+ * @internal
  * Builds the coordinator's internal per-tool validator map from the two
  * explicit, separate registration options. There is no structural/duck-type
  * discrimination anywhere in this path - `schemas` entries are always
  * compiled as JSON Schema, `validators` entries are always used as-is, and
  * a tool name present in both is a construction-time error rather than a
  * silently-resolved precedence rule. See `docs/VALIDATION.md`.
+ *
+ * Collision detection runs *before* any schema is compiled, so a colliding
+ * tool name is always reported as a collision - deterministically, even
+ * when that same tool's `schemas` entry also happens to be malformed JSON
+ * Schema. Without this ordering, whichever check happened to run first
+ * would decide which error the caller sees, for reasons unrelated to which
+ * problem is actually more fundamental.
  */
 export function buildValidatorMap(
   schemas: Record<string, object> | undefined,
   validators: Record<string, ToolInputValidator> | undefined,
 ): Map<string, ToolInputValidator> {
+  if (schemas && validators) {
+    for (const toolName of Object.keys(validators)) {
+      if (Object.prototype.hasOwnProperty.call(schemas, toolName)) {
+        throw new Error(
+          `prefix-safe-json: tool ${JSON.stringify(toolName)} is registered in both "schemas" and ` +
+            `"validators" - a tool's validation must come from exactly one source. Remove one registration.`,
+        );
+      }
+    }
+  }
+
   const map = new Map<string, ToolInputValidator>();
   if (schemas) {
-    for (const [toolName, schema] of Object.entries(schemas)) {
-      map.set(toolName, createAjvValidator(schema));
+    // One shared Ajv instance for every schema in THIS `schemas` object -
+    // pre-0.5 behavior, restored here after 0.5's per-schema
+    // createAjvValidator() calls regressed it (a schema could no longer
+    // $ref another schema registered in the same construction - see
+    // buildSharedAjvValidators's own doc comment for the direct proof).
+    for (const [toolName, validator] of buildSharedAjvValidators(schemas)) {
+      map.set(toolName, validator);
     }
   }
   if (validators) {
     for (const [toolName, validator] of Object.entries(validators)) {
-      if (map.has(toolName)) {
+      if (!isToolInputValidatorShaped(validator)) {
         throw new Error(
-          `prefix-safe-json: tool ${JSON.stringify(toolName)} is registered in both "schemas" and ` +
-            `"validators" - a tool's validation must come from exactly one source. Remove one registration.`,
+          `prefix-safe-json: validators[${JSON.stringify(toolName)}] is not a valid ToolInputValidator - ` +
+            `expected an object with a "validate" function, received: ${describeInvalidValidator(validator)}`,
         );
       }
       map.set(toolName, validator);
