@@ -456,7 +456,9 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
               thrown instanceof Error ? thrown.message : String(thrown)
             }`,
           });
-        } else if (result && !result.valid) {
+        } else if (result && result.valid === true) {
+          call.schemaValid = true;
+        } else if (result && result.valid === false) {
           call.schemaValid = false;
           const errors = (result.errors ?? []).join("; ");
           this.addDiagnostic({
@@ -465,8 +467,24 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
             internalId: call.internalId,
             message: `Tool call arguments for "${call.name}" do not match its schema: ${errors || "unknown validation error"}`,
           });
-        } else if (result) {
-          call.schemaValid = result.valid;
+        } else {
+          // A conforming ToolInputValidator never reaches here - validate()
+          // is typed to return exactly {valid: true} or {valid: false,
+          // ...}. This branch exists for the one case the type system
+          // cannot prevent: a validator that does not honor its own
+          // contract at runtime (returns undefined/null/some other shape
+          // without throwing). Fails closed the same as a thrown error -
+          // the alternative (falling through with schemaValid left unset)
+          // would let executable's `call.schemaValid !== false` check treat
+          // an unproven, malformed validator result as if no validator had
+          // run at all.
+          call.schemaValid = false;
+          this.addDiagnostic({
+            code: "E_SCHEMA_VALIDATION_FAILED",
+            severity: "error",
+            internalId: call.internalId,
+            message: `Validator for "${call.name}" returned a malformed result instead of {valid: true} or {valid: false, ...}: ${JSON.stringify(result)}`,
+          });
         }
       }
     }

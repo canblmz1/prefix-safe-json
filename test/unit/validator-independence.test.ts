@@ -112,6 +112,19 @@ describe("Explicit schemas/validators split - no structural discrimination", () 
     expect(diag?.message ?? "").toContain("boom: this validator is broken");
   });
 
+  it("a validator that returns a malformed result (neither {valid:true} nor {valid:false,...}) fails that one call closed", () => {
+    const validator = { validate: () => undefined as never } as ToolInputValidator;
+    const coord = createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: validator });
+    let call: ReturnType<typeof runToolCall> | undefined;
+    expect(() => {
+      call = runToolCall(coord, "write_file", '{"path":"a.txt"}');
+    }).not.toThrow();
+    expect(call?.schemaValid).toBe(false);
+    expect(call?.parser.executable).toBe(true); // structurally complete - the malformed *validator* result is the only reason this rejects
+    const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
+    expect(diag?.message ?? "").toContain("returned a malformed result");
+  });
+
   it("a null/non-object schemas entry still fails fast at construction (typeof null === \"object\" guarded correctly)", () => {
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: null as never })).toThrow();
     expect(() => createToolCallStreamCoordinator(undefined, undefined, { bad_tool: "not a schema" as never })).toThrow();
@@ -129,6 +142,24 @@ describe("prefix-safe-json/ajv", () => {
 
   it("createAjvValidator() throws synchronously on a malformed schema", () => {
     expect(() => createAjvValidator({ type: "not-a-real-type" })).toThrow();
+  });
+
+  it("validate() on an invalid value returns exactly {valid:false, errors} with real Ajv message text, not a placeholder", () => {
+    const validator = createAjvValidator({
+      type: "object",
+      required: ["x"],
+      properties: { x: { type: "string" } },
+      additionalProperties: false,
+    });
+    const typeMismatch = validator.validate({ x: 1 });
+    expect(typeMismatch).toEqual({ valid: false, errors: ["/x must be string"] });
+
+    // Ajv reports a missing required property at the object root, where
+    // instancePath is "" - this is exactly the case the "<root>" fallback
+    // in ajv-validator.ts exists for; asserting the literal string (not
+    // just presence of *an* error) is what actually pins that fallback down.
+    const missingRequired = validator.validate({});
+    expect(missingRequired).toEqual({ valid: false, errors: ["<root> must have required property 'x'"] });
   });
 });
 
@@ -154,6 +185,25 @@ describe("prefix-safe-json/standard-schema", () => {
     runToolCall(coord, "write_file", "{}");
     const diag = coord.snapshot().diagnostics.find((d) => d.code === "E_SCHEMA_VALIDATION_FAILED");
     expect(diag?.message ?? "").toContain("path failed the fake check");
+  });
+
+  it("an empty issues array (present, but zero-length) is treated as success, same as issues being absent entirely", () => {
+    const validator = fromStandardSchema({ "~standard": { validate: (value: unknown) => ({ value, issues: [] }) } });
+    expect(validator.validate({ path: "a.txt" })).toEqual({ valid: true });
+  });
+
+  it("an issue with no path formats as \"<root> <message>\" instead of crashing (path is documented as optional)", () => {
+    const validator = fromStandardSchema({
+      "~standard": { validate: () => ({ issues: [{ message: "whole value is invalid" }] }) },
+    });
+    expect(validator.validate({})).toEqual({ valid: false, errors: ["<root> whole value is invalid"] });
+  });
+
+  it("a multi-segment issue path is joined with \".\", not concatenated bare", () => {
+    const validator = fromStandardSchema({
+      "~standard": { validate: () => ({ issues: [{ message: "nested failure", path: ["a", "b"] }] }) },
+    });
+    expect(validator.validate({})).toEqual({ valid: false, errors: ["a.b nested failure"] });
   });
 
   it("an async Standard Schema validator fails loudly and closed: the adapter throws, the coordinator catches it as valid:false rather than crashing", () => {
