@@ -35,6 +35,17 @@ function matchDecision(
  * exactly as a provider adapter would produce them.
  */
 export function runToolCallIntegrityFixture(fixture: ConformanceFixture): ConformanceFixtureResult {
+  // `schemaVersion`/`profile` are typed as literal `1`/`"normalized-gate"`,
+  // but that is a compile-time guarantee only - fixtures are ordinary JSON
+  // read off disk (or constructed by a JS caller), so both are checked at
+  // runtime here rather than trusted from the type. v1 only; no migration
+  // machinery for a schemaVersion that doesn't exist yet.
+  if (fixture.schemaVersion !== 1) {
+    throw new Error(
+      `prefix-safe-json: fixture "${fixture.id}" declares schemaVersion ${JSON.stringify(fixture.schemaVersion)}, ` +
+        `which this runner does not support (only schemaVersion 1 exists). See docs/CONFORMANCE.md.`,
+    );
+  }
   if (fixture.profile !== "normalized-gate") {
     throw new Error(
       `prefix-safe-json: fixture "${fixture.id}" declares profile ${JSON.stringify(fixture.profile)}, ` +
