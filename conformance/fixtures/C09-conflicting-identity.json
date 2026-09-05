@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C09-conflicting-identity",
+  "description": "A second tool_call_start arrives for a sourceKey that already has an active call - a genuine protocol anomaly, not a legitimate continuation. Must fail closed rather than silently merging or overwriting the first call's identity.",
+  "provenance": { "classification": "synthetic-adversarial", "note": "No specific provider observed sending this; stresses a defensive invariant." },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "tool_a" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"a\":1}" },
+    { "type": "tool_call_start", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_2", "name": "tool_b" },
+    { "type": "tool_call_end", "sequence": 4, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "tool_a", "action": "reject", "reason": "protocol_violation" }
+  ]
+}

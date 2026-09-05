@@ -7,6 +7,24 @@ import { fileURLToPath } from "node:url";
 
 const EXPECTED_FILES = ["LICENSE", "LICENSE-APACHE", "LICENSE-MIT", "README.md", "dist"];
 const EXPECTED_RUNTIME_DEPENDENCIES = { ajv: "^8.20.0" };
+const EXPECTED_EXPORTS = {
+  ".": {
+    types: "./dist/index.d.ts",
+    import: "./dist/index.js",
+  },
+  "./ajv": {
+    types: "./dist/ajv.d.ts",
+    import: "./dist/ajv.js",
+  },
+  "./standard-schema": {
+    types: "./dist/standard-schema.d.ts",
+    import: "./dist/standard-schema.js",
+  },
+  "./conformance": {
+    types: "./dist/conformance.d.ts",
+    import: "./dist/conformance.js",
+  },
+};
 const INSTALL_LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];
 const ALLOWED_ROOT_FILES = new Set([
   "LICENSE",
@@ -118,7 +136,7 @@ export function verifyPackagePolicy(tarballPath) {
   if (manifest.sideEffects !== false) fail(`sideEffects must remain false`);
   assertObjectEquals(
     manifest.exports,
-    { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
+    EXPECTED_EXPORTS,
     "public entrypoint policy",
   );
 

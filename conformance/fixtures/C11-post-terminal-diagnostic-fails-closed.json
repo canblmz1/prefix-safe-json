@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C11-post-terminal-diagnostic-fails-closed",
+  "description": "Tests the coordinator/gate's response to an already-normalized provider_diagnostic reporting that argument evidence arrived after this call's own terminal event - NOT whether an adapter can derive that conclusion from raw provider wire data. The diagnostic is this fixture's input, not something the implementation is asked to infer: recognizing a late fragment from raw wire evidence is a provider-adapter concern outside the normalized-gate profile (see docs/CONFORMANCE.md's 'Provider-adapter conformance' section). Once such a diagnostic is present in the normalized stream, the gate must fail the call closed.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "note": "The diagnostic code modeled here (E_TOOL_ARGUMENTS_AFTER_END) is real and currently emitted by every provider adapter in this package from raw wire evidence - but that emission is out of scope for this fixture, which only tests the gate's reaction once the diagnostic already exists in the normalized stream. A bare late tool_call_arguments_delta with no such diagnostic present is a different, weaker case: it resolves retry/stream_incomplete via general trailing-data handling, not reject."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_diagnostic", "sequence": 4, "provider": "openai", "code": "E_TOOL_ARGUMENTS_AFTER_END", "severity": "error", "callRef": { "sourceKey": "call:0" }, "message": "Argument evidence arrived after this call's own terminal event." },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "protocol_violation" }
+  ]
+}

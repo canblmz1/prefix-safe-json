@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C03-truncated-but-valid-json",
+  "description": "The canonical 'unsafe finish reason' case: the JSON that arrived is syntactically complete and would parse cleanly, but the stream ended for a reason other than a genuine completion (length). Structural validity is not the same fact as confirmed completion - this fixture is the whole thesis of the package.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "project": "vercel/ai",
+    "reference": "https://github.com/vercel/ai/issues/19063",
+    "note": "Same failure class independently reported and reproduced against the Vercel AI SDK: tool calls executing regardless of an unsafe finish reason."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "length" },
+    { "type": "provider_stream_end", "sequence": 4, "provider": "openai", "reason": "length" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "retry", "reason": "stream_incomplete" }
+  ]
+}
