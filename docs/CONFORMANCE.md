@@ -102,6 +102,28 @@ package's own test suite dogfoods it directly
 (`test/conformance/conformance-suite.test.ts`) rather than maintaining a
 second, parallel truth set.
 
+## Distribution: fixtures are repository-only
+
+The npm package does **not** ship the fixture JSON files. `package.json`'s
+`files` field is `["dist", "LICENSE", "LICENSE-MIT", "LICENSE-APACHE",
+"README.md"]` — it does not include the top-level `conformance/` directory
+(`conformance/fixtures/*.json`, `conformance/schema/fixture.schema.json`),
+so an `npm install prefix-safe-json` consumer receives only the compiled
+runner and its types (`prefix-safe-json/conformance`, i.e.
+`dist/conformance.js` + `dist/conformance/*`), never the fixture data
+itself. This was verified directly against a real packed tarball
+(`pnpm pack`) installed into an isolated consumer project — the corpus
+files are absent from both the tarball's file list and the installed
+`node_modules/prefix-safe-json/` tree.
+
+A consumer who wants to run the actual corpus (as opposed to writing their
+own fixtures against the exported types and runner) needs this repository
+directly — clone it, or read `conformance/fixtures/*.json` from a specific
+tagged commit/release on GitHub. This is a deliberate, low-cost distinction
+worth stating plainly rather than leaving implicit: the *runner* is a
+supported runtime dependency; the *corpus* is project documentation and
+test data, not a runtime asset.
+
 ## Initial corpus (v1, 15 fixtures)
 
 | ID | Class | Classification |
