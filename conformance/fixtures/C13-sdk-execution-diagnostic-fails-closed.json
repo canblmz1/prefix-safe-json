@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C13-sdk-execution-diagnostic-fails-closed",
+  "description": "Tests the coordinator/gate's response to an already-normalized provider_diagnostic reporting that the host SDK's own tool loop already invoked this call - NOT whether an adapter can derive that conclusion from a raw tool-result/tool-error event. The diagnostic is this fixture's input, not something the implementation is asked to infer: recognizing SDK-side execution from a raw AI SDK fullStream part is a provider-adapter concern outside the normalized-gate profile (see docs/CONFORMANCE.md's 'Provider-adapter conformance' section). Once such a diagnostic is present in the normalized stream, execution authority has already left this package's hands and the gate must never report execute for the same call, regardless of how complete or valid its arguments otherwise look.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "project": "vercel/ai",
+    "note": "The diagnostic code modeled here (E_SDK_EXECUTION_OBSERVED) is real and currently emitted by the AI SDK adapter from a raw tool-result/tool-error fullStream part - but that emission is out of scope for this fixture, which only tests the gate's reaction once the diagnostic already exists in the normalized stream. See docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence for the adapter-level mechanism this normalizes."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "ai-sdk", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "ai-sdk", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "provider_diagnostic", "sequence": 3, "provider": "ai-sdk", "code": "E_SDK_EXECUTION_OBSERVED", "severity": "error", "callRef": { "sourceKey": "call:0" }, "message": "SDK's own tool loop already invoked this call's execute()." },
+    { "type": "tool_call_end", "sequence": 4, "provider": "ai-sdk", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "ai-sdk", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "sdk_execution_observed" }
+  ]
+}

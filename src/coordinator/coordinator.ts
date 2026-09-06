@@ -1,6 +1,6 @@
-import { Ajv, ValidateFunction } from "ajv";
 import { IncrementalJsonParser, ParserOptions } from "../types.js";
 import { createParser } from "../parser.js";
+import { buildValidatorMap, type ToolInputValidator, type ToolValidationResult } from "../validation/types.js";
 import { NormalizedToolStreamEvent, ProviderName, StreamEndReason } from "./protocol.js";
 import {
   ToolCallStreamCoordinator,
@@ -12,7 +12,6 @@ import {
   DEFAULT_COORDINATOR_LIMITS,
   ToolCallState,
   CoordinatorDiagnostic,
-  JsonSchemaLike
 } from "./types.js";
 import {
   AUTHORITY_PROTOCOL_VIOLATION_CODES,
@@ -33,6 +32,51 @@ const SDK_EXECUTION_OBSERVED_CODES: ReadonlySet<string> = new Set([
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 ]);
+
+/**
+ * @internal
+ * Runtime shape check for what `validator.validate()` actually returned.
+ * `ToolInputValidator` is a TypeScript interface, not a runtime guarantee -
+ * `result && result.valid === true/false` alone is not a safe discriminator:
+ * an array is `typeof "object"` and could carry an incidental `.valid`
+ * property; a function can too (`fn.valid = true` is legal JS), and
+ * `typeof fn !== "object"` is what actually excludes it here. Also rejects
+ * internally contradictory shapes a conforming implementation never
+ * produces: `valid: true` alongside a defined `errors` field, or
+ * `valid: false` with an `errors` field that is anything other than absent
+ * or a `string[]` - a bare string or a non-string array would otherwise
+ * reach `(result.errors ?? []).join("; ")` below, which throws on a string
+ * (no `.join`) and silently stringifies non-string elements on an array.
+ */
+function isWellFormedValidationResult(result: unknown): result is ToolValidationResult {
+  if (typeof result !== "object" || result === null || Array.isArray(result)) return false;
+  const value = result as { valid?: unknown; errors?: unknown };
+  if (value.valid === true) return value.errors === undefined;
+  if (value.valid === false) {
+    if (value.errors === undefined) return true;
+    return Array.isArray(value.errors) && value.errors.every((e) => typeof e === "string");
+  }
+  return false;
+}
+
+/**
+ * @internal
+ * Describes an arbitrary, possibly-malformed validator result for a
+ * diagnostic message without ever throwing. A circular object or a value
+ * containing a BigInt both make `JSON.stringify` throw - a diagnostic
+ * describing *why* a result was rejected must never itself crash the
+ * stream it exists to fail closed.
+ */
+function describeMalformedResult(value: unknown): string {
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return Object.prototype.toString.call(value);
+    }
+  }
+  return `${typeof value} ${String(value)}`;
+}
 
 class CoordinatorCallState {
   readonly internalId: string;
@@ -60,7 +104,7 @@ class CoordinatorCallState {
 export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinator {
   private readonly limits: CoordinatorLimits;
   private readonly parserOptions: ParserOptions | undefined;
-  private readonly toolValidators: Map<string, ValidateFunction>;
+  private readonly toolValidators: Map<string, ToolInputValidator>;
   private calls: Map<string, CoordinatorCallState> = new Map();
   private sourceKeyToInternalId: Map<string, string> = new Map();
   private pendingProtocolDiagnostics: Map<string, CoordinatorDiagnostic[]> = new Map();
@@ -78,30 +122,38 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
    *   underlying per-call IncrementalJsonParser (limits, repairs). Previously
    *   there was no way to pass the latter through at all; every parser the
    *   coordinator created was hardcoded to library defaults.
-   * @param toolSchemas Optional JSON Schema (draft-07) per tool name. When a
-   *   call for a registered tool reaches outcome "complete", its
-   *   `stableValue` is validated against the schema. Structural
-   *   prefix-safety (no truncated/fabricated values) and schema validity
-   *   are independent concerns — a value can be genuinely complete and
-   *   still not match what the tool declared it needs (wrong type, missing
+   * @param toolSchemas Optional raw JSON Schema (draft-07) per tool name,
+   *   compiled internally through `prefix-safe-json/ajv`'s
+   *   `createAjvValidator()`. This is the pre-0.5 option, unchanged in
+   *   shape - existing callers need no code change.
+   * @param validators Optional {@link ToolInputValidator} per tool name -
+   *   additive, 0.5.0+. Use this to plug in Zod, TypeBox, Valibot, a
+   *   Standard Schema-compliant validator, or a hand-written check, with no
+   *   forced dependency on this package's own validation stack. A tool name
+   *   present in both `toolSchemas` and `validators` is a construction-time
+   *   error - there is no structural discrimination or silent precedence
+   *   between the two; each tool's validation comes from exactly one
+   *   explicit source. See `docs/VALIDATION.md`.
+   *
+   *   When a call for a registered tool reaches outcome "complete", its
+   *   `stableValue` is validated. Structural prefix-safety (no
+   *   truncated/fabricated values) and validator-reported validity are
+   *   independent concerns — a value can be genuinely complete and still
+   *   not match what the tool declared it needs (wrong type, missing
    *   required field the model never provided at all). Both must hold for
-   *   `executable` to be true. Schemas are compiled eagerly here so a
-   *   malformed schema fails fast at construction, not mid-stream.
+   *   `executable` to be true. Entries are resolved eagerly here so a
+   *   malformed schema (or a misconfigured validator's constructor-time
+   *   setup) fails fast at construction, not mid-stream.
    */
   constructor(
     limits?: Partial<CoordinatorLimits>,
     parserOptions?: ParserOptions,
-    toolSchemas?: Record<string, JsonSchemaLike>,
+    toolSchemas?: Record<string, object>,
+    validators?: Record<string, ToolInputValidator>,
   ) {
     this.limits = { ...DEFAULT_COORDINATOR_LIMITS, ...limits };
     this.parserOptions = parserOptions;
-    this.toolValidators = new Map();
-    if (toolSchemas) {
-      const ajv = new Ajv({ allErrors: true, strict: false });
-      for (const [toolName, schema] of Object.entries(toolSchemas)) {
-        this.toolValidators.set(toolName, ajv.compile(schema));
-      }
-    }
+    this.toolValidators = buildValidatorMap(toolSchemas, validators);
   }
 
   push(event: NormalizedToolStreamEvent): CoordinatorPushResult {
@@ -421,19 +473,79 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     // Schema validation is a separate concern from structural
     // prefix-safety: only meaningful once the value is genuinely complete,
     // and only for tools with a registered schema.
+    //
+    // Stryker disable next-line ConditionalExpression: `call.name !==
+    // undefined` cannot observably differ from `true` here - the outcome
+    // assignment above already forces outcome to "invalid" whenever
+    // call.name is undefined, so reaching outcome === "complete" already
+    // guarantees call.name is defined. This conjunct exists for TypeScript's
+    // type narrowing (removing it is a real compile error at
+    // `this.toolValidators.get(call.name)` below, verified directly), not
+    // as an independently reachable runtime branch.
     if (outcome === "complete" && call.name !== undefined) {
       const validator = this.toolValidators.get(call.name);
       if (validator) {
-        call.schemaValid = validator(res.stableValue) === true;
-        if (!call.schemaValid) {
-          const errors = (validator.errors ?? [])
-            .map((e) => `${e.instancePath || "<root>"} ${e.message ?? ""}`.trim())
-            .join("; ");
+        // A validator that throws (e.g. a Standard Schema adapter refusing
+        // an async validator - see docs/VALIDATION.md) fails this one call
+        // closed rather than aborting the whole stream: caught here, not
+        // left to propagate out of push()/finish() and take every other
+        // in-flight call down with it.
+        let didThrow = false;
+        let thrown: unknown;
+        // Deliberately `unknown`, not `ToolValidationResult` - the interface
+        // declares validate()'s return type, but a plain-JS implementation
+        // (or an `as`-cast) can hand back anything at runtime, and this
+        // value is trusted no further than any other external input until
+        // isWellFormedValidationResult() below actually proves the shape.
+        let result: unknown;
+        try {
+          result = validator.validate(res.stableValue);
+        } catch (error) {
+          didThrow = true;
+          thrown = error;
+        }
+
+        if (didThrow) {
+          call.schemaValid = false;
+          this.addDiagnostic({
+            code: "E_SCHEMA_VALIDATION_FAILED",
+            severity: "error",
+            internalId: call.internalId,
+            message: `Validator for "${call.name}" threw instead of returning a result: ${
+              thrown instanceof Error ? thrown.message : String(thrown)
+            }`,
+          });
+        } else if (isWellFormedValidationResult(result) && result.valid === true) {
+          call.schemaValid = true;
+        } else if (isWellFormedValidationResult(result) && result.valid === false) {
+          call.schemaValid = false;
+          const errors = (result.errors ?? []).join("; ");
           this.addDiagnostic({
             code: "E_SCHEMA_VALIDATION_FAILED",
             severity: "error",
             internalId: call.internalId,
             message: `Tool call arguments for "${call.name}" do not match its schema: ${errors || "unknown validation error"}`,
+          });
+        } else {
+          // A conforming ToolInputValidator never reaches here - validate()
+          // is typed to return exactly {valid: true} or {valid: false,
+          // ...}. This branch exists for every shape the type system cannot
+          // prevent at runtime: undefined/null, an array, a function
+          // (including one with an incidental `.valid` property), a
+          // non-boolean `valid`, `valid: true` alongside a defined `errors`
+          // field, or `valid: false` with `errors` that isn't absent or a
+          // plain `string[]` - see isWellFormedValidationResult() above.
+          // Fails closed the same as a thrown error - the alternative
+          // (falling through with schemaValid left unset) would let
+          // executable's `call.schemaValid !== false` check treat an
+          // unproven, malformed validator result as if no validator had run
+          // at all.
+          call.schemaValid = false;
+          this.addDiagnostic({
+            code: "E_SCHEMA_VALIDATION_FAILED",
+            severity: "error",
+            internalId: call.internalId,
+            message: `Validator for "${call.name}" returned a malformed result instead of {valid: true} or {valid: false, ...}: ${describeMalformedResult(result)}`,
           });
         }
       }
@@ -589,7 +701,8 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
 export function createToolCallStreamCoordinator(
   limits?: Partial<CoordinatorLimits>,
   parserOptions?: ParserOptions,
-  toolSchemas?: Record<string, JsonSchemaLike>,
+  toolSchemas?: Record<string, object>,
+  validators?: Record<string, ToolInputValidator>,
 ): ToolCallStreamCoordinator {
-  return new DefaultToolCallStreamCoordinator(limits, parserOptions, toolSchemas);
+  return new DefaultToolCallStreamCoordinator(limits, parserOptions, toolSchemas, validators);
 }

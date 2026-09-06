@@ -21,7 +21,7 @@ export function createProviderExecutionGuard<TRawEvent>(
   adapter: ProviderStreamAdapter<TRawEvent>,
   options?: ExecutionGuardOptions,
 ): ExecutionGuard<TRawEvent> {
-  const gate = createToolCallExecutionGate(options?.limits, options?.parserOptions, options?.schemas);
+  const gate = createToolCallExecutionGate(options?.limits, options?.parserOptions, options?.schemas, options?.validators);
 
   return {
     push(rawEvent: TRawEvent): void {

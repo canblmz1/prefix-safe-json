@@ -26,7 +26,7 @@ This library parses untrusted JSON input from LLM streaming endpoints and can be
 - **Memory/resource safety**: The implementation avoids intentionally unbounded parser state and keeps resource limits explicit.
 - **No dynamic code execution**: The parser never uses `eval`, `Function`, or similar dynamic code execution.
 - **No network I/O in the library**: Provider adapters normalize events supplied by callers; the package does not make provider or tool network requests on its own.
-- **Runtime dependencies**: JSON Schema validation uses AJV. Dependency changes should be reviewed with the same safety and maintenance scrutiny as parser changes.
+- **Runtime dependencies**: validation is validator-agnostic (see `docs/VALIDATION.md`); a raw JSON Schema value is compiled via Ajv, imported statically as a hard runtime dependency of the core path. Dependency changes should be reviewed with the same safety and maintenance scrutiny as parser changes.
 
 ## Supported Versions
 

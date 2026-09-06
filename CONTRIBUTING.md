@@ -39,6 +39,25 @@ When adding new test fixtures, follow the schema in `corpus/schema/fixture.schem
 
 Run `pnpm validate-corpus` to verify fixture validity.
 
+## Conformance fixtures
+
+`conformance/fixtures/` is a separate, public, provider-neutral corpus of
+execution-authority outcomes (not raw parser edge cases - see
+`docs/CONFORMANCE.md`). Add a new fixture matching
+`conformance/schema/fixture.schema.json`, set `provenance.classification`
+honestly, and run `pnpm test test/conformance/` - the suite loads every
+fixture in the directory automatically.
+
+## Adding a provider adapter
+
+New provider support needs a `ProviderStreamAdapter` implementation (see
+existing adapters in `src/providers/`), a set of `corpus/provider-envelopes/`
+fixtures covering that provider's own streaming shape, and ideally a
+`conformance/fixtures/` case if it exercises a genuinely new
+execution-authority scenario the existing corpus doesn't cover. Open an
+issue describing the provider and its streaming shape before submitting a
+PR, per "Current Development Posture" above.
+
 ## Commit Messages
 
 Use conventional commit format:

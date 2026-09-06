@@ -1,4 +1,7 @@
 import * as pkg from "prefix-safe-json";
+import * as ajvSubpath from "prefix-safe-json/ajv";
+import * as standardSchemaSubpath from "prefix-safe-json/standard-schema";
+import * as conformanceSubpath from "prefix-safe-json/conformance";
 
 const {
   createParser,
@@ -7,6 +10,9 @@ const {
   GeminiStreamAdapter,
   OpenAICompatibleStreamAdapter,
 } = pkg;
+const { createAjvValidator } = ajvSubpath;
+const { fromStandardSchema } = standardSchemaSubpath;
+const { runToolCallIntegrityFixture, runToolCallIntegritySuite } = conformanceSubpath;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -18,6 +24,10 @@ for (const [name, value] of Object.entries({
   createAiSdkExecutionGuard,
   GeminiStreamAdapter,
   OpenAICompatibleStreamAdapter,
+  createAjvValidator,
+  fromStandardSchema,
+  runToolCallIntegrityFixture,
+  runToolCallIntegritySuite,
 })) {
   assert(typeof value === "function", `missing public export ${name}`);
 }
@@ -186,6 +196,101 @@ assert(openAiDecisions.length === 2, "OpenAI-compatible choices were conflated")
 assert(openAiDecisions.every((decision) => decision.action === "execute"), "OpenAI-compatible choice lost authority");
 assert(new Set(openAiDecisions.map((decision) => decision.toolCallId)).size === 2, "OpenAI-compatible identities were ambiguous");
 
+let malformedValidatorRejected = false;
+try {
+  createToolCallExecutionGate(undefined, undefined, undefined, { write_file: null });
+} catch (error) {
+  malformedValidatorRejected = /is not a valid ToolInputValidator/.test(error.message);
+}
+assert(malformedValidatorRejected, "gate accepted a null validator registration instead of rejecting it at construction");
+
+const validatorGuard = createAiSdkExecutionGuard({ validators: { write_file: { validate: () => ({ valid: true }) } } });
+for (const part of [
+  { type: "tool-input-start", id: "validator-guard", toolName: "write_file" },
+  { type: "tool-input-delta", id: "validator-guard", delta: '{"path":"v.txt","content":"ok"}' },
+  { type: "tool-input-end", id: "validator-guard" },
+  { type: "finish", finishReason: "tool-calls" },
+]) validatorGuard.push(part);
+const validatorGuardDecision = validatorGuard.finish().decisions[0];
+assert(validatorGuardDecision?.action === "execute", "AI SDK guard did not propagate the validators option through to execution");
+
+const directAjvValidator = createAjvValidator(schema);
+assert(directAjvValidator.validate({ path: "a.txt", content: "hi" }).valid === true, "direct ajv adapter rejected a valid value");
+assert(directAjvValidator.validate({ path: "a.txt" }).valid === false, "direct ajv adapter accepted a value missing a required field");
+
+const standardValidator = fromStandardSchema({
+  "~standard": {
+    version: 1,
+    vendor: "runtime-package-smoke",
+    validate(value) {
+      if (typeof value === "object" && value !== null && typeof value.path === "string") return { value };
+      return { issues: [{ message: "path must be a string" }] };
+    },
+  },
+});
+assert(standardValidator.validate({ path: "a.txt" }).valid === true, "standard-schema adapter rejected a valid value");
+assert(standardValidator.validate({ path: 1 }).valid === false, "standard-schema adapter accepted an invalid value");
+
+let emptyIssuesRejected;
+try {
+  emptyIssuesRejected = fromStandardSchema({
+    "~standard": { version: 1, vendor: "runtime-package-smoke", validate: () => ({ issues: [] }) },
+  }).validate({}).valid === false;
+} catch {
+  emptyIssuesRejected = false;
+}
+assert(emptyIssuesRejected, "standard-schema adapter treated an empty issues array as valid (wrong per Standard Schema v1)");
+
+let constructionRejectsBadVersion = false;
+try {
+  fromStandardSchema({ "~standard": { version: 2, vendor: "x", validate: () => ({ value: 1 }) } });
+} catch (error) {
+  constructionRejectsBadVersion = /only supports Standard Schema v1/.test(error.message);
+}
+assert(constructionRejectsBadVersion, "standard-schema adapter accepted an unsupported ~standard.version at construction");
+
+const asyncStandardValidator = fromStandardSchema({
+  "~standard": { version: 1, vendor: "runtime-package-smoke", validate: async (value) => ({ value }) },
+});
+let asyncValidatorThrew = false;
+try {
+  asyncStandardValidator.validate({});
+} catch (error) {
+  asyncValidatorThrew = /only supports synchronous Standard Schema validators/.test(error.message);
+}
+assert(asyncValidatorThrew, "standard-schema adapter did not fail loudly on an async validator");
+
+const conformanceFixture = {
+  schemaVersion: 1,
+  profile: "normalized-gate",
+  id: "runtime-package-smoke-fixture",
+  description: "installed-tarball smoke fixture, not part of the repository corpus",
+  provenance: { classification: "synthetic-adversarial" },
+  events: [
+    { type: "tool_call_start", sequence: 1, provider: "ai-sdk", callRef: { sourceKey: "cf" }, toolCallId: "cf", name: "write_file" },
+    { type: "tool_call_arguments_delta", sequence: 2, provider: "ai-sdk", callRef: { sourceKey: "cf" }, delta: '{"path":"a.txt","content":"hi"}' },
+    { type: "tool_call_end", sequence: 3, provider: "ai-sdk", callRef: { sourceKey: "cf" }, reason: "complete" },
+    { type: "provider_stream_end", sequence: 4, provider: "ai-sdk", reason: "complete" },
+  ],
+  expected: [{ name: "write_file", action: "execute", reason: "complete" }],
+};
+const conformanceFixtureResult = runToolCallIntegrityFixture(conformanceFixture);
+assert(conformanceFixtureResult.pass === true, "conformance runner did not pass its own well-formed fixture: " + JSON.stringify(conformanceFixtureResult));
+const conformanceSuiteResult = runToolCallIntegritySuite([conformanceFixture]);
+assert(conformanceSuiteResult.pass === true, "conformance suite runner did not pass a single well-formed fixture");
+
+let deniedSubpathError;
+try {
+  await import("prefix-safe-json/package.json");
+} catch (error) {
+  deniedSubpathError = error;
+}
+assert(deniedSubpathError !== undefined, "an unexported subpath resolved instead of failing - exports map is not being enforced");
+assert(
+  deniedSubpathError.code === "ERR_PACKAGE_PATH_NOT_EXPORTED",
+  "unexported subpath failed with the wrong error code: " + deniedSubpathError.code,
+);
+
 globalThis.console.log(JSON.stringify({
   node: globalThis.process.version,
   import: "pass",
@@ -197,5 +302,15 @@ globalThis.console.log(JSON.stringify({
   geminiProjection: "pass",
   openAiMultiChoice: "pass",
   protocolPoisoning: "pass",
+  directAjvAdapter: "pass",
+  standardSchemaAdapter: "pass",
+  standardSchemaAsyncFailsClosed: "pass",
+  standardSchemaEmptyIssuesRejected: "pass",
+  standardSchemaConstructionRejectsBadVersion: "pass",
+  malformedValidatorRegistrationRejected: "pass",
+  aiSdkGuardValidatorsPropagation: "pass",
+  conformanceFixture: "pass",
+  conformanceSuite: "pass",
+  exportsMapEnforced: "pass",
   result: "pass",
 }, null, 2));

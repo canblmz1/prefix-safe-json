@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C12-duplicate-terminal-diagnostic-fails-closed",
+  "description": "Tests the coordinator/gate's response to an already-normalized provider_diagnostic reporting a second terminal signal for a call that already ended - NOT whether an adapter can derive that conclusion from raw provider wire data. The diagnostic is this fixture's input, not something the implementation is asked to infer: recognizing a genuine duplicate terminal from raw wire evidence is a provider-adapter concern outside the normalized-gate profile (see docs/CONFORMANCE.md's 'Provider-adapter conformance' section). Once such a diagnostic is present in the normalized stream, the gate must fail the call closed.",
+  "provenance": {
+    "classification": "protocol-realistic",
+    "note": "The diagnostic code modeled here (E_DUPLICATE_TOOL_END) is real and currently emitted by every provider adapter in this package from raw wire evidence - but that emission is out of scope for this fixture, which only tests the gate's reaction once the diagnostic already exists in the normalized stream. A bare duplicate tool_call_end with no such diagnostic present is otherwise idempotent and does not by itself change an already-complete call's outcome."
+  },
+  "events": [
+    { "type": "tool_call_start", "sequence": 1, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "toolIndex": 0, "toolCallId": "call_1", "name": "get_weather" },
+    { "type": "tool_call_arguments_delta", "sequence": 2, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "delta": "{\"city\":\"Tokyo\"}" },
+    { "type": "tool_call_end", "sequence": 3, "provider": "openai", "callRef": { "sourceKey": "call:0" }, "reason": "complete" },
+    { "type": "provider_diagnostic", "sequence": 4, "provider": "openai", "code": "E_DUPLICATE_TOOL_END", "severity": "error", "callRef": { "sourceKey": "call:0" }, "message": "A second terminal event arrived for a call that already ended." },
+    { "type": "provider_stream_end", "sequence": 5, "provider": "openai", "reason": "complete" }
+  ],
+  "expected": [
+    { "name": "get_weather", "action": "reject", "reason": "protocol_violation" }
+  ]
+}
