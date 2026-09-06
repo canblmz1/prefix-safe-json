@@ -8,6 +8,34 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-06
+
+### Added
+
+- Experimental validator-independent `ToolInputValidator`.
+- Experimental synchronous Standard Schema v1 adapter.
+- Experimental explicit Ajv adapter.
+- Experimental `normalized-gate` conformance profile and deterministic runner.
+- Versioned portable conformance fixtures.
+- Product positioning, real-world failure, Sandbase adoption, conformance and v1-criteria documentation.
+
+### Changed
+
+- Repositioned the project around fail-closed tool-call execution integrity.
+- Preserved the existing raw JSON Schema API behind the validator-independent boundary.
+- Preserved shared-Ajv `$id` / `$ref` behavior.
+- Propagated custom validators through execution-gate/provider/AI-SDK paths.
+- Added intentional exports: `.`, `./ajv`, `./standard-schema`, `./conformance`.
+
+### Fixed
+
+- Malformed validator registrations fail at construction.
+- Malformed validator results fail closed.
+- Standard Schema failure semantics, including `{ issues: [] }`.
+- Asynchronous/malformed Standard Schema results are rejected.
+- Conformance schema/profile mismatch rejection.
+- Hardened conformance correlation/matching behavior.
+
 ## [0.4.5] - 2026-09-04
 
 Execution-integrity and correctness hardening across provider-specific
