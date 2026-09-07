@@ -4,334 +4,193 @@
 [![CI](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml/badge.svg)](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-**Fail-closed execution integrity for streamed LLM tool calls.**
+An incremental JSON parser and execution gate for **streamed LLM tool calls**.
 
-Prevent truncated, conflicting, or unconfirmed streamed tool arguments
-from reaching side effects. `prefix-safe-json` distinguishes complete,
-unfabricated raw arguments from truncated or unconfirmed input — including
-SDK-projected or repaired values that merely *look* complete. **JSON
-validity is not execution authority.**
+`prefix-safe-json` keeps incomplete, conflicting, or unconfirmed streamed arguments from being treated as final tool input. It is designed for callers that need to distinguish:
+
+1. JSON that can be parsed right now,
+2. values that are stable enough to expose, and
+3. arguments that the provider actually completed and confirmed.
+
+It does not execute tools itself.
 
 ```bash
 pnpm add prefix-safe-json ai
 # or: npm install prefix-safe-json ai
 ```
 
-## 30-line safe execution example
+## Safe execution example
 
 ```javascript
 import { streamText } from "ai";
-import { createAiSdkExecutionGuard, createAiSdkExecutionLock } from "prefix-safe-json";
+import {
+  createAiSdkExecutionGuard,
+  createAiSdkExecutionLock,
+} from "prefix-safe-json";
 
-// 1. Lock tool definitions before the AI SDK sees them - removes every
-//    SDK-invoked callback that could run your code before this guard does.
 const lockedTools = createAiSdkExecutionLock({
-  write_file: { description: "Write a UTF-8 text file", inputSchema: writeFileSchema },
+  write_file: {
+    description: "Write a UTF-8 text file",
+    inputSchema: writeFileSchema,
+  },
 });
 
-// 2. Stream, feeding the real fullStream into the guard.
 const result = streamText({ model, prompt, tools: lockedTools });
-const guard = createAiSdkExecutionGuard({ schemas: { write_file: writeFileSchema } });
+const guard = createAiSdkExecutionGuard({
+  schemas: { write_file: writeFileSchema },
+});
+
 for await (const part of result.fullStream) {
   guard.push(part);
 }
 
-// 3. finish() signals the stream ended. Every decision is replayable
-//    diagnostic state - it does not perform anything by itself.
 const final = guard.finish();
 
-// 4. The caller owns dispatch: take each call's authority exactly once,
-//    then run the real, irreversible side effect yourself.
 for (const observed of final.decisions) {
   const authority = guard.takeDecision(observed.internalId);
-  if (authority) await writeFile(authority.value.path, authority.value.content);
+  if (authority) {
+    await writeFile(authority.value.path, authority.value.content);
+  }
 }
 ```
 
-`prefix-safe-json` never calls `writeFile` (or anything like it) itself.
-The last line above is the only place a side effect happens, and it's
-entirely yours. See [`examples/`](examples/) for full, runnable
-demonstrations against real provider/SDK shapes, no mocked internals.
+The caller owns dispatch. `prefix-safe-json` only produces and hands out a one-shot decision for the observed tool call.
 
-## Why this exists
+## Why parse success is not enough
 
-LLM providers stream tool-call arguments as small JSON chunks. During
-streaming, the JSON is frequently incomplete: strings split mid-word,
-UTF-8 characters split mid-byte, containers left unclosed, numbers
-terminated at chunk boundaries — and even once the JSON *looks* complete,
-nothing about its shape says whether the provider actually confirmed the
-call is done, or just stopped for an unrelated reason (a token limit, an
-error, a content filter) partway through.
+Tool-call arguments often arrive as partial JSON. A renderer may reasonably repair or close an unfinished prefix so it can show progressive UI. That is useful for display, but it answers a different question from whether a side effect should run.
 
-> **The core invariant: parse completion is not execution authority.**
-
-Structural validity, confirmed completeness, and execution authority are
-three separate questions. Most streaming JSON helpers — including some
-already used for LLM tool-call arguments in the wild — are built to show
-*something* as early as possible, even if that means guessing. Given a
-stream that has so far delivered `{"city":"Tok` (the model is still
-typing "Tokyo"):
-
-| | `city` field after this chunk |
-|---|---|
-| [vercel/ai's `fixJson`](https://github.com/vercel/ai/blob/main/packages/ai/src/util/fix-json.ts) | `"Tok"` — closes the open string as-is, reports a successful parse |
-| [langchain's `parsePartialJson`](https://github.com/langchain-ai/langchainjs/blob/main/libs/langchain-core/src/utils/json.ts) | `"Tok"` — returns whatever string content it collected |
-| **`prefix-safe-json`** (`snapshot().stableValue`) | *(absent — `city` is not committed yet)* |
-
-Verified by cloning both projects and running their actual code
-side-by-side with this library. Neither is a bug — they're built for
-progressively rendering a value in a UI, where showing `"Tok"` then
-`"Tokyo"` a moment later is good UX. `prefix-safe-json` answers a
-different question: *is it safe to act on this value yet* — where
-treating `"Tok"` as the city would be wrong. If you need live
-"filling in..." UI text, a partial-JSON renderer is the right tool. If
-you need to know precisely when it's safe to execute a tool call with the
-parsed arguments, that's what this library is for.
-
-## What `execute` / `retry` / `reject` mean
-
-Every tool call gets exactly one verdict:
-
-- **`execute`** — complete, unfabricated, and (if a schema/validator is
-  registered) valid. `decision.value` is safe to pass to your tool.
-- **`retry`** — nothing is wrong with what arrived; there just isn't a
-  trustworthy complete value yet. Continue generation.
-- **`reject`** — the data itself is the problem (malformed JSON, a schema
-  mismatch, a resource limit, a provider error, a content-policy
-  termination). Retrying the same input won't help.
-
-See [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md) for the full
-decision table and every `reason` value.
-
-## Failure cases
-
-The risk above isn't hypothetical. [Cline](https://github.com/cline/cline)
-(a coding agent that writes files and runs terminal commands from LLM tool
-calls — verified by cloning it, commit `81cce3d70e1`) wires a JSON-repair
-step directly into tool execution: whatever
-[`repairMalformedToolCall`](https://github.com/cline/cline/blob/81cce3d70e10244cdde40dbd0eb0bb711c93006d/sdk/packages/llms/src/providers/ai-sdk.ts#L1332)
-returns *is* the tool call that runs, and its repair path closes an
-unterminated string as-is, same as the table above.
-
-Feeding both implementations the same truncated `write_file` call — a
-`content` argument cut off mid-value:
+Given the prefix:
 
 ```text
-input: {"path":"config/database.yml","content":"production:\n  host: db.prod.internal\n  password: correct-horse-battery-sta
-
-Cline's parseJsonStream() -> jsonrepair:
-  { "path": "config/database.yml",
-    "content": "production:\n  host: db.prod.internal\n  password: correct-horse-battery-sta" }
-  No error, no warning. This is what gets written to disk.
-
-prefix-safe-json:
-  outcome: "truncated", executable: false
-  stableValue: { "path": "config/database.yml" }   // content is absent, not guessed
+{"city":"Tok
 ```
 
-This is one instance of a class of defect independently found across
-several unrelated agent runtimes — see
-[`docs/REAL_WORLD_FAILURES.md`](docs/REAL_WORLD_FAILURES.md) for the full,
-strictly-classified matrix (which reports are upstream-fixed, which are
-still open, which are internal reproductions only) and
-[`docs/CASE_STUDY_SANDBASE.md`](docs/CASE_STUDY_SANDBASE.md) for how one
-independently maintained runtime closed this exact gap in production.
+some partial-JSON helpers can expose `"Tok"` immediately. `prefix-safe-json` keeps that field uncommitted until the stream provides enough evidence that the value is complete.
 
-## Supported boundaries
+The core distinction is simple:
 
-`prefix-safe-json` owns **tool-call execution integrity** — raw argument
-evidence, identity correlation, lifecycle completeness, truncation
-detection, conflicting evidence, and validator-verdict composition, up
-through a one-shot execution-authority decision. It does **not** own tool
-permission, application authorization, human approval, sandboxing,
-application idempotency, distributed exactly-once semantics, or prompt
-injection defense — see
-[`docs/PRODUCT_POSITIONING.md`](docs/PRODUCT_POSITIONING.md) for the full
-owns/does-not-own boundary and
-[`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the complete guarantee/
-non-guarantee list, including known internal limitations.
+> **Parse completion is not execution authority.**
 
-Concretely, it does **not**:
+See [`docs/REAL_WORLD_FAILURES.md`](docs/REAL_WORLD_FAILURES.md) for independently reproduced examples and [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md) for the decision model.
 
-- defend against prompt injection (it says nothing about whether the
-  arguments a model *chose* to send are the arguments it *should* have
-  sent — only whether they're complete and unfabricated)
-- resolve authorization (it doesn't know which caller may invoke which
-  tool)
-- sandbox execution (`action: "execute"` means "this is genuinely the
-  complete value the model produced," not "safe to run without your own
-  validation and permissions")
-- detect a malicious or wrong tool choice (a model calling the wrong tool
-  with complete, valid arguments is still reported `execute`)
+## Decisions
 
-## AI SDK integration
+Every observed tool call ends in one of three actions:
 
-The 30-line example above covers the common case. Three integration
-patterns exist, strongest first:
+- **`execute`** — arguments are complete and, when configured, validator/schema checks pass.
+- **`retry`** — no trustworthy complete value exists yet.
+- **`reject`** — the stream contains malformed, conflicting, invalid, or terminally unsafe evidence.
 
-- **Strongest — `createAiSdkExecutionLock()`.** Wrap your tool
-  definitions with it before passing them to `streamText()`/
-  `generateText()`. It removes every AI SDK-invoked callback capable of
-  running your code before this library's decision — not just `execute`,
-  but also `onInputStart`, `onInputDelta`, and `onInputAvailable`
-  (verified directly against `ai@5`/`ai@6`/`ai@7`'s own source: all three
-  fire unconditionally, independent of `needsApproval`). It also forces
-  `needsApproval: true` and rejects any provider-tool shape whose real
-  execution location it cannot verify. Still dispatch manually from
-  `guard.takeDecision(observed.internalId)` — this only closes the door
-  on the SDK (or your own callbacks) doing it *for* you.
-- **Safe, supported pattern (all majors, including `ai@5`)** — define
-  your tools *without* an AI SDK-native `execute` callback at all. Not
-  even a no-op one. Consume `fullStream` yourself and dispatch manually.
-  `createAiSdkExecutionLock()` gets you this automatically.
-- **Unprotected / misuse pattern** — attach the real side effect directly
-  as `execute`/`onInputStart`/`onInputDelta`/`onInputAvailable` on a tool
-  definition that bypasses the lock. If that happens, the side effect has
-  already run before this library ever reaches a decision; nothing here
-  can retroactively undo it.
+The full reason matrix lives in [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
-The guard does defend against the misuse pattern in one specific way: a
-`tool-result`/`tool-error` part on `fullStream` is direct evidence the
-SDK's own loop already invoked *some* call's `execute`, and once observed
-this library never again reports `action: "execute"` for the affected
-call(s) (`reason: "sdk_execution_observed"` — the highest-priority
-rejection reason of any). There is no equivalent detection for a bypassed
-`onInputStart`/`onInputDelta`/`onInputAvailable` — those callbacks
-produce no observable evidence of having run at all. Full behavior, the
-exact test matrix, and every verified `ai@5`/`ai@6`/`ai@7` behavioral
-difference:
-[`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md#execution-ownership-tool-resulttool-error-as-evidence).
+## Scope and non-goals
 
-`AiSdkStreamAdapter`/`createAiSdkExecutionGuard()` target the public
-`streamText()`/`generateText()` `fullStream` surface (`finishReason` as a
-plain unified string), not the lower-level `@ai-sdk/provider`
-`doStream()` boundary.
+The library covers streamed argument evidence, call identity, lifecycle completion, truncation detection, conflicting evidence, validation composition, and one-shot execution decisions.
+
+It does **not** provide:
+
+- application authorization,
+- human approval workflows,
+- sandboxing,
+- prompt-injection defense,
+- distributed exactly-once semantics,
+- a guarantee that the model selected the correct tool.
+
+An `execute` decision means the tool arguments were observed as complete under the configured boundary. Your application still owns permissions, policy, validation, and the side effect itself.
+
+See [`docs/PRODUCT_POSITIONING.md`](docs/PRODUCT_POSITIONING.md) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the detailed boundary.
+
+## Vercel AI SDK integration
+
+For `streamText()` / `generateText()`, the recommended pattern is:
+
+1. wrap tool definitions with `createAiSdkExecutionLock()`,
+2. consume `fullStream`,
+3. feed stream parts into `createAiSdkExecutionGuard()`, and
+4. dispatch manually only from `takeDecision()`.
+
+`createAiSdkExecutionLock()` removes SDK-invoked callbacks that could execute application code before the guard reaches a final decision. A tool definition that bypasses that lock and performs side effects directly is outside the protection boundary.
+
+The adapter targets the public AI SDK `fullStream` surface, not the lower-level `@ai-sdk/provider` `doStream()` boundary.
+
+Detailed lifecycle behavior and version-specific tests are documented in [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
 ## Provider adapters
 
-Every provider below has a public low-level adapter that composes with
-`createToolCallExecutionGate()` the same way the high-level AI SDK guard
-does internally:
+Low-level adapters are included for:
 
-**OpenAI** (legacy `function_call` and Responses API), **Anthropic**,
-**Gemini**, **OpenRouter**, generic **OpenAI-compatible** endpoints, and
-the **Vercel AI SDK**.
+- OpenAI legacy `function_call`,
+- OpenAI Responses API,
+- Anthropic,
+- Gemini,
+- OpenRouter,
+- generic OpenAI-compatible endpoints,
+- Vercel AI SDK.
 
 ```typescript
-import { createToolCallExecutionGate, OpenAIStreamAdapter } from "prefix-safe-json";
+import {
+  createToolCallExecutionGate,
+  OpenAIStreamAdapter,
+} from "prefix-safe-json";
 
 const adapter = new OpenAIStreamAdapter();
 const gate = createToolCallExecutionGate();
+
 for (const rawChunk of stream) {
-  for (const event of adapter.push(rawChunk)) gate.push(event);
+  for (const event of adapter.push(rawChunk)) {
+    gate.push(event);
+  }
 }
-for (const event of adapter.finish({ reason: "complete" })) gate.push(event);
+
+for (const event of adapter.finish({ reason: "complete" })) {
+  gate.push(event);
+}
+
 const { decisions } = gate.finish();
 ```
 
-Notes: Gemini's adapter exposes its structured argument projection for
-inspection and validation, but never grants strict execute authority —
-Gemini does not provide raw argument text at this seam. OpenAI-compatible
-and OpenRouter events require a non-negative integer `choice.index`;
-missing, invalid, or duplicate choice identity fails closed instead of
-guessing zero. Full semantics, the decision table, and provider
-finish-reason mapping: [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
+Gemini exposes structured argument projections at this seam rather than raw argument text, so its adapter does not grant the same strict raw-text execution authority. Provider-specific semantics are documented in [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
-### Bring your own validator
+## Validation
 
-Schema/validator checking is optional and validator-agnostic — plug in
-Zod, TypeBox, Valibot, a Standard Schema-compliant validator, or a
-hand-written check via the separate `validators` option, alongside or
-instead of a raw JSON Schema object via the pre-existing `toolSchemas`/
-`schemas` option (statically compiled through Ajv):
+Validation is optional and validator-agnostic. You can use JSON Schema/Ajv, Standard Schema-compatible validators, Zod, TypeBox, Valibot, or a custom validator.
 
 ```typescript
 const gate = createToolCallExecutionGate(undefined, undefined, undefined, {
-  write_file: { validate: (v) => WriteFileSchema.safeParse(v).success ? { valid: true } : { valid: false } },
+  write_file: {
+    validate: (value) =>
+      WriteFileSchema.safeParse(value).success
+        ? { valid: true }
+        : { valid: false },
+  },
 });
 ```
 
-A tool name may be registered in `toolSchemas`/`schemas` or in `validators`,
-never both — registering both throws at construction time. No forced
-dependency on any specific validation ecosystem. See
-[`docs/VALIDATION.md`](docs/VALIDATION.md).
+See [`docs/VALIDATION.md`](docs/VALIDATION.md).
 
-## Conformance
+## Conformance corpus
 
-[`conformance/`](conformance/) packages this project's failure corpus as
-a portable, provider-neutral fixture format and a small deterministic
-runner (`prefix-safe-json/conformance`) — useful even to a project that
-never installs this package at runtime, since the fixture format and
-expected outcomes are meaningful against any implementation of this
-problem class. `prefix-safe-json` is the reference implementation and
-dogfoods this exact runner in its own test suite. See
-[`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
+[`conformance/`](conformance/) contains a provider-neutral fixture format and deterministic runner for this problem class. Projects can use the fixtures without adopting this package as their runtime implementation.
 
-## Threat model / non-goals
-
-`prefix-safe-json` is honestly scoped as **execution integrity**, not a
-general "AI security platform." The complete guarantee/non-guarantee
-list, trust boundaries, and known internal limitations live in
-[`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md); the product-level
-owns/does-not-own boundary this is drawn from is
-[`docs/PRODUCT_POSITIONING.md`](docs/PRODUCT_POSITIONING.md).
-
-## Supply-chain verification
-
-Verify releases independently rather than relying on publisher claims.
-Published artifacts have npm provenance from this repository's GitHub
-Actions publish workflow, and a tarball can be rebuilt and compared
-against its release tag with `npm run verify:published-release -- <version>`
-from a clone with tags fetched. See the command-driven
-[maintainer audit](docs/MAINTAINER_AUDIT.md), the exact
-[release/hash mapping](docs/RELEASE_INTEGRITY.md), the
-[runtime dependency graph](docs/RUNTIME_DEPENDENCIES.md), and the
-[execution-critical source map](docs/EXECUTION_AUDIT_SURFACE.md).
+See [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 
 ## Compatibility
 
-ESM only (`import`, not `require`), Node `>=18.0.0`. Node 18/20 are
-end-of-life and no longer receive security patches; this describes the
-package's runtime requirement, not a recommendation to operate an
-unpatched Node release. Repository development and release jobs run on
-newer Node because the toolchain needs it — that requirement does not
-apply to the published package's own runtime dependency graph.
+- ESM only.
+- Runtime: Node `>=18.0.0`.
+- Repository development/release tooling uses newer Node versions.
+- CI exercises pinned Vercel AI SDK v5, v6, and v7 integration paths.
 
-**Vercel AI SDK**, verified directly against each exact pinned major via
-a real `streamText()` lifecycle proof (no API key, no network request, no
-paid model call — `pnpm run example:ai-sdk-lifecycle-proof`, run in CI on
-every push):
-
-| Major | Status |
+| AI SDK major | CI integration check |
 | --- | --- |
-| v5 | verified |
-| v6 | verified |
-| v7 | verified |
+| v5 | yes |
+| v6 | yes |
+| v7 | yes |
 
-Not a claim that every version within a major is tested. Full
-per-provider compatibility matrix, exact AI SDK pin requirements, and the
-runtime-vs-toolchain distinction:
-[`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
+This is not a claim that every patch release inside each major is tested. Exact pins and provider notes live in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
 
-## Development / audit
-
-### Current status
-
-**Implemented:** incremental UTF-8 decoder, 17-state lexical JSON state
-machine, grammar stack, semantic event emission, duplicate-key rejection,
-`push()`/`snapshot()`/`drainEvents()`/`finish()`, configurable resource
-limits, a machine-readable test corpus plus the public
-[Tool Call Integrity conformance corpus](conformance/), provider stream
-adapters (OpenAI legacy + Responses, Anthropic, Gemini, OpenRouter,
-OpenAI-compatible, Vercel AI SDK) with a coordinator for concurrent
-tool-call streams, validator-agnostic per-tool validation (see
-[`docs/VALIDATION.md`](docs/VALIDATION.md)), `createToolCallExecutionGate()`,
-`createAiSdkExecutionGuard()`, call-scoped one-shot authority via
-`takeDecision(internalId)`, and SDK execution-ownership detection.
-
-**Not yet implemented:** a CLI tool, network/SSE client integration.
-
-### Low-level parser API
+## Low-level parser API
 
 ```typescript
 import { createParser } from "prefix-safe-json";
@@ -339,20 +198,40 @@ import { createParser } from "prefix-safe-json";
 const parser = createParser();
 parser.push('{"tool":"calc",');
 parser.push('"args":{"x":42}}');
+
 console.log(parser.snapshot().stableValue);
+
 const result = parser.finish({ reason: "complete" });
-console.log(result.executable); // true if safe to execute
+console.log(result.executable);
 ```
 
-Runnable, CI-checked, real-API examples (no mocked internals):
-[`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs),
-[`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs),
-[`examples/ai-sdk-lifecycle-proof.mjs`](examples/ai-sdk-lifecycle-proof.mjs).
+## Development
 
-### Contributing
+Implemented components include the incremental UTF-8 decoder, lexical/grammar state tracking, semantic events, duplicate-key rejection, configurable resource limits, provider adapters, concurrent call coordination, validation hooks, and execution-gate APIs.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to run tests, add a
-provider fixture or conformance case, and propose adapter support.
+Not currently provided: a standalone CLI or network/SSE client.
+
+Runnable examples:
+
+- [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs)
+- [`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)
+- [`examples/ai-sdk-lifecycle-proof.mjs`](examples/ai-sdk-lifecycle-proof.mjs)
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow.
+
+## Release verification
+
+Published packages use npm provenance from this repository's GitHub Actions release workflow. A release tarball can also be rebuilt and compared with its tag using:
+
+```bash
+npm run verify:published-release -- <version>
+```
+
+Additional release and dependency documentation is available in:
+
+- [`docs/MAINTAINER_AUDIT.md`](docs/MAINTAINER_AUDIT.md)
+- [`docs/RELEASE_INTEGRITY.md`](docs/RELEASE_INTEGRITY.md)
+- [`docs/RUNTIME_DEPENDENCIES.md`](docs/RUNTIME_DEPENDENCIES.md)
 
 ## License
 
