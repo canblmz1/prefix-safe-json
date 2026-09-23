@@ -150,15 +150,24 @@ export function buildValidatorMap(
 
   const map = new Map<string, ToolInputValidator>();
   if (schemas) {
-    for (const [toolName, schema] of Object.entries(schemas)) {
+    // Read every entry exactly once, then use that one snapshot for both the
+    // refusal check and compilation. If a `schemas` value were an accessor,
+    // iterating `schemas` twice (once here, once inside
+    // buildSharedAjvValidators) could let a getter return a plain schema on
+    // the checked pass and an AI SDK wrapper on the compiled pass, so the
+    // wrapper reaches Ajv unchecked and compiles to accept-everything -
+    // exactly what assertJsonSchemaDocument exists to stop.
+    const schemaEntries = Object.entries(schemas);
+    for (const [toolName, schema] of schemaEntries) {
       assertJsonSchemaDocument(toolName, schema);
     }
+    const materializedSchemas = Object.fromEntries(schemaEntries);
     // One shared Ajv instance for every schema in THIS `schemas` object -
     // pre-0.5 behavior, restored here after 0.5's per-schema
     // createAjvValidator() calls regressed it (a schema could no longer
     // $ref another schema registered in the same construction - see
     // buildSharedAjvValidators's own doc comment for the direct proof).
-    for (const [toolName, validator] of buildSharedAjvValidators(schemas)) {
+    for (const [toolName, validator] of buildSharedAjvValidators(materializedSchemas)) {
       map.set(toolName, validator);
     }
   }
