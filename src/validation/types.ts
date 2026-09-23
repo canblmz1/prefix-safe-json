@@ -94,7 +94,8 @@ const AI_SDK_SCHEMA_MARKER = Symbol.for("vercel.ai.schema");
  * only add symbol keys), carry neither marker and are unaffected.
  */
 function assertJsonSchemaDocument(toolName: string, schema: unknown): void {
-  if (typeof schema !== "object" || schema === null) return;
+  // Functions too: an ArkType schema is a callable Standard Schema.
+  if ((typeof schema !== "object" && typeof schema !== "function") || schema === null) return;
   const name = JSON.stringify(toolName);
   if ((schema as Record<symbol, unknown>)[AI_SDK_SCHEMA_MARKER]) {
     throw new Error(

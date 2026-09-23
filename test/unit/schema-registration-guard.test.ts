@@ -78,6 +78,30 @@ describe("schemas entries that are not JSON Schema documents are refused at cons
     );
   });
 
+  it("a callable Standard Schema (ArkType's shape) is refused the same way", () => {
+    const callable = Object.assign(() => true, standardSchema());
+    expect(() => createAiSdkExecutionGuard({ schemas: { write_file: callable } })).toThrow(STANDARD_ERROR);
+  });
+
+  it("null and primitive entries still reach Ajv's own error, not one from the marker checks", () => {
+    expect(() => createToolCallStreamCoordinator(undefined, undefined, { write_file: null as never })).toThrow(
+      "Cannot read properties of null (reading '$id')",
+    );
+    for (const bad of [undefined, "not a schema", 1]) {
+      expect(() => createToolCallStreamCoordinator(undefined, undefined, { write_file: bad as never })).toThrow(
+        "schema must be object or boolean",
+      );
+    }
+  });
+
+  it("an unserializable malformed validator is still named in the error (JSON.stringify fallback)", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => createToolCallStreamCoordinator(undefined, undefined, undefined, { write_file: circular as never })).toThrow(
+      'validators["write_file"] is not a valid ToolInputValidator - expected an object with a "validate" function, received: [object Object]',
+    );
+  });
+
   it("the same Standard Schema object is accepted through validators", () => {
     expect(() => createAiSdkExecutionGuard({ validators: { write_file: fromStandardSchema(standardSchema() as never) } })).not.toThrow();
   });
