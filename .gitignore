@@ -11,3 +11,4 @@ reports/mutation
 *.tsbuildinfo
 *.tgz
 artifacts/
+test/docs/.generated/

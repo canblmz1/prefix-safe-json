@@ -11,18 +11,22 @@ const EXPECTED_EXPORTS = {
   ".": {
     types: "./dist/index.d.ts",
     import: "./dist/index.js",
+    default: "./dist/index.js",
   },
   "./ajv": {
     types: "./dist/ajv.d.ts",
     import: "./dist/ajv.js",
+    default: "./dist/ajv.js",
   },
   "./standard-schema": {
     types: "./dist/standard-schema.d.ts",
     import: "./dist/standard-schema.js",
+    default: "./dist/standard-schema.js",
   },
   "./conformance": {
     types: "./dist/conformance.d.ts",
     import: "./dist/conformance.js",
+    default: "./dist/conformance.js",
   },
 };
 const INSTALL_LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];

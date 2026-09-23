@@ -130,11 +130,15 @@ than treating `0.x` as a formality:
 
 ## ESM / Node / module format
 
-- **ESM only.** `package.json` declares `"type": "module"` and a single
-  `exports["."]` condition set (`types` + `import`) — there is no `require`
-  condition and no CommonJS build. `import { createParser } from
-  "prefix-safe-json"` (or dynamic `import()` from CommonJS) is the only
-  supported consumption path.
+- **ESM only, `require()`-able where Node supports it.** `package.json`
+  declares `"type": "module"`, and every `exports` entry has `types`,
+  `import` and `default` conditions that point at the same ESM file - there
+  is no CommonJS build. `import { createParser } from "prefix-safe-json"`
+  works everywhere; CommonJS code can `require("prefix-safe-json")` (and
+  every subpath) on runtimes with `require(esm)` - Node 20.19+, 22.12+,
+  23+ - and needs dynamic `import()` on older ones. The package has no
+  top-level `await`, which `require(esm)` would reject. The packed-runtime
+  smoke test checks `require()` on the Node versions that support it.
 - **Node `>=18.0.0` package runtime** (`package.json` `engines.node`). The
   distributed ESM/ES2022 output and complete AJV runtime graph were exercised
   from the real `0.4.0` npm tarball on Node 18.20.8, 20.11.1, 22.23.2, and

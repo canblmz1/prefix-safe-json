@@ -53,6 +53,25 @@ createToolCallExecutionGate(undefined, undefined,
 Each tool's validation comes from exactly one explicit source. No
 validator or schema ever silently overrides the other.
 
+### Objects `schemas` refuses
+
+Two kinds of objects are routinely mistaken for JSON Schema documents, and
+both are refused at construction. Nothing is converted or re-routed - the
+refusal only turns a silent failure into a loud one:
+
+| Registered in `schemas` | What happened before 0.5.1 | What to register instead |
+| --- | --- | --- |
+| AI SDK `jsonSchema()` / `zodSchema()` wrapper | Ajv ignored the wrapper's fields and compiled an accept-everything validator - every call passed validation | `schemas: { write_file: wrapper.jsonSchema }` |
+| Standard Schema object (Zod, Valibot, ArkType, ...) | Ajv threw an unrelated-looking meta-schema error (`data/required must be array`) | `validators: { write_file: fromStandardSchema(schema) }` |
+
+They are recognized by explicit markers, not by shape: the AI SDK's
+registry symbol `Symbol.for("vercel.ai.schema")`, and a `~standard` property
+carrying a `validate` function. Plain JSON Schema documents - including
+TypeBox schemas, which are plain objects with extra symbol keys - carry
+neither and compile exactly as before. The collision check above still runs
+first, so a colliding tool name is reported as a collision even when its
+`schemas` entry is also one of these objects.
+
 ## `ToolInputValidator`
 
 ```ts

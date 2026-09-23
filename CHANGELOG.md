@@ -8,6 +8,17 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- `schemas` no longer silently accepts an AI SDK `jsonSchema()` / `zodSchema()` wrapper. Ajv ignored the wrapper's fields, so the tool's validation accepted every call. Such a wrapper is now refused at construction with a message naming the raw schema to register instead (`wrapper.jsonSchema`). Plain JSON Schema documents, including TypeBox schemas, are unaffected.
+- A Zod or other Standard Schema object passed in `schemas` now fails at construction with a message pointing to `validators` + `fromStandardSchema()`, instead of Ajv's unrelated-looking `data/required must be array`.
+- The README's main example now runs as written: it defines the tool schema once (Zod), uses it for both the locked tool and the guard, and reports skipped calls. A new test executes that README block against the AI SDK mock model on every run.
+- CommonJS `require("prefix-safe-json")` (and every subpath) now works on runtimes with `require(esm)` support (Node 20.19+, 22.12+, 23+). Each `exports` entry gained a `default` condition pointing at the same ESM file; the packed-runtime smoke test now checks `require()` on those versions.
+
+### Changed
+
+- Replaced the misleading `json-repair` npm keyword with `vercel-ai-sdk` - this package refuses to repair truncated arguments.
+
 ## [0.5.0] - 2026-09-06
 
 ### Added

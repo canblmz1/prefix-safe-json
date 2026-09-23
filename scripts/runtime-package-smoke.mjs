@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import * as pkg from "prefix-safe-json";
 import * as ajvSubpath from "prefix-safe-json/ajv";
 import * as standardSchemaSubpath from "prefix-safe-json/standard-schema";
@@ -291,9 +292,26 @@ assert(
   "unexported subpath failed with the wrong error code: " + deniedSubpathError.code,
 );
 
+// CommonJS consumers can require() this ESM-only package wherever Node
+// supports require(esm) unflagged (20.19+, 22.12+, 23+); older runtimes
+// still need import().
+const [nodeMajor, nodeMinor] = globalThis.process.versions.node.split(".").map(Number);
+const requireEsmSupported = nodeMajor >= 23 || (nodeMajor === 22 && nodeMinor >= 12) || (nodeMajor === 20 && nodeMinor >= 19);
+let requireResult = "skipped (no require(esm) on this Node)";
+if (requireEsmSupported) {
+  const require = createRequire(import.meta.url);
+  const cjsRoot = require("prefix-safe-json");
+  assert(cjsRoot.createAiSdkExecutionGuard === createAiSdkExecutionGuard, "require() and import returned different module instances");
+  assert(typeof require("prefix-safe-json/ajv").createAjvValidator === "function", "require(prefix-safe-json/ajv) failed");
+  assert(typeof require("prefix-safe-json/standard-schema").fromStandardSchema === "function", "require(prefix-safe-json/standard-schema) failed");
+  assert(typeof require("prefix-safe-json/conformance").runToolCallIntegritySuite === "function", "require(prefix-safe-json/conformance) failed");
+  requireResult = "pass";
+}
+
 globalThis.console.log(JSON.stringify({
   node: globalThis.process.version,
   import: "pass",
+  require: requireResult,
   parser: "pass",
   gate: "pass",
   guard: "pass",

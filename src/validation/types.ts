@@ -70,6 +70,50 @@ function describeInvalidValidator(value: unknown): string {
   return `${typeof value} ${String(value)}`;
 }
 
+// Registry key the Vercel AI SDK stamps on the objects `jsonSchema()` and
+// `zodSchema()` return (the same global symbol across ai@5, @6 and @7).
+const AI_SDK_SCHEMA_MARKER = Symbol.for("vercel.ai.schema");
+
+/**
+ * @internal
+ * Rejects two schema-library objects that are routinely mistaken for JSON
+ * Schema documents. This is not structural discrimination - nothing is
+ * converted or re-routed; a recognized non-JSON-Schema object is refused, and
+ * everything else is still compiled as JSON Schema exactly as before.
+ *
+ * - An AI SDK `jsonSchema()`/`zodSchema()` wrapper keeps its schema behind a
+ *   `jsonSchema` getter, and Ajv (`strict: false`) ignores every field it
+ *   does not recognize, so the wrapper compiles to an accept-everything
+ *   validator: every call would pass validation. That is the fail-open case
+ *   this check exists for.
+ * - A Standard Schema object (Zod, Valibot, ArkType, ...) either crashes Ajv
+ *   with an unrelated-looking meta-schema error or, depending on its own
+ *   fields, compiles to something that validates the wrong thing.
+ *
+ * Plain JSON Schema documents, including TypeBox schemas (plain objects that
+ * only add symbol keys), carry neither marker and are unaffected.
+ */
+function assertJsonSchemaDocument(toolName: string, schema: unknown): void {
+  // Functions too: an ArkType schema is a callable Standard Schema.
+  if ((typeof schema !== "object" && typeof schema !== "function") || schema === null) return;
+  const name = JSON.stringify(toolName);
+  if ((schema as Record<symbol, unknown>)[AI_SDK_SCHEMA_MARKER]) {
+    throw new Error(
+      `prefix-safe-json: schemas[${name}] is an AI SDK jsonSchema()/zodSchema() wrapper, not a JSON Schema ` +
+        `document - compiled as-is it would validate nothing. Register the raw schema it wraps instead, ` +
+        `e.g. schemas: { ${name}: wrapper.jsonSchema }.`,
+    );
+  }
+  const standard = (schema as { "~standard"?: unknown })["~standard"];
+  if (typeof standard === "object" && standard !== null && typeof (standard as { validate?: unknown }).validate === "function") {
+    throw new Error(
+      `prefix-safe-json: schemas[${name}] is a Standard Schema (Zod, Valibot, ArkType, ...), not a JSON Schema ` +
+        `document. Register it through "validators" instead: validators: { ${name}: fromStandardSchema(schema) }, ` +
+        `with fromStandardSchema imported from "prefix-safe-json/standard-schema".`,
+    );
+  }
+}
+
 /**
  * @internal
  * Builds the coordinator's internal per-tool validator map from the two
@@ -77,14 +121,17 @@ function describeInvalidValidator(value: unknown): string {
  * discrimination anywhere in this path - `schemas` entries are always
  * compiled as JSON Schema, `validators` entries are always used as-is, and
  * a tool name present in both is a construction-time error rather than a
- * silently-resolved precedence rule. See `docs/VALIDATION.md`.
+ * silently-resolved precedence rule. See `docs/VALIDATION.md`. The one
+ * exception is refusal, never re-routing: `assertJsonSchemaDocument` rejects
+ * objects that are recognizably not JSON Schema before Ajv sees them.
  *
  * Collision detection runs *before* any schema is compiled, so a colliding
  * tool name is always reported as a collision - deterministically, even
  * when that same tool's `schemas` entry also happens to be malformed JSON
- * Schema. Without this ordering, whichever check happened to run first
- * would decide which error the caller sees, for reasons unrelated to which
- * problem is actually more fundamental.
+ * Schema (or one of the objects `assertJsonSchemaDocument` refuses).
+ * Without this ordering, whichever check happened to run first would decide
+ * which error the caller sees, for reasons unrelated to which problem is
+ * actually more fundamental.
  */
 export function buildValidatorMap(
   schemas: Record<string, object> | undefined,
@@ -103,6 +150,9 @@ export function buildValidatorMap(
 
   const map = new Map<string, ToolInputValidator>();
   if (schemas) {
+    for (const [toolName, schema] of Object.entries(schemas)) {
+      assertJsonSchemaDocument(toolName, schema);
+    }
     // One shared Ajv instance for every schema in THIS `schemas` object -
     // pre-0.5 behavior, restored here after 0.5's per-schema
     // createAjvValidator() calls regressed it (a schema could no longer
