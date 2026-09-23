@@ -15,46 +15,57 @@ An incremental JSON parser and execution gate for **streamed LLM tool calls**.
 It does not execute tools itself.
 
 ```bash
-pnpm add prefix-safe-json ai
-# or: npm install prefix-safe-json ai
+pnpm add prefix-safe-json ai zod
+# or: npm install prefix-safe-json ai zod
 ```
 
 ## Safe execution example
 
 ```javascript
+import { writeFile } from "node:fs/promises";
 import { streamText } from "ai";
+import { z } from "zod";
 import {
   createAiSdkExecutionGuard,
   createAiSdkExecutionLock,
 } from "prefix-safe-json";
+import { fromStandardSchema } from "prefix-safe-json/standard-schema";
 
-const lockedTools = createAiSdkExecutionLock({
+const writeFileSchema = z.object({ path: z.string(), content: z.string() });
+
+const tools = createAiSdkExecutionLock({
   write_file: {
     description: "Write a UTF-8 text file",
     inputSchema: writeFileSchema,
   },
 });
 
-const result = streamText({ model, prompt, tools: lockedTools });
 const guard = createAiSdkExecutionGuard({
-  schemas: { write_file: writeFileSchema },
+  validators: { write_file: fromStandardSchema(writeFileSchema) },
 });
 
+const result = streamText({ model, prompt, tools });
 for await (const part of result.fullStream) {
   guard.push(part);
 }
 
-const final = guard.finish();
-
-for (const observed of final.decisions) {
-  const authority = guard.takeDecision(observed.internalId);
+const { decisions, diagnostics } = guard.finish();
+for (const decision of decisions) {
+  const authority = guard.takeDecision(decision.internalId);
   if (authority) {
     await writeFile(authority.value.path, authority.value.content);
+  } else {
+    console.warn(`skipped ${decision.name}: ${decision.action} (${decision.reason})`);
   }
+}
+if (decisions.length === 0 && diagnostics.length > 0) {
+  console.warn("no tool call was executed:", diagnostics);
 }
 ```
 
-The caller owns dispatch. `prefix-safe-json` only produces and hands out a one-shot decision for the observed tool call.
+`model` and `prompt` are yours. The lock stops the SDK from running `write_file` itself; the guard checks each streamed call against the same schema and hands out a one-shot decision. The caller owns dispatch, and a call the guard doesn't hand out never runs.
+
+Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
 
 ## Why parse success is not enough
 
@@ -156,6 +167,8 @@ Gemini exposes structured argument projections at this seam rather than raw argu
 
 Validation is optional and validator-agnostic. You can use JSON Schema/Ajv, Standard Schema-compatible validators, Zod, TypeBox, Valibot, or a custom validator.
 
+`schemas` takes plain JSON Schema documents (TypeBox schemas count). Zod and other Standard Schema libraries go through `validators` with `fromStandardSchema()` from `prefix-safe-json/standard-schema`. Handing `schemas` a Zod schema or an AI SDK `jsonSchema()` wrapper throws at construction instead of silently validating nothing.
+
 ```typescript
 const gate = createToolCallExecutionGate(undefined, undefined, undefined, {
   write_file: {
@@ -177,7 +190,7 @@ See [`docs/CONFORMANCE.md`](docs/CONFORMANCE.md).
 
 ## Compatibility
 
-- ESM only.
+- ESM only. CommonJS code can `require()` it on Node 20.19+ / 22.12+ (Node's `require(esm)`); older runtimes need `import()`.
 - Runtime: Node `>=18.0.0`.
 - Repository development/release tooling uses newer Node versions.
 - CI exercises pinned Vercel AI SDK v5, v6, and v7 integration paths.
