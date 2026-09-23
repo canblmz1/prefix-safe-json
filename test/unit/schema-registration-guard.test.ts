@@ -102,6 +102,29 @@ describe("schemas entries that are not JSON Schema documents are refused at cons
     );
   });
 
+  it("reads each schemas entry exactly once, so an accessor can't return a plain schema to the check and a wrapper to Ajv", () => {
+    // Before the snapshot fix, buildValidatorMap iterated `schemas` twice: once
+    // for the marker check, once inside buildSharedAjvValidators. A getter could
+    // pass the check with a plain schema, then hand Ajv the wrapper (which
+    // compiles to accept-everything). The fix materializes each entry once.
+    let reads = 0;
+    const schemas: Record<string, object> = {};
+    Object.defineProperty(schemas, "write_file", {
+      enumerable: true,
+      get() {
+        reads += 1;
+        // First read: a strict raw schema. Any later read: an AI SDK wrapper.
+        return reads === 1 ? WRITE_FILE_SCHEMA : (jsonSchemaV7(WRITE_FILE_SCHEMA) as object);
+      },
+    });
+
+    // A single construction. Before the fix, the second internal read handed
+    // Ajv the wrapper and INVALID_ARGS executed; after it, the one materialized
+    // value (the strict raw schema) is enforced and INVALID_ARGS is rejected.
+    expect(decide({ schemas }, INVALID_ARGS)).toEqual({ action: "reject", reason: "schema_invalid" });
+    expect(reads).toBe(1);
+  });
+
   it("the same Standard Schema object is accepted through validators", () => {
     expect(() => createAiSdkExecutionGuard({ validators: { write_file: fromStandardSchema(standardSchema() as never) } })).not.toThrow();
   });
