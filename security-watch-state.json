@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-25",
+  "run": "first (baseline attempt)",
+  "items": {
+    "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
+      "status": "could not check",
+      "reason": "no GitHub API auth available in this session (gh CLI not installed; unauthenticated api.github.com request blocked by session's repo-scoping proxy: 'GitHub access to this repository is not enabled for this session'; repo cannot be attached for API access because push/write access was denied)"
+    },
+    "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
+      "status": "could not check",
+      "reason": "gh CLI unavailable; add_repo for BerriAI/litellm-ghsa-gcmc-j4g5-42gw returned 'not found / no access' (private advisory-collaboration repo not visible to this session's GitHub App installation); unauthenticated curl to api.github.com blocked by session proxy (403)"
+    },
+    "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
+      "status": "could not check",
+      "reason": "no GitHub API auth available in this session (same as item 1)"
+    },
+    "4_vercel_ai_pr_18770": {
+      "status": "could not check",
+      "reason": "gh CLI unavailable; unauthenticated curl to api.github.com blocked by session proxy (403: repo not enabled for this session); WebFetch to the same URL also returned 403"
+    },
+    "5_vercel_ai_pr_20519": {
+      "status": "could not check",
+      "reason": "same as item 4"
+    },
+    "6_actions_runner_pr_4694": {
+      "status": "could not check",
+      "reason": "same as item 4"
+    }
+  }
+}
