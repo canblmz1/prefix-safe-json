@@ -1,22 +1,22 @@
 {
-  "date": "2026-10-02",
-  "run": "sixth (still no usable GitHub API access in this session)",
+  "date": "2026-10-03",
+  "run": "seventh (still no usable GitHub API access in this session)",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh CLI token (GH_TOKEN) invalid; gh api and github MCP tool both refuse with 'GitHub access to this repository is not enabled for this session' (BerriAI/litellm not attached with API credentials for this session, which is scoped to canblmz1/prefix-safe-json only); advisory requires gh api specifically per task instructions, so not retried via curl"
+      "reason": "gh api returns the session proxy's own 'GitHub access to this repository is not enabled for this session' message (HTTP 403), not a GitHub-side response; BerriAI/litellm is not in this session's repo scope (canblmz1/prefix-safe-json only); advisory requires gh api specifically per task instructions, so not retried via curl"
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api 403 same as item 1; unauthenticated curl fallback to api.github.com also returns the session's own 'GitHub access to this repository is not enabled for this session' message (blocked before reaching GitHub, not a GitHub-side 401/403/404)"
+      "reason": "gh api 403 same as item 1; unauthenticated curl fallback to api.github.com also returns the session's own 'GitHub access to this repository is not enabled for this session' message -- blocked by the local proxy before reaching GitHub, not a GitHub-side 401/403/404"
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same as item 1, for desktop/desktop -- gh api requires auth/scope this session does not have, advisory needs gh api specifically"
+      "reason": "same as item 1, for desktop/desktop -- gh api blocked by session proxy scope, advisory needs gh api specifically"
     },
     "4_vercel_ai_pr_18770": {
       "status": "could not check",
-      "reason": "gh api 403; github MCP pull_request_read explicitly denies 'repository \"vercel/ai\" is not configured for this session, allowed repositories: canblmz1/prefix-safe-json'; add_repo(access=read) confirms only anonymous public git clone, not API access; unauthenticated curl fallback to api.github.com blocked by the session's own proxy with the same 'not enabled for this session' message, not a GitHub-side response"
+      "reason": "gh api 403; unauthenticated curl fallback to api.github.com blocked by the session's own proxy with the same 'not enabled for this session' message, not a GitHub-side response; vercel/ai not in session repo scope"
     },
     "5_vercel_ai_pr_20519": {
       "status": "could not check",
