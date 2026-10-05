@@ -1,22 +1,22 @@
 {
-  "date": "2026-10-04",
-  "run": "eighth (still no usable GitHub API access in this session)",
+  "date": "2026-10-05",
+  "run": "ninth (still no usable GitHub API access in this session)",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api and github MCP tool both return 'Access denied / not enabled for this session' -- BerriAI/litellm is not in this session's repo scope (canblmz1/prefix-safe-json only); advisory requires gh api specifically per task instructions, so not retried via curl"
+      "reason": "gh api and github MCP tool both return 'GitHub access to this repository is not enabled for this session' -- BerriAI/litellm is not in this session's repo scope; add_repo confirms public read-only git clone is available but that does not cover GitHub API calls, and add_repo with access:push was explicitly refused ('you need push access to berriai/litellm for Claude to make changes there'). Advisory requires gh api specifically per task instructions, so not retried via curl."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api same session-scope denial; unauthenticated curl fallback to api.github.com also blocked by the session's own proxy with the same message -- blocked locally before reaching GitHub, not a GitHub-side 401/403/404"
+      "reason": "add_repo reports this repo does not exist or is not accessible to this session's GitHub credential ('you don't have access to berriai/litellm-ghsa-gcmc-j4g5-42gw'). gh api and unauthenticated curl to api.github.com both blocked by the session's own proxy before reaching GitHub (local 403, not a GitHub-side 401/403/404)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same as item 1, for desktop/desktop -- blocked by session repo scope, advisory needs gh api specifically"
+      "reason": "same as item 1, for desktop/desktop -- blocked by session repo scope, add_repo push access explicitly refused, advisory needs gh api specifically"
     },
     "4_vercel_ai_pr_18770": {
       "status": "could not check",
-      "reason": "gh api and github MCP pull_request_read both denied; curl fallback to api.github.com also blocked by the session's own proxy, not a GitHub-side response; vercel/ai not in session repo scope"
+      "reason": "gh api, github MCP pull_request_read, and unauthenticated curl to api.github.com all blocked by the session's own proxy (local 403: 'GitHub access to this repository is not enabled for this session'), not a GitHub-side response; add_repo push access explicitly refused ('you need push access to vercel/ai')"
     },
     "5_vercel_ai_pr_20519": {
       "status": "could not check",
