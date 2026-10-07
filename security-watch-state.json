@@ -1,30 +1,45 @@
 {
-  "date": "2026-10-05",
-  "run": "ninth (still no usable GitHub API access in this session)",
+  "date": "2026-10-07",
+  "run": "tenth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api and github MCP tool both return 'GitHub access to this repository is not enabled for this session' -- BerriAI/litellm is not in this session's repo scope; add_repo confirms public read-only git clone is available but that does not cover GitHub API calls, and add_repo with access:push was explicitly refused ('you need push access to berriai/litellm for Claude to make changes there'). Advisory requires gh api specifically per task instructions, so not retried via curl."
+      "reason": "gh api still returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, local/session-side, not GitHub-side). add_repo confirms anonymous public git clone is available but that does not cover GitHub API/advisory endpoints. add_repo access:push was not retried (prior runs already had it explicitly refused for this class of repo). Advisory requires gh api specifically per task instructions; the public security-advisory URL (github.com/BerriAI/litellm/security/advisories/GHSA-gcmc-j4g5-42gw) returned 404 via WebFetch, consistent with the advisory still being in non-public 'triage' state (expected, not a new finding) rather than a successful empty check."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "add_repo reports this repo does not exist or is not accessible to this session's GitHub credential ('you don't have access to berriai/litellm-ghsa-gcmc-j4g5-42gw'). gh api and unauthenticated curl to api.github.com both blocked by the session's own proxy before reaching GitHub (local 403, not a GitHub-side 401/403/404)."
+      "reason": "add_repo reports this temporary advisory-collaboration repo does not exist or is not accessible to this session's credential. gh api blocked (local 403, same as item 1). Unauthenticated curl via Bash was denied by the session's permission classifier. WebFetch to the public PR URL returned 404 (expected for a private advisory-collaboration repo, not a status change)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same as item 1, for desktop/desktop -- blocked by session repo scope, add_repo push access explicitly refused, advisory needs gh api specifically"
+      "reason": "same blockers as item 1, for desktop/desktop. Public advisory URL returned 404 via WebFetch (expected: advisory still in non-public triage state)."
     },
     "4_vercel_ai_pr_18770": {
-      "status": "could not check",
-      "reason": "gh api, github MCP pull_request_read, and unauthenticated curl to api.github.com all blocked by the session's own proxy (local 403: 'GitHub access to this repository is not enabled for this session'), not a GitHub-side response; add_repo push access explicitly refused ('you need push access to vercel/ai')"
+      "status": "checked (via public PR page, not gh api)",
+      "state": "open",
+      "merged": false,
+      "comments": 1,
+      "review_comments": 0,
+      "last_activity": "2026-09-09",
+      "reason": "gh api and direct curl to api.github.com both blocked for this session (gh: local 403 'GitHub access to this repository is not enabled for this session'; curl: denied by permission classifier). Data obtained instead via WebFetch against the public github.com PR page (github.com/vercel/ai/pull/18770), which is reachable unauthenticated. First successful real read for this item; no prior real value to diff against (previous snapshot was 'could not check')."
     },
     "5_vercel_ai_pr_20519": {
-      "status": "could not check",
-      "reason": "same as item 4"
+      "status": "checked (via public PR page, not gh api)",
+      "state": "open",
+      "merged": false,
+      "comments": 1,
+      "review_comments": 0,
+      "last_activity": "2026-09-09",
+      "reason": "same method/blockers as item 4. First successful real read; no prior real value to diff against."
     },
     "6_actions_runner_pr_4694": {
-      "status": "could not check",
-      "reason": "same as item 4, for actions/runner"
+      "status": "checked (via public PR page, not gh api)",
+      "state": "open",
+      "merged": false,
+      "comments": 2,
+      "review_comments": 6,
+      "last_activity": "2026-09-11",
+      "reason": "same method/blockers as item 4. Note: page shows a 'merge commit 5fa130b' in the PR's own commit history -- this is the base branch (main) being merged INTO the PR branch to keep it up to date, NOT the PR itself being merged; PR header explicitly reads 'Open' with no merged badge. First successful real read; no prior real value to diff against."
     }
   }
 }
