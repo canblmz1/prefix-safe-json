@@ -1,18 +1,18 @@
 {
-  "date": "2026-10-10",
-  "run": "thirteenth",
+  "date": "2026-10-11",
+  "run": "fourteenth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api still returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run. add_repo (access:read) re-confirmed only anonymous public git clone is available for this repo, which does not cover GitHub API/advisory endpoints. Advisory requires gh api specifically per task instructions. WebFetch to the public advisory URL again returned 404, consistent with the advisory still being in non-public 'triage' state (expected, not a new finding) rather than a successful empty check."
+      "reason": "gh api still returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run. Advisory requires gh api specifically per task instructions, so no fallback attempted."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1). Unauthenticated curl to api.github.com was again intercepted by the session proxy with the identical 403 'GitHub access to this repository is not enabled for this session' message (not a real GitHub response). add_repo for this repo name returned 'not found / no access' (expected for a private advisory-collaboration repo). WebFetch to the public PR URL returned 404 (expected, not a status change)."
+      "reason": "gh api blocked (session-side 403, same as item 1). Unauthenticated curl to api.github.com was again intercepted by the session proxy with the identical 403 'GitHub access to this repository is not enabled for this session' message (not a real GitHub response). WebFetch to the public PR URL returned 404 (expected, not a status change -- this is a private advisory-collaboration repo)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same blockers as item 1, for desktop/desktop. add_repo (access:read) confirms only anonymous public git clone, not API/advisory access. WebFetch to the public advisory URL returned 404 (expected: advisory still in non-public triage state)."
+      "reason": "same blockers as item 1, for desktop/desktop. WebFetch to the public advisory URL returned 404 (expected: advisory still in non-public triage state)."
     },
     "4_vercel_ai_pr_18770": {
       "status": "checked (via public PR page, not gh api)",
@@ -21,16 +21,16 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "gh api blocked (session 403) and the required unauthenticated curl fallback to api.github.com was also intercepted by the session proxy with the same 403 message (not a real GitHub 401/403/404), so neither could reach GitHub. Data obtained instead via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-09 snapshot -- no change. (Commit 20d88ed remains visible with no timestamp to compare against.)"
+      "reason": "gh api blocked (session 403) and unauthenticated curl fallback to api.github.com was also intercepted by the session proxy with the same 403 message, so neither could reach GitHub. Data obtained instead via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-10 snapshot -- no change."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
       "state": "open",
       "merged": false,
-      "comments": 1,
+      "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. WebFetch summary again did not surface an explicit numeric comment count beyond the opening description (page scrape imprecision, not a verified API count); last-activity date is unchanged from 2026-10-09 (2026-09-09) and no new label/review activity is visible, so carried forward as unchanged."
+      "reason": "same method/blockers as item 4. WebFetch again shows only the opening description as the sole conversation entry plus a bot label event -- consistent with the page-scrape imprecision already flagged in prior snapshots (no verified API count available); last-activity date unchanged from the 2026-10-10 snapshot (2026-09-09), so carried forward as unchanged."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
@@ -39,7 +39,7 @@
       "comments": 2,
       "review_comments": 6,
       "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape again shows the base-branch merge commit 5fa130b in the PR's own commit history (base being merged into the PR branch to keep it current, NOT the PR itself merging); header still reads 'Open', 'At least 1 approving review is required to merge'. Visible review activity (Copilot summaries, salmanmkc review and replies, inline threads on BrokerMessageListener.cs/MessageListener.cs/BrokerMessageListenerL0.cs) is dated Sep 9/11 2026, same as the last-activity date already captured in the 2026-10-09 snapshot -- no new activity since then."
+      "reason": "same method/blockers as item 4. Page scrape shows the same 5 reviews (4 Copilot Sep 9, salmanmkc Sep 11) and the same 3 inline review-comment threads on BrokerMessageListener.cs/MessageListener.cs/BrokerMessageListenerL0.cs already captured in the 2026-10-10 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open', approving review still required."
     }
   }
 }
