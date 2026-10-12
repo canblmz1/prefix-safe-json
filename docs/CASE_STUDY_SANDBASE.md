@@ -29,8 +29,14 @@ Sandbase depends on `prefix-safe-json` directly — `package.json`, current
 `main`:
 
 ```json
-"prefix-safe-json": "0.4.3"
+"prefix-safe-json": "0.5.0"
 ```
+
+The dependency is active runtime code, not just a lockfile entry. Current
+`main` imports both `createAiSdkExecutionLock()` and
+`createAiSdkExecutionGuard()` from `prefix-safe-json`; its AI SDK v4 bridge
+translates the older stream-part names into the guard's raw lifecycle
+events instead of reconstructing arguments from an SDK projection.
 
 Sandbase's own `default-strategy.ts` drains the full AI SDK `fullStream`,
 calls `guard.finish()` once, and resolves each pending confirmation call's
@@ -62,6 +68,10 @@ with no public API change on their side — `createAiSdkExecutionGuard()`/
 directly against the installed package's own `.d.ts` files before the
 upgrade landed, not assumed.
 
+Sandbase has since advanced its direct pin to `0.5.0`, which is useful
+follow-through evidence: the adopter did not remain stranded on the one
+security-patch version that originally motivated the case study.
+
 ## What this proves
 
 - A real, independently maintained runtime found this package's
@@ -70,6 +80,8 @@ upgrade landed, not assumed.
   changes on the adopter's side — evidence the public API surface this
   project commits to (`docs/COMPATIBILITY.md`) is genuinely stable enough
   to depend on across a patch release.
+- The adopter later moved to `0.5.0` and still imports the lock/guard
+  execution-integrity surface in current runtime code.
 - The upgrade was itself driven by a genuine security disclosure being
   taken seriously and acted on quickly by both sides.
 

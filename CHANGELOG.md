@@ -8,7 +8,11 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-12
+
 ### Fixed
+
+- `schemas` registration now snapshots each property value once before both type-refusal checks and Ajv compilation, preventing an accessor from supplying a benign schema for the check and an accept-everything wrapper for compilation. Regression tests verify one read and fail-closed enforcement.
 
 - `schemas` no longer silently accepts an AI SDK `jsonSchema()` / `zodSchema()` wrapper. Ajv ignored the wrapper's fields, so the tool's validation accepted every call. Such a wrapper is now refused at construction with a message naming the raw schema to register instead (`wrapper.jsonSchema`). Plain JSON Schema documents, including TypeBox schemas, are unaffected.
 - A Zod or other Standard Schema object passed in `schemas` now fails at construction with a message pointing to `validators` + `fromStandardSchema()`, instead of Ajv's unrelated-looking `data/required must be array`.
