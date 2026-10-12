@@ -13,7 +13,7 @@ runtime; AJV is its only direct runtime dependency.
 
 | Surface | Node 18 | Node 20 | Node 22 | Node 24 | Evidence / minimum |
 |---|---|---|---|---|---|
-| `prefix-safe-json` package runtime | Yes | Yes | Yes | Yes | The real `prefix-safe-json@0.4.0` npm tarball was installed in four isolated projects and exercised through parser, gate, guard, AJV, provider-identity, protocol-poisoning, and one-shot-authority paths. Declared minimum: `>=18.0.0`. |
+| `prefix-safe-json` package runtime | Yes | Yes | Yes | Yes | Packed-tarball CI installs the current candidate into isolated consumers and exercises its runtime on these Node lines. Declared minimum: `>=18.0.0`. |
 | Exact `ai@5.0.244` dependency graph | Yes | Yes | Yes | Yes | `ai@5.0.244` and its AI SDK runtime dependencies declare Node `>=18`. |
 | Exact `ai@6.0.264` dependency graph | `>=18.17` only | Yes | Yes | Yes | `ai@6.0.264` declares `>=18`; its exact `@ai-sdk/provider-utils@4.0.46` dependency declares `>=18.17`. |
 | Exact `ai@7.0.77` dependency graph | No | No | Yes | Yes | `ai@7.0.77` and its AI SDK runtime dependencies declare Node `>=22`. |
@@ -33,20 +33,27 @@ do not claim that every lifecycle suite was rerun on every Node matrix entry.
 
 | Integration | Tested version(s) | Target API surface | Status | Raw evidence | Terminal evidence | Caveat |
 |---|---|---|---|---|---|---|
-| **Vercel AI SDK** (`ai` package) | `ai@5.0.244`, `ai@6.0.264`, `ai@7.0.77`. Lifecycle contract verified against these exact pinned versions; this is not a claim that every version in each major is tested. | `streamText()`/`generateText()`'s `fullStream` (`TextStreamPart<TOOLS>` union) — `tool-input-start`/`-delta`/`-end`, `tool-call`, `tool-result`, `tool-error`, `finish`, `error`, `abort` parts | Stable (`createAiSdkExecutionGuard`), Experimental (`AiSdkStreamAdapter` directly) | Raw `tool-input-delta` text only — the SDK's own resolved `tool-call.input` is read by nothing in this adapter | `finishReason` literal union (`stop`/`length`/`content-filter`/`tool-calls`/`error`/`other`, identical wire vocabulary across all three tested majors) + `abort` part | Does **not** target the lower-level `@ai-sdk/provider` `LanguageModelV3`/`V4` `doStream()` boundary, where `finishReason` is `{ unified, raw }`-object-shaped, not a plain string. Building a provider directly against that interface needs different handling of that field — untested, unsupported by this adapter. |
-| **OpenAI** (Chat Completions, legacy `function_call`) | No specific `openai`-package version tested — targets the documented raw SSE delta JSON shape directly, not a specific SDK's generated types | `choices[].delta.function_call` streaming deltas, `finish_reason` | Experimental | Raw `arguments` delta string | `finish_reason: "stop"\|"tool_calls"\|"function_call"\|"length"\|"cancelled"` | Legacy `function_call` shape, not the newer `tool_calls` array shape (see OpenAI-compatible below for that). |
-| **OpenAI** (Responses API) | Same as above — verified against `openai-node`'s public `Response`/`ResponseIncompleteEvent` **type definitions**, not a pinned SDK version number | `response.completed`/`response.incomplete`/`response.failed`/`error` events | Experimental | Raw text deltas | `incomplete_details.reason` (`max_output_tokens`\|`content_filter`) | An unrecognized/missing `incomplete_details.reason` normalizes to `unknown`, never assumed complete. |
+| **Vercel AI SDK** (`ai` package) | `ai@5.0.244`, `ai@6.0.264`, `ai@7.0.77`. Lifecycle contract verified against these exact pinned versions; this is not a claim that every version in each major is tested. | `streamText()`'s `fullStream` (`TextStreamPart<TOOLS>` union) — `tool-input-start`/`-delta`/`-end`, `tool-call`, `tool-result`, `tool-error`, `finish`, `error`, `abort` parts | Stable (`createAiSdkExecutionGuard`), Experimental (`AiSdkStreamAdapter` directly) | Raw `tool-input-delta` text only — the SDK's own resolved `tool-call.input` is read by nothing in this adapter | `finishReason` literal union (`stop`/`length`/`content-filter`/`tool-calls`/`error`/`other`, identical wire vocabulary across all three tested majors) + `abort` part | Does **not** target the lower-level `@ai-sdk/provider` `LanguageModelV3`/`V4` `doStream()` boundary, where `finishReason` is `{ unified, raw }`-object-shaped, not a plain string. Building a provider directly against that interface needs different handling of that field — untested, unsupported by this adapter. |
+| **OpenAI** (Chat Completions, legacy `function_call`) | `openai@7.8.0`, selected regressions through its real HTTP/SSE parser against a local fixture server | `choices[].delta.function_call` streaming deltas, `finish_reason` | Experimental | Raw `arguments` delta string | `finish_reason: "stop"\|"tool_calls"\|"function_call"\|"length"\|"cancelled"` | Legacy `function_call` shape, not the newer `tool_calls` array shape (see OpenAI-compatible below for that). Local-fixture evidence, not live-provider certification. |
+| **OpenAI** (Responses API) | `openai@7.8.0`, selected lifecycle regressions through its real HTTP/SSE parser against a local fixture server | `response.completed`/`response.incomplete`/`response.failed`/`error` events | Experimental | Raw text deltas | `incomplete_details.reason` (`max_output_tokens`\|`content_filter`) | An unrecognized/missing `incomplete_details.reason` normalizes to `unknown`, never assumed complete. Local-fixture evidence, not live-provider certification. |
 | **OpenAI-compatible** (generic; also underlies **OpenRouter**) | No specific SDK/version — targets the widely-used `choices[].delta.tool_calls[]` array shape shared by OpenAI's current API and most compatible endpoints | Explicit non-negative integer `choices[].index` + `tool_calls[].index` + `tool_calls[].function.{name,arguments}`, `finish_reason` | Experimental | Raw `arguments` delta string per choice/tool coordinate | `finish_reason` string | Missing, invalid, or duplicate explicit choice identity fails closed; outer array order is never guessed as identity. "Compatible" describes wire shape, not a hosted-vendor guarantee. |
 | **OpenRouter** | No specific SDK/version — thin wrapper over `OpenAICompatibleStreamAdapter`'s shape, plus an `error` field | Same as OpenAI-compatible, plus OpenRouter's own `error` field on a choice | Experimental | Raw `arguments` delta string | `finish_reason` string, or `error` presence | Shares essentially all wire-shape risk with the OpenAI-compatible adapter above. |
-| **Anthropic** (Messages API) | No specific SDK/version — targets the documented raw SSE event shape (`content_block_start`/`content_block_delta`/`message_delta`) directly | `input_json_delta.partial_json` deltas on `tool_use` content blocks, `stop_reason` | Experimental | Raw `partial_json` delta string | `stop_reason: "end_turn"\|"tool_use"\|"max_tokens"` | — |
-| **Gemini** | No specific SDK/version — targets the documented structured `functionCall` shape | `candidates[].content.parts[].functionCall` (**structured**, not streamed raw JSON text) | Experimental | Projection-only: the already-parsed `args` value is serialized for inspection/validation, never treated as raw proof | `finishReason: "STOP"\|"MAX_TOKENS"\|"SAFETY"\|"RECITATION"\|"OTHER"` | Even valid JSON, a valid schema, and `STOP` cannot produce strict `execute`; the gate rejects with `projection_only`. |
+| **Anthropic** (Messages API) | `@anthropic-ai/sdk@0.123.0`, selected lifecycle regressions through its real HTTP/SSE parser against a local fixture server | `input_json_delta.partial_json` deltas on `tool_use` content blocks, `stop_reason` | Experimental | Raw `partial_json` delta string | `stop_reason: "end_turn"\|"tool_use"\|"max_tokens"` | Local-fixture evidence, not live-provider certification. |
+| **Gemini** | `@google/genai@2.21.0`, selected identity/terminal regressions through its real HTTP/SSE parser against a local fixture server | `candidates[].content.parts[].functionCall` (**structured**, not streamed raw JSON text) | Experimental | Projection-only: the already-parsed `args` value is serialized for inspection/validation, never treated as raw proof | `finishReason: "STOP"\|"MAX_TOKENS"\|"SAFETY"\|"RECITATION"\|"OTHER"` | Even valid JSON, a valid schema, and `STOP` cannot produce strict `execute`; the gate rejects with `projection_only`. |
 
-All five non-AI-SDK adapters are exercised by `test/providers/adapters.test.ts`,
-`test/providers/coverage.test.ts`, `test/providers/provider-safety.test.ts`,
-and the machine-readable fixture corpus in `test/corpus/provider-envelopes.test.ts`
-— real test coverage, just not version-pinned SDK verification the way the
-AI SDK adapter is, because none of these five import or type-check against
-an actual SDK package (by design — see "Runtime dependencies" below).
+All five non-AI-SDK adapters have wire-shape coverage in
+`test/providers/adapters.test.ts`, `test/providers/coverage.test.ts`,
+`test/providers/provider-safety.test.ts`, and the provider-envelope corpus.
+In addition, these integration suites exercise installed official SDK parsers
+against a local loopback HTTP/SSE fixture server:
+
+- [`openai-official-sdk-lifecycle.test.ts`](../test/integration/openai-official-sdk-lifecycle.test.ts) — `openai@7.8.0`;
+- [`anthropic-official-sdk-lifecycle.test.ts`](../test/integration/anthropic-official-sdk-lifecycle.test.ts) — `@anthropic-ai/sdk@0.123.0`;
+- [`gemini-official-sdk-lifecycle.test.ts`](../test/integration/gemini-official-sdk-lifecycle.test.ts) — `@google/genai@2.21.0`.
+
+These are selected fixture/parser-reachability checks, not live provider calls,
+a full protocol certification, or a claim covering all SDK versions. SDKs are
+dev dependencies used by tests; the runtime adapters still do not import them.
 
 The AI SDK claim is independently runnable with
 `pnpm run example:ai-sdk-lifecycle-proof`. The proof drives each exact pinned
@@ -57,23 +64,24 @@ on a second attempt. This is not sandboxing, authorization, durable idempotency,
 or provider-side tool execution. `ai@5.0.244` has no approval
 mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
 `ai@7.0.77` additionally use their approval mechanism as an `execute` backstop.
-Other provider entries above remain wire-shape-tested rather than SDK-lifecycle
-version claims.
+
+`generateText()` returns a non-streaming result with no `fullStream`. The lock
+can remove callbacks from its tool definitions, but the raw-stream guard recipe
+requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
+See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
 
 ## Runtime dependencies
 
 No provider adapter imports its vendor SDK's package or types. Every
 adapter is a hand-rolled local interface matching the provider's wire
-shape, verified against that provider's published type declarations or API
-documentation at the time it was written (see the matrix above for what
-"verified" actually means per adapter). This is deliberate: a consumer on
-any version of `ai`, `openai`, `@anthropic-ai/sdk`, or a Gemini/OpenRouter
-client can use the matching adapter without this package forcing a
-specific version of any of them into their dependency graph.
+shape, with the evidence for each adapter listed in the matrix above.
+This is deliberate: consumers are not forced to install an SDK runtime
+dependency through this package. It does not imply every version of every
+provider SDK is compatible; only the explicitly tested surfaces are claimed.
 
 ## Versioning & stability policy
 
-**Package status: pre-1.0** (`0.4.3` at the time of writing). Per
+**Package status: pre-1.0** (the current version is in `package.json`). Per
 [Semantic Versioning](https://semver.org/), a pre-1.0 project's public API
 is not yet guaranteed stable, and this project takes that seriously rather
 than treating `0.x` as a formality:
@@ -86,17 +94,19 @@ than treating `0.x` as a formality:
   is also, as of `0.4.3`, backed by real external production adoption —
   see `docs/CASE_STUDY_SANDBASE.md`. Currently: `createParser`,
   `createToolCallStreamCoordinator`, `createToolCallExecutionGate`,
-  `createAiSdkExecutionGuard`, `createAiSdkExecutionLock`, and their
-  associated types (including the pre-existing `toolSchemas`/`schemas`
-  raw-JSON-Schema registration option, unchanged in shape since before
-  0.5.0). Breaking changes to these are avoided pre-1.0 and would be
-  called out prominently in `CHANGELOG.md` if one became necessary.
+  `createAiSdkExecutionGuard`, and their associated types (including the
+  pre-existing `toolSchemas`/`schemas` raw-JSON-Schema registration option,
+  unchanged in shape since before 0.5.0). Breaking changes to these are
+  avoided pre-1.0 and would be called out prominently in `CHANGELOG.md`
+  if one became necessary.
 - **`@public (Experimental)`** — exported, usable, and tested, but may
   change without a major-version bump while the project is pre-1.0,
   typically because the underlying provider/SDK surface it targets is
   itself still evolving, or because the surface is new and has not yet
-  been proven against real external usage. Currently: all six raw
-  provider adapters (`OpenAIStreamAdapter`, `OpenAICompatibleStreamAdapter`,
+  been proven against real external usage. `createAiSdkExecutionLock`
+  and its mapped types remain Experimental, matching `src/index.ts`.
+  Also Experimental: all six raw provider adapters
+  (`OpenAIStreamAdapter`, `OpenAICompatibleStreamAdapter`,
   `AnthropicStreamAdapter`, `GeminiStreamAdapter`, `OpenRouterStreamAdapter`,
   `AiSdkStreamAdapter`); every 0.5.0 validation addition - the
   `validators` registration option, `ToolInputValidator`/
@@ -127,6 +137,18 @@ than treating `0.x` as a formality:
 - This policy describes present intent, not a guarantee stronger than a
   small, pre-1.0 project can actually maintain. It will itself evolve as
   the project approaches 1.0.
+
+### Rejected-push diagnostic retention
+
+Coordinator-owned `E_COORDINATOR_LIMIT_EVENTS`, `E_EVENT_AFTER_STREAM_END`,
+and `E_TERMINAL_REASON_CONFLICT` are each retained and queued only on their
+first occurrence in a coordinator instance. This changes repeated diagnostic
+counts, not the codes, first message/severity, `accepted: false`, or execution
+revocation. Queue drains and repeated `finish()` calls do not reset retention.
+Provider-supplied and per-call diagnostics are not deduplicated by this rule.
+This is a bound on repeated rejected-push records, not a total heap-byte bound.
+The deterministic regression is
+[`coordinator-rejected-event-retention.test.ts`](../test/unit/coordinator-rejected-event-retention.test.ts).
 
 ## ESM / Node / module format
 

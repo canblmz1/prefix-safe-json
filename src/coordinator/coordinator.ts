@@ -33,6 +33,11 @@ const SDK_EXECUTION_OBSERVED_CODES: ReadonlySet<string> = new Set([
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
 ]);
 
+type RejectedPushDiagnosticCode =
+  | "E_COORDINATOR_LIMIT_EVENTS"
+  | typeof EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE
+  | typeof TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE;
+
 /**
  * @internal
  * Runtime shape check for what `validator.validate()` actually returned.
@@ -111,6 +116,10 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
   private callCounter = 0;
   private eventQueue: ToolCallCoordinatorEvent[] = [];
   private diagnostics: CoordinatorDiagnostic[] = [];
+  // Only the three coordinator-owned rejection categories can enter this
+  // set. Keep it separate from provider diagnostics and never reset it on
+  // drainEvents(): draining observations must not erase rejection evidence.
+  private readonly rejectedPushDiagnosticCodes = new Set<RejectedPushDiagnosticCode>();
   private eventsProcessed = 0;
   private globalSequence = 0;
   private isFinished = false;
@@ -173,7 +182,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
         event.type === "provider_stream_end" &&
         this.finishedReason !== undefined &&
         event.reason !== this.finishedReason;
-      this.addDiagnostic(
+      this.addRejectedPushDiagnostic(
         isConflictingTerminalReason
           ? {
               code: TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE,
@@ -190,7 +199,7 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     }
 
     if (this.eventsProcessed >= this.limits.maxNormalizedEvents) {
-      this.addDiagnostic({
+      this.addRejectedPushDiagnostic({
         code: "E_COORDINATOR_LIMIT_EVENTS",
         severity: "fatal",
         message: "Maximum normalized events exceeded",
@@ -646,6 +655,17 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
       return undefined;
     }
     return call;
+  }
+
+  private addRejectedPushDiagnostic(diag: CoordinatorDiagnostic & { code: RejectedPushDiagnosticCode }): void {
+    // Rejected pushes do not advance eventsProcessed, so the input budget
+    // cannot bound their diagnostics. Retain the first record of each of
+    // these three categories, including its original message and severity.
+    // Never evict evidence: takeDecision() still needs it after finish() or
+    // drainEvents(). Ordinary provider/per-call diagnostics are unaffected.
+    if (this.rejectedPushDiagnosticCodes.has(diag.code)) return;
+    this.rejectedPushDiagnosticCodes.add(diag.code);
+    this.addDiagnostic(diag);
   }
 
   private addDiagnostic(diag: CoordinatorDiagnostic) {
