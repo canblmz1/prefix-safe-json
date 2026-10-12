@@ -95,6 +95,16 @@ Every observed tool call ends in one of three actions:
 
 The full reason matrix lives in [`docs/EXECUTION_GATE.md`](docs/EXECUTION_GATE.md).
 
+## Resource handling
+
+The coordinator retains the first diagnostic for each rejected-push category:
+normalized-event budget exhaustion, input after stream end, and conflicting
+terminal reason. Repeating an already-rejected push does not keep appending
+that category to its diagnostic history or observation queue. Draining the
+queue does not erase the retained evidence or restore execution authority.
+This bounds those three categories, not total application memory or network
+traffic; existing parser/input limits and caller-owned cancellation still apply.
+
 ## Scope and non-goals
 
 The library covers streamed argument evidence, call identity, lifecycle completion, truncation detection, conflicting evidence, validation composition, and one-shot execution decisions.
@@ -114,12 +124,18 @@ See [`docs/PRODUCT_POSITIONING.md`](docs/PRODUCT_POSITIONING.md) and [`docs/THRE
 
 ## Vercel AI SDK integration
 
-For `streamText()` / `generateText()`, the recommended pattern is:
+For `streamText()`, the recommended pattern is:
 
 1. wrap tool definitions with `createAiSdkExecutionLock()`,
 2. consume `fullStream`,
 3. feed stream parts into `createAiSdkExecutionGuard()`, and
 4. dispatch manually only from `takeDecision()`.
+
+`generateText()` returns a non-streaming result, not `fullStream`, so this
+raw-stream guard recipe does not apply to it. The lock can remove callbacks
+from tools supplied to either function, but that alone does not provide the
+raw argument evidence this guard requires. Do not synthesize stream deltas
+from `generateText()`'s parsed tool-call results to claim raw-stream integrity.
 
 `createAiSdkExecutionLock()` removes SDK-invoked callbacks that could execute application code before the guard reaches a final decision. A tool definition that bypasses that lock and performs side effects directly is outside the protection boundary.
 
