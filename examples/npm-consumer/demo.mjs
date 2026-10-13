@@ -110,10 +110,12 @@ async function runScenario({ name, rawInput, projectedInput = rawInput, finishRe
     assert.notDeepEqual(dispatched[0], sdkProjection);
   }
   if (name === "invalid-schema") {
-    // ai@7.0.77 emits tool-error on schema failure before any callback runs.
-    // The guard rejects that evidence as sdk_execution_observed; the counter
-    // checks above establish that no SDK callback actually executed here.
-    assert.ok(observedParts.includes("tool-error"));
+    // The SDK accepts its schema-valid projection; PSJ must independently
+    // reject the invalid raw arguments through its Standard Schema validator.
+    assert.ok(observedParts.includes("tool-call"));
+    assert.equal(observedParts.includes("tool-error"), false);
+    assert.deepEqual(sdkProjection, projectedValue);
+    assert.equal(decision.reason, "schema_invalid");
   }
   console.log(JSON.stringify({
     scenario: name,
@@ -144,6 +146,8 @@ await runScenario({
 await runScenario({
   name: "invalid-schema",
   rawInput: JSON.stringify({ message: 42 }),
+  // Keep the SDK's own validation from hiding the guard's raw-schema check.
+  projectedInput: JSON.stringify(projectedValue),
   finishReason: "tool-calls",
   expectedEffects: 0,
 });
