@@ -1,12 +1,13 @@
 # Case study: Sandbase Harness
 
-Sandbase Harness is the first independently maintained external runtime
-currently known to use `prefix-safe-json` as a production dependency.
+Sandbase Harness provides a publicly verifiable dependency and runtime
+integration of `prefix-safe-json` outside this repository. This is not a
+customer relationship, endorsement, or confirmation of production deployment.
+Independent maintainer-run validation has not been confirmed.
 
-This is not a customer relationship and not an endorsement beyond what is
-directly observable in Sandbase's own public repository. Everything below
-is drawn from Sandbase's own committed code and commit history, verified
-directly against `sandbaseai/sandbase-harness`'s current `main` branch.
+The source snapshot below is pinned to Sandbase commit
+[`427b52a96a5309ca23268407f85c237468ab6a4e`](https://github.com/sandbaseai/sandbase-harness/tree/427b52a96a5309ca23268407f85c237468ab6a4e),
+checked on 2026-10-13. It does not describe future changes to `main`.
 
 ## What Sandbase needed to close
 
@@ -17,31 +18,37 @@ is exactly the boundary where a raw-vs-projected value distinction
 matters — a proposal that *looks* final because some SDK-level projection
 of it appeared complete is not the same fact as "the provider actually
 confirmed this call is done, with no later evidence contradicting it."
-Before adopting `prefix-safe-json`, Sandbase's own confirmation-persistence
-path had no independent way to distinguish those two facts from each
-other.
+The committed integration places a raw-stream guard at that
+confirmation-persistence boundary. Source inspection establishes that wiring;
+it does not establish how often the path runs in a deployed system.
 
 ## How it was integrated
 
-The integration originated from an external investigation into Sandbase's
-own AI SDK usage, was incorporated into Sandbase's `main` branch, and
-Sandbase depends on `prefix-safe-json` directly — `package.json`, current
-`main`:
+At the pinned commit, Sandbase's
+[`package.json`](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/package.json#L123-L137)
+directly depends on:
 
 ```json
-"prefix-safe-json": "0.5.0"
+"prefix-safe-json": "0.5.0",
+"ai": "^7.0.128"
 ```
 
-The dependency is active runtime code, not just a lockfile entry. Current
-`main` imports both `createAiSdkExecutionLock()` and
-`createAiSdkExecutionGuard()` from `prefix-safe-json`; its AI SDK v4 bridge
-translates the older stream-part names into the guard's raw lifecycle
-events instead of reconstructing arguments from an SDK projection.
+The dependency is referenced by runtime source, not just a lockfile entry.
+[`default-strategy.ts`](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/src/strategy/default-strategy.ts#L355-L368)
+uses `createAiSdkExecutionLock()`. Its
+[`ai-sdk-v4-execution-guard.ts`](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/src/strategy/ai-sdk-v4-execution-guard.ts)
+wraps `createAiSdkExecutionGuard()`: it translates older stream-part names,
+passes modern parts through, and does not rebuild raw arguments from the
+SDK's parsed `tool-call` projection. The bridge's v4 name does not establish
+an incompatibility with the declared `ai ^7.0.128` dependency. That version
+range is not an exact installed-version result or part of this repository's
+exact `ai@7.0.77` lifecycle proof.
 
-Sandbase's own `default-strategy.ts` drains the full AI SDK `fullStream`,
-calls `guard.finish()` once, and resolves each pending confirmation call's
-`takeDecision()` synchronously in the same tick — the same pattern this
-project's own README recommends, adopted independently.
+The
+[confirmation path](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/src/strategy/default-strategy.ts#L740-L836)
+drains `fullStream`, feeds the guard, calls `guard.finish()`, and takes
+per-call authority through `takeDecision()`. This is source-level evidence;
+the complete Sandbase application was not rerun for this snapshot.
 
 ## The security upgrade
 
@@ -62,35 +69,25 @@ Sandbase's integration depends on:
 
 Sandbase merged the upgrade
 ([sandbaseai/sandbase-harness#117](https://github.com/sandbaseai/sandbase-harness/pull/117))
-with no public API change on their side — `createAiSdkExecutionGuard()`/
-`createAiSdkExecutionLock()` and the `push`/`finish`/`takeDecision`/
-`snapshot` surface Sandbase's integration reads were confirmed unchanged
-directly against the installed package's own `.d.ts` files before the
-upgrade landed, not assumed.
-
-Sandbase has since advanced its direct pin to `0.5.0`, which is useful
-follow-through evidence: the adopter did not remain stranded on the one
-security-patch version that originally motivated the case study.
+and the pinned source snapshot now declares `0.5.0`. These public records
+show the dependency upgrade history; they do not by themselves prove a
+production rollout, independent validation, or patch compatibility for every
+consumer.
 
 ## What this proves
 
-- A real, independently maintained runtime found this package's
-  guarantee valuable enough to adopt in production, not just evaluate.
-- The integration survived a real security patch with zero call-site
-  changes on the adopter's side — evidence the public API surface this
-  project commits to (`docs/COMPATIBILITY.md`) is genuinely stable enough
-  to depend on across a patch release.
-- The adopter later moved to `0.5.0` and still imports the lock/guard
-  execution-integrity surface in current runtime code.
-- The upgrade was itself driven by a genuine security disclosure being
-  taken seriously and acted on quickly by both sides.
+- A separate public repository declares `prefix-safe-json@0.5.0` as a direct
+  dependency and references its lock/guard surface in runtime code.
+- The pinned source wires raw-stream evidence into confirmation decisions.
+- A public upgrade PR and the later dependency pin are observable history.
 
 ## What this does not prove
 
-- Broad market validation. This is one adopter, publicly verifiable, not
-  a survey or a claim about adoption at scale.
-- That Sandbase endorses this project beyond the fact of depending on it.
-- That every integration pattern this project documents has been
-  independently exercised in production — only the specific
-  `fullStream` → guard → `finish()` → `takeDecision()` pattern Sandbase
-  actually uses.
+- Production deployment, independent maintainer-run validation, or adoption
+  at scale. These have not been confirmed.
+- That Sandbase endorses this project beyond the committed integration.
+- End-to-end compatibility of the whole Sandbase application, or that every
+  integration pattern documented here has been independently exercised.
+
+This evidence classification matches the Sandbase row in
+[`REAL_WORLD_FAILURES.md`](REAL_WORLD_FAILURES.md).

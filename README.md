@@ -67,6 +67,31 @@ if (decisions.length === 0 && diagnostics.length > 0) {
 
 Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
 
+## Run a standalone npm demo
+
+Copy [`examples/npm-consumer/`](examples/npm-consumer/) into an empty directory
+outside this checkout, then run these commands there with **Node 22+**:
+
+```bash
+npm install --engine-strict --no-audit --no-fund
+npm ls prefix-safe-json ai zod
+npm start
+```
+
+The example pins `prefix-safe-json@0.5.1`, `ai@7.0.77`, and `zod@4.4.3`.
+It needs no repository build, workspace aliases, or API key. It drives real
+`streamText().fullStream` using the SDK's official `MockLanguageModelV4` and
+imports the installed package's public entry point and `standard-schema`
+subpath. Its only side effect is a harmless in-memory counter: complete input
+executes once; truncated and schema-invalid input execute zero times. A
+projection-mismatch case executes the raw `authority.value`, never the SDK
+projection. Every attached SDK callback stays at zero, and a second
+`takeDecision()` returns `undefined`.
+
+This is a deterministic mock-provider check, not a live-provider call or
+independent adoption evidence. CI runs the same demo against a freshly packed
+candidate tarball in a separate, isolated npm consumer directory.
+
 ## Why parse success is not enough
 
 Tool-call arguments often arrive as partial JSON. A renderer may reasonably repair or close an unfinished prefix so it can show progressive UI. That is useful for display, but it answers a different question from whether a side effect should run.

@@ -65,6 +65,16 @@ or provider-side tool execution. `ai@5.0.244` has no approval
 mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
 `ai@7.0.77` additionally use their approval mechanism as an `execute` backstop.
 
+For an installed-package consumer check, copy
+[`examples/npm-consumer/`](../examples/npm-consumer/) outside the checkout and
+run `npm install --engine-strict --no-audit --no-fund`, then `npm start` on
+Node 22+. It pins `prefix-safe-json@0.5.1`, `ai@7.0.77`, and `zod@4.4.3`, uses
+public imports (including `prefix-safe-json/standard-schema`), and exercises
+real `streamText().fullStream` with the official `MockLanguageModelV4`.
+CI separately substitutes the current packed candidate for the published PSJ
+pin. Both are deterministic mock-provider checks, not live-provider or
+independent-adoption evidence.
+
 `generateText()` returns a non-streaming result with no `fullStream`. The lock
 can remove callbacks from its tool definitions, but the raw-stream guard recipe
 requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
@@ -90,9 +100,10 @@ than treating `0.x` as a formality:
   project's own automated test suite and CI-run examples exercise as the
   primary supported surface (`test/guard/`,
   `test/unit/execution-gate*.test.ts`, `examples/*.mjs`). This is a
-  statement about this repository's own maturity/compatibility intent; it
-  is also, as of `0.4.3`, backed by real external production adoption —
-  see `docs/CASE_STUDY_SANDBASE.md`. Currently: `createParser`,
+  statement about this repository's own maturity/compatibility intent.
+  Sandbase provides public dependency and runtime-integration evidence;
+  production deployment and independent maintainer-run validation have not
+  been confirmed (see `docs/CASE_STUDY_SANDBASE.md`). Currently: `createParser`,
   `createToolCallStreamCoordinator`, `createToolCallExecutionGate`,
   `createAiSdkExecutionGuard`, and their associated types (including the
   pre-existing `toolSchemas`/`schemas` raw-JSON-Schema registration option,
