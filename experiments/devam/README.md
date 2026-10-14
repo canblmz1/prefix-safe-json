@@ -34,8 +34,8 @@ The static server binds only to loopback.
 5. Copy the continuation packet to the next conversation. It includes the
    current request, identified requirements, explicit claim/review states
    and file fingerprints. Supply any needed source files separately.
-6. Paste back the AI's single JSON report. Its project ID and request
-   revision must match; unknown requirements and extra authority fields are
+6. Paste back the AI's single JSON report. Its project ID, request revision
+   and intent ID must match; unknown requirements and extra authority fields are
    refused. A report never grants a review or changes the user's request.
 
 Each example opens a separate task; it does not discard your existing one.

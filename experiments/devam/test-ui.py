@@ -57,13 +57,15 @@ with sync_playwright() as p:
     expect(page.locator('#revision')).to_have_text('İSTEK 02')
 
     page.locator('.report-panel summary').click()
-    old={'formatVersion':1,'projectId':previous['id'],'baseRevision':1,'claims':[{'requirementId':'r1','note':'old report'}],'nextSteps':[]}
+    old={'formatVersion':1,'projectId':previous['id'],'intentId':previous['intentId'],'baseRevision':1,'claims':[{'requirementId':'r1','note':'old report'}],'nextSteps':[]}
     page.get_by_label('AI devam raporu',exact=True).fill(json.dumps(old))
     page.get_by_role('button',name='Beyanları ekle').click()
     expect(page.locator('#notice')).to_contain_text('eski veya farklı')
     expect(first.locator('.status')).to_have_text('Yeniden incele')
 
-    current={**old,'baseRevision':2,'claims':[{'requirementId':'r1','note':'Duyuru taslağı hazır.'}]}
+    packet=page.locator('#handoff-preview').input_value()
+    current_template=json.loads(packet.split('```json\n')[-1].split('\n```')[0])
+    current={**old,'intentId':current_template['intentId'],'baseRevision':2,'claims':[{'requirementId':'r1','note':'Duyuru taslağı hazır.'}]}
     page.get_by_label('AI devam raporu',exact=True).fill('```json\n'+json.dumps(current)+'\n```')
     page.get_by_role('button',name='Beyanları ekle').click()
     expect(first.locator('.status')).to_have_text('AI bildirdi')

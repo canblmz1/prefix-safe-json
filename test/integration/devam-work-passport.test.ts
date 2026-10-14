@@ -5,7 +5,7 @@ const input = { title: "Report", goal: "Review the plan before implementation.",
 const file = { name: "result.txt", size: 3, sha256: "a".repeat(64) };
 const first = (project: Project) => { const item = project.requirements[0]; if (!item) throw new Error("Missing fixture requirement"); return item; };
 const reviewed = () => reviewRequirement(attachEvidence(createProject(input), "r1", file), "r1");
-const report = (project: Project, overrides: object = {}) => JSON.stringify({ formatVersion: 1, projectId: project.id, baseRevision: project.revision, claims: [{ requirementId: "r1", note: "Everything is done." }], nextSteps: [], ...overrides });
+const report = (project: Project, overrides: object = {}) => JSON.stringify({ formatVersion: 1, projectId: project.id, intentId: project.intentId, baseRevision: project.revision, claims: [{ requirementId: "r1", note: "Everything is done." }], nextSteps: [], ...overrides });
 
 describe("Devam experimental task handoff", () => {
   it("records AI completion as a claim, never as a user review", () => {
@@ -42,6 +42,11 @@ describe("Devam experimental task handoff", () => {
     const changed = reviseProject(a, { ...input, goal: "Only review." });
     expect(() => applyReport(changed, report(a))).toThrow();
     expect(first(changed).claim).toBeNull();
+    const fork = reviseProject(importProject(exportProject(a)), { ...input, goal: "Different work in an imported branch." });
+    expect(fork.id).toBe(changed.id);
+    expect(fork.revision).toBe(changed.revision);
+    expect(fork.intentId).not.toBe(changed.intentId);
+    expect(() => applyReport(fork, report(changed))).toThrow();
   });
 
   it("drops obsolete next-step suggestions on an intent revision and preserves no-op edits", () => {

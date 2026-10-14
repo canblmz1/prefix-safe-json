@@ -8,7 +8,7 @@ export interface Requirement {
   review: { revision: number; sha256: string } | null;
 }
 /** Experimental portable task state, unrelated to execution authority. */
-export interface Project { formatVersion: number; id: string; title: string; goal: string; revision: number; requirements: Requirement[]; nextSteps: string[]; }
+export interface Project { formatVersion: number; id: string; intentId: string; title: string; goal: string; revision: number; requirements: Requirement[]; nextSteps: string[]; }
 /** User-authored task input. */
 export interface ProjectInput { title: string; goal: string; items: string[]; }
 export function createProject(input: ProjectInput): Project;

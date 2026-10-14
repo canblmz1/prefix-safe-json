@@ -180,4 +180,4 @@ try {
   writable = false;
   announce("Önceki tarayıcı kaydı okunamadı; üzerine yazılmadı. Bu oturumdaki çalışmanı dosya olarak indirebilirsin.", true);
 }
-if (!records.length) addProject(createProject(samples.daily)); else render();
+if (!records.length) addProject(createProject(samples.daily)); else { persist(); render(); }
