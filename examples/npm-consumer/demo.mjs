@@ -144,6 +144,13 @@ await runScenario({
   expectedEffects: 0,
 });
 await runScenario({
+  name: "valid-json-token-limit",
+  // Parse success and schema validity cannot override unsafe termination.
+  rawInput: JSON.stringify(rawValue),
+  finishReason: "length",
+  expectedEffects: 0,
+});
+await runScenario({
   name: "invalid-schema",
   rawInput: JSON.stringify({ message: 42 }),
   // Keep the SDK's own validation from hiding the guard's raw-schema check.
@@ -158,5 +165,5 @@ await runScenario({
   finishReason: "tool-calls",
   expectedEffects: 1,
 });
-console.log("PASS: effects 1/0/0/1; SDK callbacks zero; second takeDecision() undefined.");
+console.log("PASS: effects 1/0/0/0/1; SDK callbacks zero; second takeDecision() undefined.");
 console.log("This is a local mock-provider check, not a live-provider or independent-adoption claim.");
