@@ -105,6 +105,11 @@ This is a deterministic mock-provider check, not a live-provider call or
 independent adoption evidence. CI runs the same demo against a freshly packed
 candidate tarball in a separate, isolated npm consumer directory.
 
+Using LangChain? The [standalone SDK comparison](examples/langchain-consumer/README.md)
+feeds the same original OpenAI-compatible fixture to `ChatOpenAI.stream()` and
+PSJ, checking that token-limit calls produce zero effects. It is a mock-transport
+comparison; your application still needs access to original provider evidence.
+
 ## Why parse success is not enough
 
 Tool-call arguments often arrive as partial JSON. A renderer may reasonably repair or close an unfinished prefix so it can show progressive UI. That is useful for display, but it answers a different question from whether a side effect should run.
