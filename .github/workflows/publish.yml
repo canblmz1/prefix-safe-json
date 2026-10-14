@@ -1,6 +1,7 @@
 name: Publish to npm
 
 on:
+  workflow_dispatch:
   push:
     branches: ["main"]
     paths:
@@ -26,6 +27,8 @@ jobs:
   # expensive job below is now conditional on its result.
   release-intent:
     name: Release intent
+    # Manual retries must preserve the same main-only release boundary as pushes.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -215,13 +218,10 @@ jobs:
     if: needs.release-intent.result == 'success' && needs.release-intent.outputs.should_publish == 'true'
     permissions:
       contents: read
-    # Measured locally at ~30.5 minutes for a full run against the current
-    # break:85.01 config (2185 killed / 294 survived / 52 timeout / 8
-    # no-coverage mutants across 10 mutated files, 88.11% score - above the
-    # threshold, so the job exits 0). 60 minutes leaves real headroom for a
-    # shared/slower CI runner without tuning the cap to the exact observed
-    # number.
-    timeout-minutes: 60
+    # Run 38559678919 (22 files / 4850 instrumented mutants) reached 91%
+    # with ~5 minutes remaining when the old 60-minute cap canceled it.
+    # Allow runner variation while retaining the full scope and >85% bar.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
