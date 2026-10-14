@@ -5,6 +5,11 @@ one complete call that runs once and one interrupted call that does not run.
 
 ## Check the published demo
 
+Without a checkout, download the
+[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-14)
+and follow its extraction and npm commands. It contains example sources and
+licenses and installs published PSJ `0.5.2`; it does not bundle a new runtime.
+
 With Node 22+ and npm available, run from this checkout:
 
 ```bash

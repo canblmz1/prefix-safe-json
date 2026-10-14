@@ -5,6 +5,11 @@ Run this when your application owns tool dispatch and receives original
 limits: every argument object is complete and schema-valid, and the provider
 reports successful termination, but two calls reuse the same identity.
 
+For a trial without cloning the repository, download the
+[standalone example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-14).
+Extract it, enter `examples/npm-consumer`, install with npm and run
+`npm run identity`. Node 22+ and npm registry access are required.
+
 From a repository checkout with Node 22+ and npm:
 
 ```bash

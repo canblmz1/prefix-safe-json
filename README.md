@@ -93,6 +93,12 @@ checkout without model requests or tool dispatch.
 
 ## Run a standalone npm demo
 
+To try it without cloning this repository, download the
+[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-14).
+It contains only the example sources and licenses; its release notes give
+the extraction and npm commands. It installs published PSJ `0.5.2`, not a new
+or unpublished package version.
+
 With Node 22+ and npm, you can run the published-package demo from this checkout
 without installing the repository's development dependencies:
 
