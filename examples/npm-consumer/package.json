@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "ai": "7.0.77",
-    "prefix-safe-json": "0.5.1",
+    "prefix-safe-json": "0.5.2",
     "zod": "4.4.3"
   }
 }

@@ -68,7 +68,7 @@ mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
 For an installed-package consumer check, copy
 [`examples/npm-consumer/`](../examples/npm-consumer/) outside the checkout and
 run `npm install --engine-strict --no-audit --no-fund`, then `npm start` on
-Node 22+. It pins `prefix-safe-json@0.5.1`, `ai@7.0.77`, and `zod@4.4.3`, uses
+Node 22+. It pins `prefix-safe-json@0.5.2`, `ai@7.0.77`, and `zod@4.4.3`, uses
 public imports (including `prefix-safe-json/standard-schema`), and exercises
 real `streamText().fullStream` with the official `MockLanguageModelV4`.
 CI separately substitutes the current packed candidate for the published PSJ
