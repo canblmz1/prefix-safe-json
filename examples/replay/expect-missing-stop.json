@@ -1,0 +1,6 @@
+{
+  "formatVersion": 1,
+  "calls": [
+    { "name": "record", "action": "retry", "reason": "stream_incomplete" }
+  ]
+}
