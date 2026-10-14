@@ -261,7 +261,15 @@ export function createAiSdkExecutionLock<TTools extends Record<string, object>>(
       needsApproval: _droppedNeedsApproval,
       ...rest
     } = probe;
-    locked[name] = { ...rest, needsApproval: true };
+    // Tool names are data. Assignment to "__proto__" would invoke the
+    // inherited setter, changing the map's prototype and losing the tool
+    // from Object.entries() when the SDK prepares its tool definitions.
+    Object.defineProperty(locked, name, {
+      value: { ...rest, needsApproval: true },
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   return locked as LockedAiSdkTools<TTools>;
 }

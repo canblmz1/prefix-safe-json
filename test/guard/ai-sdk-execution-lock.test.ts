@@ -54,6 +54,22 @@ describe("createAiSdkExecutionLock", () => {
     expect(locked.delete_file.needsApproval).toBe(true);
   });
 
+  it.each(["__proto__", "constructor", "toString"])("preserves %s as an own tool entry without changing the tool map's prototype", (name) => {
+    const execute = async () => "should never run";
+    const inputSchema = { type: "object" };
+    const original = Object.fromEntries([[name, {
+      inputSchema, execute,
+      onInputStart: () => {}, onInputDelta: () => {}, onInputAvailable: () => {},
+    }]]);
+    const locked = createAiSdkExecutionLock(original);
+
+    expect(Object.keys(locked)).toEqual([name]);
+    expect(Object.hasOwn(locked, name)).toBe(true);
+    expect(Object.getPrototypeOf(locked)).toBe(Object.prototype);
+    expect(locked[name]).toEqual({ inputSchema, needsApproval: true });
+    expect(original[name]?.execute).toBe(execute);
+  });
+
   it("does not mutate the caller's original tool definitions", () => {
     const original = { write_file: { description: "d", inputSchema: {}, execute: async () => "x" } };
     createAiSdkExecutionLock(original);
