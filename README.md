@@ -67,6 +67,13 @@ if (decisions.length === 0 && diagnostics.length > 0) {
 
 Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
 
+## Replay an incident and keep it as a regression test
+
+Have a recorded Anthropic or AI SDK tool stream? The experimental
+[local replay workflow](docs/REPLAY.md) explains each call's execution decision
+and compares it with reviewed expectations in CI. It runs from a repository
+checkout without model requests or tool dispatch.
+
 ## Run a standalone npm demo
 
 With Node 22+ and npm, you can run the published-package demo from this checkout

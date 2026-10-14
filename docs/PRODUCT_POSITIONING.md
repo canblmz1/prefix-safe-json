@@ -108,6 +108,12 @@ summary is drawn from.
 
 ## Public API surface
 
+The experimental [local replay workflow](REPLAY.md) is companion development
+tooling: it helps turn recorded incidents into reviewed regression checks.
+It uses the existing gate and guard without expanding runtime authority or
+dispatching tools. Its recurring-use value remains a product hypothesis,
+pending evidence from developers applying it to their own incidents.
+
 The README leads with exactly one high-level entry point
 (`createAiSdkExecutionGuard()` + `createAiSdkExecutionLock()`) on purpose.
 The rest of the public surface exists and is fully supported, but is not
