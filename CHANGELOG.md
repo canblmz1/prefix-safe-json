@@ -8,6 +8,10 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Added
+
+- A standalone native-versus-PSJ identity comparison: two complete, schema-valid calls with distinct IDs produce two effects in both paths; reusing one ID produces two native effects and zero caller-owned PSJ effects. The existing demo launcher includes this authored-fixture comparison, and packed-consumer CI also checks AI SDK `7.0.140`. This does not add WorkflowAgent support or repair result pairing.
+
 ### Fixed
 
 - `createAiSdkExecutionLock()` preserves `__proto__` as an enumerable own tool entry instead of changing the returned tool map's prototype and silently dropping the tool from SDK preparation. Real AI SDK regression tests cover native execution versus locked, one-shot caller dispatch, with `constructor` and `toString` controls. Callback stripping and forced approval remain unchanged.

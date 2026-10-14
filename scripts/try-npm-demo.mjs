@@ -25,7 +25,7 @@ if (Number(process.versions.node.split(".")[0]) < 22) {
 
 const consumer = await mkdtemp(join(tmpdir(), "psj-demo-"));
 console.log(`Installing the published ${selected} demo in ${consumer}`);
-for (const file of ["package.json", "demo.mjs", ...(demo.batch ? ["batch-demo.mjs"] : [])]) {
+for (const file of ["package.json", "demo.mjs", ...(demo.batch ? ["batch-demo.mjs", "identity-demo.mjs"] : [])]) {
   await copyFile(new URL(`../examples/${demo.directory}/${file}`, import.meta.url), join(consumer, file));
 }
 
@@ -35,6 +35,7 @@ for (const args of [
   ["ls", "prefix-safe-json", ...demo.packages],
   ["start"],
   ...(demo.batch ? [["run", "batch"]] : []),
+  ...(demo.batch ? [["run", "identity"]] : []),
 ]) {
   const code = await new Promise((resolve, reject) => {
     const child = spawn("npm", args, {

@@ -257,9 +257,10 @@ jobs:
           PSJ_SOURCE_DIR="$PWD"
           # 7.0.128 is the exact AI SDK pin in the public Sandbase lockfile snapshot.
           # 7.0.137 matches the parallel-call truncation report in vercel/ai#22914.
-          for PSJ_AI_VERSION in 7.0.77 7.0.128 7.0.137; do
+          # 7.0.140 was npm latest when the identity comparison was checked (2026-10-14).
+          for PSJ_AI_VERSION in 7.0.77 7.0.128 7.0.137 7.0.140; do
             PSJ_CONSUMER_DIR=$(mktemp -d)
-            cp "$PSJ_SOURCE_DIR/examples/npm-consumer/package.json" "$PSJ_SOURCE_DIR/examples/npm-consumer/demo.mjs" "$PSJ_SOURCE_DIR/examples/npm-consumer/batch-demo.mjs" "$PSJ_CONSUMER_DIR/"
+            cp "$PSJ_SOURCE_DIR/examples/npm-consumer/package.json" "$PSJ_SOURCE_DIR/examples/npm-consumer/demo.mjs" "$PSJ_SOURCE_DIR/examples/npm-consumer/batch-demo.mjs" "$PSJ_SOURCE_DIR/examples/npm-consumer/identity-demo.mjs" "$PSJ_CONSUMER_DIR/"
             cp "$PSJ_SOURCE_DIR/prefix-safe-json-smoke.tgz" "$PSJ_CONSUMER_DIR/"
             (
               cd "$PSJ_CONSUMER_DIR"
@@ -269,6 +270,7 @@ jobs:
               npm ls prefix-safe-json ai zod
               npm start
               npm run batch
+              npm run identity
             )
           done
 

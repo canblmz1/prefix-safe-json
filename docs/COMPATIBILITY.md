@@ -73,7 +73,7 @@ public imports (including `prefix-safe-json/standard-schema`), and exercises
 real `streamText().fullStream` with the official `MockLanguageModelV4`.
 CI separately substitutes the current packed candidate for the published PSJ
 pin and runs the same five-scenario demo with `ai@7.0.77`, `ai@7.0.128`, and
-`ai@7.0.137`. The `7.0.128` pin matches Sandbase's public lockfile snapshot at
+`ai@7.0.137`, and `ai@7.0.140`. The `7.0.128` pin matches Sandbase's public lockfile snapshot at
 `427b52a96a5309ca23268407f85c237468ab6a4e`. The `7.0.128` consumer check covers
 complete, truncated, valid-JSON token-limit, schema-invalid, and
 projection-mismatch calls; it is narrower than the three exact-major lifecycle
@@ -86,6 +86,14 @@ complete and one truncated call grants neither. The `7.0.137` pin matches
 [vercel/ai #22914](https://github.com/vercel/ai/issues/22914). This comparison
 checks caller-owned dispatch; it does not cover the requested UI outcomes,
 skipped-call states, output budgeting, or continuation features.
+
+All four installed consumers also run `npm run identity`, comparing native
+effects with locked, caller-owned effects for distinct IDs (**2 / 2**) and
+duplicate IDs (**2 / 0**). The same authored original-stream fixture was
+checked locally with installed published PSJ `0.5.2` and `ai@7.0.140`, npm's
+latest when checked on 2026-10-14. This is a `streamText()` boundary comparison,
+not WorkflowAgent support or an upstream result-pairing fix. See
+[the identity trial](IDENTITY_TRIAL.md) for limits and reproduction steps.
 
 `generateText()` returns a non-streaming result with no `fullStream`. The lock
 can remove callbacks from its tool definitions, but the raw-stream guard recipe

@@ -36,6 +36,12 @@ temporary project. Application retry policy and UI state remain caller-owned.
 The demo uses a mock provider. Running it alone does not establish integration
 in your project or compatibility with your live provider.
 
+The launcher also runs `npm run identity`: native / PSJ effect counts are
+**2 / 2** for two distinct IDs and **2 / 0** for two complete calls sharing
+an ID. Unlike the locked cases, its native control intentionally executes
+harmless counters. The [identity trial](IDENTITY_TRIAL.md) explains when this
+demonstrates an additional check and when your provider already resolves IDs.
+
 ## Connect your existing AI SDK stream
 
 Use the [README's safe execution example](../README.md#safe-execution-example)
