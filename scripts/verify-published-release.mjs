@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -86,17 +86,16 @@ function verifyIntegrity(buffer, integrity) {
   }
 }
 
-// This GNU tar build resolves an archive/`-C` path containing a drive-letter
-// colon inconsistently when passed Windows-style backslashes together with
-// `--force-local` (needed so `C:\...` isn't parsed as a remote `host:path`
-// spec in the first place). Forward slashes avoid both problems and are
-// accepted by both `tar` and Windows itself.
+// Forward slashes work for extraction destinations in both GNU tar and
+// Windows' built-in bsdtar. Archive operands use a basename with cwd set to
+// its directory: GNU tar then cannot interpret a drive letter as host:path,
+// and bsdtar does not need the unsupported GNU-only --force-local option.
 function tarPath(path) {
   return path.replaceAll("\\", "/");
 }
 
 function listArchive(tarball) {
-  const entries = capture("tar", ["--force-local", "-tzf", tarPath(tarball)])
+  const entries = capture("tar", ["-tzf", basename(tarball)], { cwd: dirname(tarball) })
     .split(/\r?\n/u)
     .filter(Boolean);
   for (const entry of entries) {
@@ -116,7 +115,7 @@ function listArchive(tarball) {
 function unpack(tarball, destination) {
   listArchive(tarball);
   mkdirSync(destination, { recursive: true });
-  run("tar", ["--force-local", "-xzf", tarPath(tarball), "-C", tarPath(destination)]);
+  run("tar", ["-xzf", basename(tarball), "-C", tarPath(destination)], { cwd: dirname(tarball) });
 }
 
 function manifest(root, current = root) {
@@ -450,7 +449,7 @@ async function main() {
   run("git", ["-c", "core.autocrlf=false", "archive", "--format=tar", `--output=${sourceTar}`, releaseCommit], { cwd: repoRoot });
   const sourceRoot = join(auditRoot, "source");
   mkdirSync(sourceRoot);
-  run("tar", ["--force-local", "-xf", tarPath(sourceTar), "-C", tarPath(sourceRoot)]);
+  run("tar", ["-xf", basename(sourceTar), "-C", tarPath(sourceRoot)], { cwd: dirname(sourceTar) });
   const packageManager = JSON.parse(readFileSync(join(sourceRoot, "package.json"), "utf8")).packageManager;
   if (!/^pnpm@\d+\.\d+\.\d+$/u.test(packageManager ?? "")) fail("release source lacks an exact pnpm packageManager pin");
   const publishWorkflow = readFileSync(join(sourceRoot, ".github", "workflows", "publish.yml"), "utf8");
