@@ -8,6 +8,10 @@ export default defineConfig({
     testTimeout: 10_000,
     coverage: {
       provider: "v8",
+      // Release coverage measures the package's own runtime source. Local
+      // research checkouts and the separately browser-tested product
+      // experiment must not be counted as unpublished package code.
+      include: ["src/**/*.ts"],
       // Global (project-wide) floors, not per-file: per-file thresholds
       // would fail immediately against legitimately-lower-coverage
       // defensive branches (e.g. semantic/snapshot.ts's internal-invariant
