@@ -40,9 +40,9 @@ export const SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE = "E_SDK_EXECUTION_OBSERVED"
 /**
  * Emitted (as a `provider_diagnostic` carrying the call's own `callRef`, when
  * a `callRef` could be determined) by the AI SDK adapter when a `tool-error`
- * part is observed: proof that the Vercel AI SDK's own tool-calling loop
- * already invoked this call's `execute` callback and it threw. This does NOT
- * prove no partial irreversible side effect occurred before the throw, so it
+ * part is observed. It may represent execute() throwing after a partial
+ * side effect, or input validation failing before execute() was invoked.
+ * The generic part alone does NOT establish which occurred, so it
  * receives the exact same fail-closed treatment as
  * `SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE` - success and failure are not
  * distinguished into safe/unsafe here, both must fail closed.

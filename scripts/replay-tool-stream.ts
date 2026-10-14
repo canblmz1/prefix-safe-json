@@ -33,7 +33,7 @@ const explanations: Record<ExecutionReason, string> = {
   resource_limit: "A parser or coordinator resource limit was reached.",
   provider_error: "The recorded stream contains a provider failure.",
   content_filtered: "The recorded stream ended under a content restriction.",
-  sdk_execution_observed: "The stream reports SDK execution; caller-owned authority is withheld.",
+  sdk_execution_observed: "SDK execution was observed or cannot be excluded; caller-owned authority is withheld.",
   projection_only: "A parsed projection has insufficient original argument evidence.",
   protocol_violation: "Recorded identity or lifecycle evidence is contradictory or out of order.",
   unknown: "The recorded evidence does not establish an execution outcome.",

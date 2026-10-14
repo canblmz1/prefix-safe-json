@@ -331,10 +331,10 @@ export class AiSdkStreamAdapter implements ProviderStreamAdapter<unknown> {
         break;
       }
       case "tool-error": {
-        // Also proof the SDK's own tool loop already invoked this call's
-        // `execute` callback - it threw, but that does not prove no partial
-        // irreversible side effect occurred first. Deliberately the same
-        // fail-closed treatment as "tool-result" above: see
+        // May follow execute() throwing after a partial side effect, but
+        // the SDK also emits this for input validation failures before
+        // execute() runs. The generic part alone does not prove either
+        // history. Keep the conservative fail-closed treatment; see
         // SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE's own docs.
         const id = this.resolveIdentity(part, events);
         events.push({

@@ -8,8 +8,9 @@
 //
 // Priority order matters and is intentional. SDK-execution-ownership
 // evidence (attributed to this call, or stream-wide/unattributable) is
-// checked FIRST, before every other disqualifier - it is a statement that
-// execution authority already left this library's hands, categorically
+// checked FIRST, before every other disqualifier - execution authority may
+// already have left this library's hands (generic tool-error is ambiguous),
+// categorically
 // different from every other check below, which are all statements about
 // the ARGUMENTS/STREAM being unusable. A caller's higher-level logic might
 // reasonably retry a whole request on resource_limit/provider_error/
