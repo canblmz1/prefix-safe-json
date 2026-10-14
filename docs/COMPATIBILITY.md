@@ -38,7 +38,7 @@ do not claim that every lifecycle suite was rerun on every Node matrix entry.
 | **OpenAI** (Responses API) | `openai@7.8.0`, selected lifecycle regressions through its real HTTP/SSE parser against a local fixture server | `response.completed`/`response.incomplete`/`response.failed`/`error` events | Experimental | Raw text deltas | `incomplete_details.reason` (`max_output_tokens`\|`content_filter`) | An unrecognized/missing `incomplete_details.reason` normalizes to `unknown`, never assumed complete. Local-fixture evidence, not live-provider certification. |
 | **OpenAI-compatible** (generic; also underlies **OpenRouter**) | No specific SDK/version — targets the widely-used `choices[].delta.tool_calls[]` array shape shared by OpenAI's current API and most compatible endpoints | Explicit non-negative integer `choices[].index` + `tool_calls[].index` + `tool_calls[].function.{name,arguments}`, `finish_reason` | Experimental | Raw `arguments` delta string per choice/tool coordinate | `finish_reason` string | Missing, invalid, or duplicate explicit choice identity fails closed; outer array order is never guessed as identity. "Compatible" describes wire shape, not a hosted-vendor guarantee. |
 | **OpenRouter** | No specific SDK/version — thin wrapper over `OpenAICompatibleStreamAdapter`'s shape, plus an `error` field | Same as OpenAI-compatible, plus OpenRouter's own `error` field on a choice | Experimental | Raw `arguments` delta string | `finish_reason` string, or `error` presence | Shares essentially all wire-shape risk with the OpenAI-compatible adapter above. |
-| **Anthropic** (Messages API) | `@anthropic-ai/sdk@0.123.0`, selected lifecycle regressions through its real HTTP/SSE parser against a local fixture server | `input_json_delta.partial_json` deltas on `tool_use` content blocks, `stop_reason` | Experimental | Raw `partial_json` delta string | `stop_reason: "end_turn"\|"tool_use"\|"max_tokens"` | Local-fixture evidence, not live-provider certification. |
+| **Anthropic** (Messages API) | `@anthropic-ai/sdk@0.123.0`, selected lifecycle regressions through its real HTTP/SSE parser against a local fixture server | `input_json_delta.partial_json` deltas on `tool_use` content blocks, `stop_reason` | Experimental | Raw `partial_json` delta string | `message_stop` after `stop_reason: "end_turn"\|"tool_use"\|"max_tokens"` | Local-fixture evidence, not live-provider certification. |
 | **Gemini** | `@google/genai@2.21.0`, selected identity/terminal regressions through its real HTTP/SSE parser against a local fixture server | `candidates[].content.parts[].functionCall` (**structured**, not streamed raw JSON text) | Experimental | Projection-only: the already-parsed `args` value is serialized for inspection/validation, never treated as raw proof | `finishReason: "STOP"\|"MAX_TOKENS"\|"SAFETY"\|"RECITATION"\|"OTHER"` | Even valid JSON, a valid schema, and `STOP` cannot produce strict `execute`; the gate rejects with `projection_only`. |
 
 All five non-AI-SDK adapters have wire-shape coverage in
@@ -79,6 +79,20 @@ independent-adoption evidence.
 can remove callbacks from its tool definitions, but the raw-stream guard recipe
 requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
 See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
+
+## Anthropic message completion
+
+The Anthropic adapter requires both `message_delta.delta.stop_reason` and the
+final `message_stop` before reporting successful termination. This follows the
+[documented Messages streaming sequence](https://platform.claude.com/docs/en/build-with-claude/streaming).
+EOF between those events is incomplete even when the tool argument JSON and
+its content block are complete. `finish({ reason: "complete" })` cannot replace
+the missing event. Duplicate stop metadata and content-block evidence after a
+stop reason reject the affected stream's authority.
+
+This behavior is currently an unreleased correction to `0.5.1`. The regression
+is checked with the installed official SDK against a local SSE fixture, not a
+live provider.
 
 ## Runtime dependencies
 

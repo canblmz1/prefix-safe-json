@@ -42,7 +42,8 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
 
   it("handles message_delta with max_tokens stop_reason", () => {
     const a = new AnthropicStreamAdapter();
-    const events = a.push({ type: "message_delta", delta: { stop_reason: "max_tokens" } });
+    expect(a.push({ type: "message_delta", delta: { stop_reason: "max_tokens" } })).toEqual([]);
+    const events = a.push({ type: "message_stop" });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.type).toBe("provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("length");
@@ -50,7 +51,8 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
 
   it("handles message_delta with unknown stop_reason", () => {
     const a = new AnthropicStreamAdapter();
-    const events = a.push({ type: "message_delta", delta: { stop_reason: "some_future_reason" } });
+    expect(a.push({ type: "message_delta", delta: { stop_reason: "some_future_reason" } })).toEqual([]);
+    const events = a.push({ type: "message_stop" });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.type).toBe("provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("unknown");
@@ -58,7 +60,8 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
 
   it("handles message_delta with tool_use stop_reason", () => {
     const a = new AnthropicStreamAdapter();
-    const events = a.push({ type: "message_delta", delta: { stop_reason: "tool_use" } });
+    expect(a.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })).toEqual([]);
+    const events = a.push({ type: "message_stop" });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect(end?.type).toBe("provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("complete");
@@ -75,6 +78,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
     // end-to-end authority-revocation proof through a real gate.
     const a = new AnthropicStreamAdapter();
     a.push({ type: "message_delta", delta: { stop_reason: "end_turn" } });
+    a.push({ type: "message_stop" });
     const events = a.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } });
     expect(events).toHaveLength(1);
     expect(events[0]?.type).toBe("tool_call_arguments_delta");
@@ -104,6 +108,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
     for (const e of malformedEvents) gate.push(e);
     for (const e of a.push({ type: "content_block_stop", index: 0 })) gate.push(e);
     for (const e of a.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+    for (const e of a.push({ type: "message_stop" })) gate.push(e);
     const final = gate.finish();
     // No argument bytes were ever received - the call closes with no
     // stableValue (never reaches a fabricated/incorrect "executable" state).
@@ -134,6 +139,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
   it("finish() is idempotent after already finished", () => {
     const a = new AnthropicStreamAdapter();
     a.push({ type: "message_delta", delta: { stop_reason: "end_turn" } });
+    a.push({ type: "message_stop" });
     const events = a.finish({ reason: "cancelled" });
     expect(events).toHaveLength(0);
   });
@@ -148,7 +154,8 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
 
   it("handles message_delta with end_turn stop_reason (maps to complete, same as tool_use)", () => {
     const a = new AnthropicStreamAdapter();
-    const events = a.push({ type: "message_delta", delta: { stop_reason: "end_turn" } });
+    expect(a.push({ type: "message_delta", delta: { stop_reason: "end_turn" } })).toEqual([]);
+    const events = a.push({ type: "message_stop" });
     const end = events.find((e) => e.type === "provider_stream_end");
     expect((end as { reason?: string })?.reason).toBe("complete");
   });
@@ -167,6 +174,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       ...a.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{}" } }),
       ...a.push({ type: "content_block_stop", index: 0 }),
       ...a.push({ type: "message_delta", delta: { stop_reason: "tool_use" } }),
+      ...a.push({ type: "message_stop" }),
     ];
     for (let i = 1; i < events.length; i++) {
       expect(expectDefined(events[i]).sequence, `event ${i} sequence`).toBeGreaterThan(expectDefined(events[i - 1]).sequence);
@@ -193,6 +201,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       for (const e of lateEvents) gate.push(e);
 
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
       const final = gate.finish();
       const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
       expect(a.action).not.toBe("execute");
@@ -216,6 +225,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       for (const e of lateEvents) gate.push(e);
 
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
       const final = gate.finish();
       const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
       expect(a.action).not.toBe("execute");
@@ -237,6 +247,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       for (const e of adapter.push({ type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: '{"b":2}' } })) gate.push(e);
       for (const e of adapter.push({ type: "content_block_stop", index: 1 })) gate.push(e);
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
 
       const final = gate.finish();
       const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
@@ -267,6 +278,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       for (const e of events) gate.push(e);
 
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
       const final = gate.finish();
       // A's own clean, legitimate authority is unaffected by the unrelated
       // never-started identity's delta; no phantom "block 5" call exists.
@@ -293,6 +305,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       for (const e of secondStop) gate.push(e);
 
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
       const final = gate.finish();
       const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));
       expect(a.action).not.toBe("execute");
@@ -306,6 +319,7 @@ describe("AnthropicStreamAdapter — uncovered branches", () => {
       // Syntactically COMPLETE already - but content_block_stop never fires.
       for (const e of adapter.push({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a":1}' } })) gate.push(e);
       for (const e of adapter.push({ type: "message_delta", delta: { stop_reason: "tool_use" } })) gate.push(e);
+      for (const e of adapter.push({ type: "message_stop" })) gate.push(e);
 
       const final = gate.finish();
       const a = expectDefined(final.decisions.find((d) => (d as { name?: string }).name === "toolA"));

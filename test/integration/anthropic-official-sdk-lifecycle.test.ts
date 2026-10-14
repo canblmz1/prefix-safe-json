@@ -43,6 +43,33 @@ const messageStart = () =>
   });
 
 describe("Anthropic official SDK (@anthropic-ai/sdk@0.123.0): Messages streaming, through the real SDK parser", () => {
+  it("withholds authority when EOF follows stop_reason but no message_stop arrives", async () => {
+    server = await startSseFixtureServer({
+      chunks: [
+        messageStart(),
+        sseFrame("content_block_start", { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_eof", name: "search", input: {} } }),
+        sseFrame("content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"q":"test"}' } }),
+        sseFrame("content_block_stop", { type: "content_block_stop", index: 0 }),
+        sseFrame("message_delta", { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 10 } }),
+      ],
+    });
+    const stream = await client(server.baseUrl).messages.create({ model: "claude-test", max_tokens: 100, messages: [{ role: "user", content: "hi" }], stream: true });
+    const adapter = new AnthropicStreamAdapter();
+    const gate = createToolCallExecutionGate();
+    const types: string[] = [];
+    for await (const event of stream) {
+      types.push(event.type);
+      for (const normalized of adapter.push(event)) gate.push(normalized);
+    }
+    expect(types.at(-1)).toBe("message_delta");
+    expect(types).not.toContain("message_stop");
+    for (const normalized of adapter.finish()) gate.push(normalized);
+    const decision = expectDefined(gate.finish().decisions[0]);
+    expect(decision.evidence.structurallyComplete).toBe(true);
+    expect(decision.action).not.toBe("execute");
+    expect(gate.takeDecision(decision.internalId)).toBeUndefined();
+  });
+
   it("(1) normal tool_use lifecycle: id/name/input-JSON-bytes/call-close/terminal-reason/executable authority all survive the real SDK parser end to end, exactly once", async () => {
     server = await startSseFixtureServer({
       chunks: [
@@ -231,7 +258,7 @@ describe("Anthropic official SDK (@anthropic-ai/sdk@0.123.0): Messages streaming
     for (const event of rawEvents) for (const normalized of adapter.push(event)) gate.push(normalized);
 
     // Universal documented lifecycle (docs/EXECUTION_GATE.md#example):
-    // message_delta already observed a genuine provider-level terminal
+    // message_stop already observed a genuine provider-level terminal
     // above, so adapter.finish() here must be the standard idempotent
     // no-op every adapter guarantees - no Anthropic-specific exception.
     const finishEvents = adapter.finish();

@@ -210,7 +210,7 @@ for (const rawEvent of anthropicSseEvents) {
 // adapter synthesize/finalize provider-stream termination if it hasn't
 // already. Call this for every adapter, always, even one whose push() may
 // already have observed a genuine provider-level terminal (e.g. Anthropic's
-// own message_delta/stop_reason, or OpenAI's Responses API
+// own message_stop after message_delta/stop_reason, or OpenAI's Responses API
 // response.completed): every adapter's finish() is idempotent - it returns
 // no events at all once the stream has genuinely already ended - so this is
 // the one safe, universal pattern regardless of which provider adapter is
@@ -264,7 +264,7 @@ conflate:
 Calling `adapter.finish()` before `gate.finish()` is required to reach a
 genuine `execute` decision reliably across every provider adapter - some
 adapters' `push()` can legitimately observe the whole provider stream ending
-on its own (a single `message_delta`, a Responses API `response.completed`),
+on its own (`message_stop` after stop metadata, a Responses API `response.completed`),
 but every adapter with a genuine per-choice/per-candidate shape deliberately
 never does: `OpenAICompatibleStreamAdapter`, `OpenAIStreamAdapter` (both its
 plural `tool_calls` path and its legacy singular `function_call` path),

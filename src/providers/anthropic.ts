@@ -3,6 +3,8 @@ import { ProviderStreamAdapter } from "./adapter.js";
 import {
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
   DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
+  DUPLICATE_MESSAGE_TERMINAL_DIAGNOSTIC_CODE,
+  MESSAGE_CONTENT_AFTER_STOP_REASON_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 interface AnthropicContentBlockDeltaEvent {
@@ -47,6 +49,7 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
   readonly provider: ProviderName = "anthropic";
   private sequence = 0;
   private finished = false;
+  private terminalReason: { reason: StreamEndReason; providerReason: string } | undefined;
   // Block-local terminal state (P4.2 / F-1): every content-block index that
   // has already received its own content_block_stop. Uses the adapter's
   // existing `content-block:{index}` sourceKey identity - no second
@@ -98,6 +101,14 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
       content_block?: { type?: string; id: string; name: string };
       delta?: { type?: string; partial_json: string; stop_reason: string };
     };
+
+    if (this.terminalReason && !this.finished &&
+      (chunk.type === "content_block_start" || chunk.type === "content_block_delta" ||
+        chunk.type === "content_block_stop")) {
+      events.push({ type: "provider_diagnostic", sequence: ++this.sequence,
+        provider: this.provider, code: MESSAGE_CONTENT_AFTER_STOP_REASON_DIAGNOSTIC_CODE,
+        severity: "error", message: "Content block evidence arrived after the message's stop_reason" });
+    }
 
     switch (chunk.type) {
       case "content_block_start": {
@@ -202,15 +213,26 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
              reason = "length";
           }
           
-          events.push({
-            type: "provider_stream_end",
-            sequence: ++this.sequence,
-            provider: this.provider,
-            reason,
-            providerReason: sr,
-          });
-          this.finished = true;
+          if (this.finished) {
+            // Late terminal evidence must reach the coordinator and revoke authority.
+            events.push({ type: "provider_stream_end", sequence: ++this.sequence,
+              provider: this.provider, reason, providerReason: sr });
+          } else if (this.terminalReason) {
+            events.push({ type: "provider_diagnostic", sequence: ++this.sequence,
+              provider: this.provider, code: DUPLICATE_MESSAGE_TERMINAL_DIAGNOSTIC_CODE,
+              severity: "error", message: "Multiple message_delta events carried a stop_reason" });
+          } else {
+            // stop_reason is metadata; only message_stop confirms protocol completion.
+            this.terminalReason = { reason, providerReason: sr };
+          }
         }
+        break;
+      }
+      case "message_stop": {
+        events.push({ type: "provider_stream_end", sequence: ++this.sequence,
+          provider: this.provider, reason: this.terminalReason?.reason ?? "unknown",
+          providerReason: this.terminalReason?.providerReason });
+        this.finished = true;
         break;
       }
       case "error": {
@@ -235,12 +257,14 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
   finish(meta?: { reason?: StreamEndReason; providerReason?: string }): readonly NormalizedToolStreamEvent[] {
     if (this.finished) return [];
     this.finished = true;
+    // Caller metadata cannot invent a missing message_stop.
+    const observedReason = meta?.reason ?? this.terminalReason?.reason ?? "unknown";
     return [{
       type: "provider_stream_end",
       sequence: ++this.sequence,
       provider: this.provider,
-      reason: meta?.reason ?? "unknown",
-      providerReason: meta?.providerReason,
+      reason: observedReason === "complete" ? "unknown" : observedReason,
+      providerReason: meta?.providerReason ?? this.terminalReason?.providerReason,
     }];
   }
 }
