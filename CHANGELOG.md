@@ -8,6 +8,10 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- `createAiSdkExecutionLock()` preserves `__proto__` as an enumerable own tool entry instead of changing the returned tool map's prototype and silently dropping the tool from SDK preparation. Real AI SDK regression tests cover native execution versus locked, one-shot caller dispatch, with `constructor` and `toString` controls. Callback stripping and forced approval remain unchanged.
+
 ## [0.5.2] - 2026-10-14
 
 ### Fixed

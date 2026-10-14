@@ -88,6 +88,47 @@ async function runGuardOverFullStream(fullStream: AsyncIterable<unknown>) {
 }
 
 describe("real ai@7 lifecycle — execution lock (needsApproval structural guarantee)", () => {
+  it.each(["__proto__", "constructor", "toString"])("keeps the %s tool available to the real SDK while withholding callbacks until caller dispatch", async (name) => {
+    const args = JSON.stringify({ path: "result.txt", content: "hello" });
+    for (const locked of [false, true]) {
+      let sdkExecutions = 0;
+      let inputCallbacks = 0;
+      let callerExecutions = 0;
+      const model = mockModel([streamStart(), ...toolInputParts("call_1", name, args), toolCallPart("call_1", name, args), finishPart("tool-calls")]);
+      const definitions = Object.fromEntries([[name, {
+        description: "writes a harmless result", inputSchema: WRITE_FILE_SCHEMA,
+        execute: async () => { sdkExecutions++; return "written"; },
+        onInputStart: () => { inputCallbacks++; },
+        onInputDelta: () => { inputCallbacks++; },
+        onInputAvailable: () => { inputCallbacks++; },
+      }]]);
+      const result = streamText({ model, prompt: "Write hello", tools: locked ? createAiSdkExecutionLock(definitions) : definitions });
+      const guard = createAiSdkExecutionGuard({ schemas: Object.fromEntries([[name, WRITE_FILE_SCHEMA.jsonSchema]]) });
+      const errors: unknown[] = [];
+      for await (const part of result.fullStream) {
+        if (part.type === "tool-error" || part.type === "error") errors.push(part);
+        guard.push(part);
+      }
+      const final = guard.finish();
+      expect(errors).toEqual([]);
+      expect(sdkExecutions).toBe(locked ? 0 : 1);
+      if (!locked) {
+        expect(inputCallbacks).toBeGreaterThan(0);
+        continue;
+      }
+      expect(inputCallbacks).toBe(0);
+      expect(final.decisions).toHaveLength(1);
+      const decision = final.decisions[0];
+      if (!decision) throw new Error("Missing decision");
+      expect(decision).toMatchObject({ name, action: "execute", reason: "complete" });
+      const authority = guard.takeDecision(decision.internalId);
+      expect(authority?.value).toEqual({ path: "result.txt", content: "hello" });
+      if (authority) callerExecutions++;
+      expect(guard.takeDecision(decision.internalId)).toBeUndefined();
+      expect(callerExecutions).toBe(1);
+    }
+  });
+
   it("CASE 1 — safe complete call: locked tool never self-executes; manual execution after guard.finish() runs exactly once", async () => {
     const args = JSON.stringify({ path: "config/database.yml", content: "production:\n  host: db.prod.internal\n" });
     const model = mockModel([streamStart(), ...toolInputParts("call_1", "write_file", args), toolCallPart("call_1", "write_file", args), finishPart("tool-calls")]);
