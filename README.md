@@ -110,6 +110,12 @@ feeds the same original OpenAI-compatible fixture to `ChatOpenAI.stream()` and
 PSJ, checking that token-limit calls produce zero effects. It is a mock-transport
 comparison; your application still needs access to original provider evidence.
 
+Using the official Anthropic SDK? Run `node scripts/try-npm-demo.mjs anthropic`
+for the [installed-package terminal-boundary trial](examples/anthropic-consumer/README.md).
+It checks complete, token-limited, missing-`message_stop`, and post-terminal
+argument cases through the SDK's actual SSE parser. The LangChain comparison
+can also be launched with `node scripts/try-npm-demo.mjs langchain`.
+
 ## Why parse success is not enough
 
 Tool-call arguments often arrive as partial JSON. A renderer may reasonably repair or close an unfinished prefix so it can show progressive UI. That is useful for display, but it answers a different question from whether a side effect should run.
