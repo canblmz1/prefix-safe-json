@@ -27,6 +27,12 @@ scenario has complete, schema-valid JSON but ends with a token-limit reason;
 the tool must still not run. All SDK callbacks stay at zero, and consuming an
 execution decision a second time produces no authority.
 
+The AI SDK launcher then runs the interleaved batch check: effects **2 / 0**
+for two complete calls and for a token-limited step containing a complete call
+plus a truncated call. A completed call inside that interrupted step must not
+run. You can rerun that comparison with `npm run batch` in the retained
+temporary project. Application retry policy and UI state remain caller-owned.
+
 The demo uses a mock provider. Running it alone does not establish integration
 in your project or compatibility with your live provider.
 

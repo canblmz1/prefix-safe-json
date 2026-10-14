@@ -105,6 +105,13 @@ This is a deterministic mock-provider check, not a live-provider call or
 independent adoption evidence. CI runs the same demo against a freshly packed
 candidate tarball in a separate, isolated npm consumer directory.
 
+The launcher also runs `npm run batch`: two interleaved calls execute twice
+after complete termination, while a token-limited step with one complete call
+and one truncated call executes neither. Both cases keep SDK callbacks at
+zero. The installed-consumer check also passes with `ai@7.0.137`, matching the
+version in [the parallel-call truncation report](https://github.com/vercel/ai/issues/22914).
+It does not implement UI state changes or continuation after a truncated step.
+
 Using LangChain? The [standalone SDK comparison](examples/langchain-consumer/README.md)
 feeds the same original OpenAI-compatible fixture to `ChatOpenAI.stream()` and
 PSJ, checking that token-limit calls produce zero effects. It is a mock-transport
