@@ -105,8 +105,8 @@ test suite (`test/unit/execution-gate-decision-table.test.ts`,
 - `takeDecision(internalId)` exposes each call's executable authority at most
   once per gate/guard instance and never consumes an unrelated call. Replayable
   `finish()` output remains diagnostic, not the recommended dispatch token.
-- Direct evidence that a provider SDK's own tool loop already invoked a
-  call's `execute` callback (a `tool-result` or `tool-error` part on the
+- Evidence that a provider SDK's own tool loop executed a call or that
+  execution cannot be excluded (a `tool-result` or `tool-error` part on the
   Vercel AI SDK's `fullStream`) permanently blocks this library from *also*
   authorizing that call's execution — attributed to the exact call when a
   usable call ID is present, or across every call in that

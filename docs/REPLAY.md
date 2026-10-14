@@ -125,6 +125,12 @@ parser. To investigate an SDK change, capture fresh events through that
 version in your actual harness, then replay and compare. This CLI makes no
 live-provider or complete SDK-compatibility claim.
 
+`sdk_execution_observed` includes conservative withholding after a
+`tool-error`; that event can be emitted for invalid input before execution.
+Do not read the reason name as proof that a tool ran. See the
+[external fit audit](EXTERNAL_FIT_AUDIT.md) for the real-SDK counterexample
+and for cases where the existing SDK/application behavior already suffices.
+
 The product hypothesis is a recurring incident-to-regression workflow:
 diagnose one failure, preserve its expected outcome, and keep checking it as
 the application changes. Demand for this workflow is not yet established;

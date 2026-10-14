@@ -64,7 +64,7 @@ type ExecutionReason =
   | "resource_limit"      // reject - a parser or coordinator limit was hit
   | "provider_error"      // reject - the upstream provider call itself failed
   | "content_filtered"    // reject - stopped by a content-safety/policy filter, not truncation
-  | "sdk_execution_observed" // reject - the SDK already invoked the call
+  | "sdk_execution_observed" // reject - SDK execution observed or cannot be excluded
   | "projection_only"     // reject - structured projection, not raw argument proof
   | "protocol_violation"  // reject - sticky ordering/identity violation
   | "unknown";            // reject - unreachable fallback; fail closed, never guess
@@ -386,11 +386,14 @@ effect has already run before `prefix-safe-json` was ever consulted; no
 library operating purely on `fullStream` evidence can undo that
 retroactively.
 
-What this library *can* do, and does: a `tool-result` part (the SDK's
-`execute` callback returned - including a no-op one) or a `tool-error` part
-(it threw) on `fullStream` is direct, observable proof that a provider
-SDK's own tool loop already invoked *some* call - regardless of what its
-arguments look like or how the stream eventually finishes.
+What this library *can* do, and does: a `tool-result` part is execution-result
+evidence. A `tool-error` part is ambiguous: it may follow `execute` throwing,
+but the SDK also emits it for invalid input before `execute` is invoked.
+The generic error part alone cannot distinguish those histories. Both
+therefore cause conservative withholding, regardless of argument shape or
+how the stream eventually finishes. The compatibility reason name
+`sdk_execution_observed` covers both cases; it is not proof of an actual
+side effect, and must not be interpreted as an execution receipt.
 `AiSdkStreamAdapter` normalizes either into a `provider_diagnostic`; the
 coordinator treats success and failure identically (an error does not
 prove the absence of a partial side effect before the throw). Two evidence
@@ -411,7 +414,7 @@ actually tells it:
   refers to, and does not guess: it records a stream-wide diagnostic
   (`internalId: undefined`) instead of assigning it to one call arbitrarily.
   With no way to rule any call out - including one whose `tool_call_start`
-  arrives *after* this point - as the one the SDK already executed,
+  arrives *after* this point - as one the SDK may already have executed,
   **every call the gate ever decides for this stream fails closed**, not
   just the one that happens to look safest. This is deliberately the more
   conservative of the two responses: attributing wrongly risks leaving the
@@ -434,8 +437,10 @@ execution will be manually dispatched from this library's decisions.
 Consume `fullStream`, feed every part to the guard/adapter, and dispatch
 manually only from `takeDecision(internalId)` after `finish()` (see the
 recommended boundary in the root README). Under this pattern
-`tool-result`/`tool-error` never arrive, because the SDK never runs
-`execute` itself.
+local execution results do not arrive, because the SDK never runs `execute`
+itself. Input-validation failures can still emit `tool-error` with no
+execution. Those errors retain the conservative rejection above; the lock
+does not turn PSJ's classifications into an automatic recovery policy.
 
 **Unprotected / misuse pattern** - defining `execute` (a no-op
 implementation included) *and* running the guard on the same stream. This

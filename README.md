@@ -67,6 +67,15 @@ if (decisions.length === 0 && diagnostics.length > 0) {
 
 Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
 
+## When this adds value
+
+Use PSJ when your application owns tool dispatch and needs original-stream
+evidence to govern it. If your SDK already blocks unsafe termination, first
+check whether that existing behavior meets your need. PSJ does not provide
+UI recovery, automatic continuation, or domain validation such as XML
+completeness. The [external fit audit](docs/EXTERNAL_FIT_AUDIT.md) records
+both useful integrations and cases where no additional benefit was shown.
+
 ## Replay an incident and keep it as a regression test
 
 Have a recorded Anthropic or AI SDK tool stream? The experimental
