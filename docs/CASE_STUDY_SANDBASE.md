@@ -3,7 +3,9 @@
 Sandbase Harness provides a publicly verifiable dependency and runtime
 integration of `prefix-safe-json` outside this repository. This is not a
 customer relationship, endorsement, or confirmation of production deployment.
-Independent maintainer-run validation has not been confirmed.
+An independent maintainer reported passing project integration tests for the
+historical `0.4.3` upgrade. The later `0.5.0` snapshot has not received that
+same confirmed project-level validation.
 
 The source snapshot below is pinned to Sandbase commit
 [`427b52a96a5309ca23268407f85c237468ab6a4e`](https://github.com/sandbaseai/sandbase-harness/tree/427b52a96a5309ca23268407f85c237468ab6a4e),
@@ -74,10 +76,26 @@ Sandbase's integration depends on:
 
 Sandbase merged the upgrade
 ([sandbaseai/sandbase-harness#117](https://github.com/sandbaseai/sandbase-harness/pull/117))
-and the pinned source snapshot now declares `0.5.0`. These public records
-show the dependency upgrade history; they do not by themselves prove a
-production rollout, independent validation, or patch compatibility for every
-consumer.
+and the pinned source snapshot now declares `0.5.0`.
+
+On 2026-08-30, maintainer `liyangbing`
+[reported verification on the upgrade PR head](https://github.com/sandbaseai/sandbase-harness/pull/117#issuecomment-5471098695),
+including 11 passing tests across `post-terminal-authority.test.ts` and
+`tool-confirmation-reliability.test.ts`, a build, a package check, and a release
+smoke check. The reviewed head
+[`24cf9a04bbad0bf14ffc3972d7409ade1c4a11eb`](https://github.com/sandbaseai/sandbase-harness/tree/24cf9a04bbad0bf14ffc3972d7409ade1c4a11eb)
+pins `prefix-safe-json@0.4.3`. Its
+[confirmation tests](https://github.com/sandbaseai/sandbase-harness/blob/24cf9a04bbad0bf14ffc3972d7409ade1c4a11eb/tests/integration/tool-confirmation-reliability.test.ts)
+exercise the application's own session executor, confirmation path, and
+sandbox write counter: a complete call writes once after confirmation, and a
+length-limited stream writes zero times. Its
+[post-terminal tests](https://github.com/sandbaseai/sandbase-harness/blob/24cf9a04bbad0bf14ffc3972d7409ade1c4a11eb/tests/integration/post-terminal-authority.test.ts)
+also import PSJ directly and through Sandbase's runtime wrapper.
+
+This is a maintainer-reported run of project integration tests with a scripted
+model, not a live-provider trace or production rollout. It establishes
+historical independent use of the `0.4.3` integration; it does not validate
+the later `0.5.0`/AI SDK 7 snapshot or every consumer's patch compatibility.
 
 ## What this proves
 
@@ -85,11 +103,13 @@ consumer.
   dependency and references its lock/guard surface in runtime code.
 - The pinned source wires raw-stream evidence into confirmation decisions.
 - A public upgrade PR and the later dependency pin are observable history.
+- An independent maintainer reported passing application-boundary tests on
+  the historical `0.4.3` upgrade head.
 
 ## What this does not prove
 
-- Production deployment, independent maintainer-run validation, or adoption
-  at scale. These have not been confirmed.
+- Production deployment, adoption at scale, or an independent maintainer-run
+  result for the later `0.5.0` snapshot. These have not been confirmed.
 - That Sandbase endorses this project beyond the committed integration.
 - End-to-end compatibility of the whole Sandbase application, or that every
   integration pattern documented here has been independently exercised.
