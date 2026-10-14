@@ -306,6 +306,22 @@ const result = parser.finish({ reason: "complete" });
 console.log(result.executable);
 ```
 
+## Product experiment: Devam
+
+[Devam](experiments/devam/README.md) is a separate browser prototype for
+carrying the current request, completion claims, manual reviews and unfinished
+work between AI conversations. It includes examples for everyday users,
+people coding with AI, and AI application developers. Run it locally without
+dependencies or API keys:
+
+```bash
+node experiments/devam/server.mjs
+```
+
+Open `http://127.0.0.1:4317`. The prototype is experimental; its
+[research notes](experiments/devam/RESEARCH.md) distinguish reported pain,
+existing alternatives and unvalidated product demand.
+
 ## Development
 
 Implemented components include the incremental UTF-8 decoder, lexical/grammar state tracking, semantic events, duplicate-key rejection, configurable resource limits, provider adapters, concurrent call coordination, validation hooks, and execution-gate APIs.

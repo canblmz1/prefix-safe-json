@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Devam — AI ile işin kaldığı yer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23275640'/%3E%3Cpath d='M10 20h20m-8-8 8 8-8 8' stroke='%23f7f5eb' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Çalışmaya geç</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="./" aria-label="Devam ana sayfa"><span class="brand-icon" aria-hidden="true">↗</span>devam<span class="brand-dot">.</span></a>
+      <p class="sidebar-caption">AI değişir.<br>İşin sende kalır.</p>
+      <div class="sidebar-heading"><span>ÇALIŞMALARIN</span><button id="new-project" class="new-button" aria-label="Yeni çalışma oluştur">+</button></div>
+      <nav id="project-list" aria-label="Çalışmalar"></nav>
+      <div class="sidebar-bottom"><span class="local-dot"></span>Bu tarayıcıda saklanır<p>Hesap ve API anahtarı gerekmez.<br>Yedeklemek için çalışmanı indir.</p><span class="experiment">DENEYSEL PROTOTİP · 01</span></div>
+    </aside>
+    <main id="main">
+      <header class="topbar"><span>ÇALIŞMA PASAPORTU</span><div class="top-actions"><button id="import-project" class="quiet">Çalışma aç <span aria-hidden="true">↥</span></button><button id="export-project" class="quiet">Kaydı indir <span aria-hidden="true">↧</span></button></div></header>
+      <section class="intro"><div><p class="eyebrow">KALDIĞIN YER, AÇIKÇA.</p><h1>Her yeni sohbette<br><em>baştan başlama.</em></h1><p class="intro-copy">Son isteğin, incelenen dosyaların ve açık işlerin.<br>Bir sonraki AI’ye birlikte taşınır.</p></div><div class="paper-stack" aria-hidden="true"><div class="paper-back"></div><div class="paper-front"><span>DEVAM KAYDI</span><strong>İstek<br>+ dayanak<br>+ sıradaki iş.</strong><div class="paper-line"></div><small>ÖZETTEN FAZLASI.</small><b>↗</b></div></div></section>
+      <section class="sample-strip" aria-label="Kullanım örnekleri"><span>Bir örnekle başla</span><div><button data-sample="daily">Günlük işler ↗</button><button data-sample="code">AI ile kodlama ↗</button><button data-sample="app">AI uygulamaları ↗</button></div></section>
+      <div class="workspace-heading"><div><span class="eyebrow">AKTİF ÇALIŞMA</span><h2 id="project-title"></h2></div><span id="revision" class="revision"></span></div>
+      <div class="workspace-grid">
+        <div class="work-column">
+          <section class="request-panel"><div class="panel-heading"><h3>Son isteğin</h3><button id="edit-project" class="text-button">Düzenle ↗</button></div><p id="project-goal"></p><p class="request-note">İstek değişince önceki incelemeler yeniden kontrol edilir.</p></section>
+          <section class="requirements-panel"><div class="panel-heading"><h3>İşin dayanakları</h3><span id="review-count"></span></div><p class="muted small">“AI bildirdi” ve “ben inceledim” ayrı kayıtlardır.</p><div id="requirements"></div></section>
+          <details class="report-panel"><summary>AI’nin devam raporunu ekle <span aria-hidden="true">+</span></summary><p class="small muted">Devam paketindeki biçimde dönen raporu buraya yapıştır. Rapor, kullanıcı isteğini değiştiremez ve senin incelemen yerine geçmez.</p><label for="ai-report" class="sr-only">AI devam raporu</label><textarea id="ai-report" rows="7" spellcheck="false" placeholder="JSON raporunu ya da tek JSON bloğu içeren AI yanıtını yapıştır…"></textarea><button id="apply-report" class="secondary">Beyanları ekle</button></details>
+        </div>
+        <section class="handoff-panel" aria-labelledby="handoff-title"><div class="handoff-top"><span class="eyebrow">BİR SONRAKİ SOHBETE</span><span class="arrow-badge" aria-hidden="true">↗</span></div><h3 id="handoff-title">İşe buradan<br>devam et.</h3><p>Güncel kaydı kopyala; çalıştığın AI’ye yapıştır. Hesaplar arasında otomatik veri aktarılmaz.</p><div id="handoff-summary" class="handoff-summary"></div><button id="copy-handoff" class="primary">Devam paketini kopyala <span aria-hidden="true">↗</span></button><button id="download-handoff" class="download-link">Metin olarak indir ↧</button><details class="preview"><summary>Paketin içini gör</summary><label for="handoff-preview" class="sr-only">Güncel devam paketi</label><textarea id="handoff-preview" readonly rows="13" spellcheck="false"></textarea></details><p class="handoff-note">Dosyaların içeriği pakete eklenmez. Dosya izi, içeriğin doğru olduğunu tek başına göstermez.</p></section>
+      </div>
+      <footer>Devam, PSJ’nin yanında geliştirilen bir ürün deneyi. <span>Henüz bir kullanım alışkanlığı kanıtı yok.</span></footer>
+    </main>
+  </div>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <input id="project-file" type="file" accept=".json,application/json" hidden>
+  <dialog id="edit-dialog"><form id="edit-form"><div class="dialog-heading"><h2>İsteği güncelle</h2><button type="button" class="quiet close-dialog" aria-label="Pencereyi kapat">×</button></div><label for="task-title">Çalışma adı</label><input id="task-title" required maxlength="100"><label for="task-goal">AI’den istediğin iş</label><textarea id="task-goal" required maxlength="6000" rows="4"></textarea><label for="task-items">İş maddeleri <span>Her satıra bir madde · en fazla 20</span></label><textarea id="task-items" required rows="5"></textarea><p class="small muted">Bu değişiklik eski AI raporlarını güncel istek yapmaz; mevcut incelemeler yeniden kontrol bekler.</p><button class="primary" type="submit">Güncel isteği kaydet ↗</button></form></dialog>
+  <dialog id="claim-dialog"><form id="claim-form"><div class="dialog-heading"><h2>AI ne bildirdi?</h2><button type="button" class="quiet close-dialog" aria-label="Pencereyi kapat">×</button></div><p id="claim-item"></p><label for="claim-note">Tamamlandığı söylenen iş</label><textarea id="claim-note" required maxlength="2000" rows="4"></textarea><p class="small muted">Bunu eklemek işi incelenmiş saymaz.</p><button class="primary" type="submit">AI beyanını kaydet</button></form></dialog>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
