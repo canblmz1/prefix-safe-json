@@ -1,0 +1,49 @@
+name: Integration result or blocker
+description: Share a result from trying PSJ in your own project, or get help with a blocker.
+title: "[Integration]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying prefix-safe-json. A demo run is useful feedback;
+        an integration in your own project is stronger evidence. We distinguish both.
+        Share only information you are comfortable making public. Never paste API keys
+        or sensitive raw tool arguments.
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      description: Public repository link, or a brief description of a private project.
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: What did you run?
+      options:
+        - Standalone mock-provider demo only
+        - PSJ in my project's test or development environment
+        - PSJ in my project's deployed runtime
+        - Installation or integration blocked
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions and stream boundary
+      description: Node, prefix-safe-json, provider or SDK version; fullStream or raw provider events.
+      placeholder: "Node 22; prefix-safe-json 0.5.1; ai 7.0.77; streamText().fullStream"
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Result or blocker
+      description: What ran, what was rejected, and any integration difficulty. Include a minimal reproduction if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Optional commit, test, or redacted output showing your own integration. A maintainer may ask for clarification before recording adoption.

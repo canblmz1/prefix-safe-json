@@ -69,6 +69,17 @@ Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema ins
 
 ## Run a standalone npm demo
 
+With Node 22+ and npm, you can run the published-package demo from this checkout
+without installing the repository's development dependencies:
+
+```bash
+node scripts/try-npm-demo.mjs
+```
+
+The launcher creates a separate temporary npm project and leaves it available
+for editing. To connect the guard to your own stream and share a result, follow
+the [integration trial guide](docs/TRY_IN_YOUR_PROJECT.md).
+
 Copy [`examples/npm-consumer/`](examples/npm-consumer/) into an empty directory
 outside this checkout, then run these commands there with **Node 22+**:
 
@@ -84,6 +95,8 @@ It needs no repository build, workspace aliases, or API key. It drives real
 imports the installed package's public entry point and `standard-schema`
 subpath. Its only side effect is a harmless in-memory counter: complete input
 executes once; truncated and schema-invalid input execute zero times. A
+complete, schema-valid call that ends at the token limit also executes zero
+times: parse success cannot override unsafe termination. A
 projection-mismatch case executes the raw `authority.value`, never the SDK
 projection. Every attached SDK callback stays at zero, and a second
 `takeDecision()` returns `undefined`.
