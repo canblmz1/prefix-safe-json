@@ -95,7 +95,8 @@ its content block are complete. `finish({ reason: "complete" })` cannot replace
 the missing event. Duplicate stop metadata and content-block evidence after a
 stop reason reject the affected stream's authority.
 
-This behavior is currently an unreleased correction to `0.5.1`. The regression
+This correction is included in `0.5.2`; `0.5.1` does not enforce that final
+message completion boundary. The regression
 is checked with the installed official SDK against a local SSE fixture, not a
 live provider.
 
