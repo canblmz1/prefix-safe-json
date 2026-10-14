@@ -8,7 +8,16 @@ machine.
 
 ## 1. What triggers a release
 
-`publish.yml` runs on every push to `main` that changes `package.json`. A
+`publish.yml` runs on every push to `main` that changes `package.json`, and
+can be retried manually against `main` after a release-workflow correction:
+
+```bash
+gh workflow run publish.yml --ref main
+```
+
+Manual requests targeting any other ref skip `release-intent`. Both triggers
+use the same unpublished-version check, full validation chain, and protected
+`npm-publish` authorization. A
 cheap `release-intent` job checks whether `package.json`'s `version` is
 already published on npm:
 
@@ -29,7 +38,9 @@ merge it to `main`.
 - A dedicated coverage job: statements/branches/functions/lines all `>=95%`.
 - Mutation testing (`stryker run`): `thresholds.break: 85.01` (Stryker's own
   semantics: `score < break` fails the job - 85.01 is the smallest value
-  making that equivalent to a strict `>85%` requirement).
+  making that equivalent to a strict `>85%` requirement). The job permits
+  90 minutes: the 22-file run on 2026-10-14 was still making progress with
+  about five minutes remaining when the previous 60-minute cap canceled it.
 - A release-grade fuzz soak: `test:fuzz` looped until wall-clock time
   reaches 10+ minutes, not a fixed iteration count.
 
