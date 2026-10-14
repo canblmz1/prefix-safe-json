@@ -6,7 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node demo.mjs"
+    "start": "node demo.mjs",
+    "batch": "node batch-demo.mjs"
   },
   "dependencies": {
     "ai": "7.0.77",
