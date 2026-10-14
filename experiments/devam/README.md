@@ -1,5 +1,10 @@
 # Devam — a portable record of AI-assisted work
 
+Devam now has a [standalone prototype repository](https://github.com/canblmz1/devam-prototype)
+and a [live demo](https://canblmz1.github.io/devam-prototype/).
+Ongoing development belongs there. This directory preserves the original
+tested experiment; the published PSJ runtime is a separate product.
+
 An experimental companion product for three audiences: everyday AI users,
 people coding with AI, and developers building AI applications. The shared
 job is to carry the current request, the basis for completion claims, and

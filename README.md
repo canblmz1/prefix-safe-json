@@ -308,11 +308,14 @@ console.log(result.executable);
 
 ## Product experiment: Devam
 
-[Devam](experiments/devam/README.md) is a separate browser prototype for
+[Devam](https://github.com/canblmz1/devam-prototype) is a separate browser prototype for
 carrying the current request, completion claims, manual reviews and unfinished
 work between AI conversations. It includes examples for everyday users,
-people coding with AI, and AI application developers. Run it locally without
-dependencies or API keys:
+people coding with AI, and AI application developers.
+[Try the live prototype](https://canblmz1.github.io/devam-prototype/).
+Development continues in its own repository; it is not part of the PSJ npm
+package and does not currently depend on PSJ. The original experiment remains
+here as a tested snapshot. Run that snapshot without dependencies or API keys:
 
 ```bash
 node experiments/devam/server.mjs
