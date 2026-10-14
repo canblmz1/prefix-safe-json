@@ -16,6 +16,12 @@ prints the installed versions, and runs the standalone demo. It needs no API
 key or repository dependencies. The directory stays available for editing and
 rerunning. Installation requires access to the npm registry.
 
+For the official Anthropic SDK, run `node scripts/try-npm-demo.mjs anthropic`.
+The [Anthropic consumer trial](../examples/anthropic-consumer/README.md) checks
+effects **1 / 0 / 0 / 0 / 0**, including complete JSON at a token limit and EOF
+after stop-reason metadata but before `message_stop`. For the installed
+LangChain comparison, run `node scripts/try-npm-demo.mjs langchain`.
+
 Expected effect counts, in scenario order: **1 / 0 / 0 / 0 / 1**. The third
 scenario has complete, schema-valid JSON but ends with a token-limit reason;
 the tool must still not run. All SDK callbacks stay at zero, and consuming an

@@ -6,21 +6,33 @@ import { spawn } from "node:child_process";
 import process from "node:process";
 import console from "node:console";
 
+const demos = {
+  "ai-sdk": { directory: "npm-consumer", packages: ["ai", "zod"] },
+  anthropic: { directory: "anthropic-consumer", packages: ["@anthropic-ai/sdk"] },
+  langchain: { directory: "langchain-consumer", packages: ["@langchain/openai", "@langchain/core"] },
+};
+const selected = process.argv[2] ?? "ai-sdk";
+if (process.argv.length > 3 || !Object.hasOwn(demos, selected)) {
+  console.error("Usage: node scripts/try-npm-demo.mjs [ai-sdk|anthropic|langchain]");
+  process.exit(1);
+}
+const demo = demos[selected];
+
 if (Number(process.versions.node.split(".")[0]) < 22) {
-  console.error("The AI SDK v7 demo requires Node 22 or newer.");
+  console.error("The consumer demos require Node 22 or newer.");
   process.exit(1);
 }
 
 const consumer = await mkdtemp(join(tmpdir(), "psj-demo-"));
-console.log(`Installing the published demo in ${consumer}`);
+console.log(`Installing the published ${selected} demo in ${consumer}`);
 for (const file of ["package.json", "demo.mjs"]) {
-  await copyFile(new URL(`../examples/npm-consumer/${file}`, import.meta.url), join(consumer, file));
+  await copyFile(new URL(`../examples/${demo.directory}/${file}`, import.meta.url), join(consumer, file));
 }
 
 // Commands and arguments are fixed. Windows needs its command shell for npm.cmd.
 for (const args of [
   ["install", "--engine-strict", "--no-audit", "--no-fund"],
-  ["ls", "prefix-safe-json", "ai", "zod"],
+  ["ls", "prefix-safe-json", ...demo.packages],
   ["start"],
 ]) {
   const code = await new Promise((resolve, reject) => {

@@ -100,6 +100,12 @@ message completion boundary. The regression
 is checked with the installed official SDK against a local SSE fixture, not a
 live provider.
 
+The [standalone Anthropic consumer](../examples/anthropic-consumer/README.md)
+installs published `prefix-safe-json@0.5.2` with `@anthropic-ai/sdk@0.123.0`
+outside the checkout. It feeds the SDK's unchanged events to the gate and
+checks complete, truncated, token-limited, missing-terminal and post-terminal
+argument cases. CI runs the same consumer against the packed candidate.
+
 ## Runtime dependencies
 
 No provider adapter imports its vendor SDK's package or types. Every
