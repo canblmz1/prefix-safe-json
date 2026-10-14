@@ -51,8 +51,11 @@ For other providers, use `createToolCallExecutionGate()` with the matching
 adapter and original provider events. See the
 [compatibility matrix](COMPATIBILITY.md) before choosing a boundary. Parsed
 LangChain messages or reconstructed SDK projections cannot substitute for raw
-argument evidence. There is no dedicated LangChain or Pi integration recipe
-verified by this repository.
+argument evidence. The [LangChain consumer comparison](../examples/langchain-consumer/README.md)
+runs the installed `ChatOpenAI.stream()` against the same raw fixture envelopes
+as PSJ; it demonstrates the boundary without providing a production LangChain
+adapter. A real application must preserve its own raw provider evidence. There
+is no dedicated Pi integration recipe verified by this repository.
 
 ## Report a result or request help
 
