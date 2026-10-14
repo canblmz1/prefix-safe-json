@@ -8,6 +8,14 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Anthropic adapter now waits for `message_stop` before confirming a successful message. EOF after `message_delta.stop_reason` no longer grants execution authority, even when the arguments are complete and schema-valid or the caller passes `finish({ reason: "complete" })`. Duplicate stop metadata and content-block evidence after a stop reason fail closed. The regression is exercised through the installed official SDK's real SSE parser.
+
+### Changed
+
+- Synthetic Anthropic provider fixtures and the standalone Anthropic example now include the documented `message_delta` then `message_stop` lifecycle. Integrations must feed the final `message_stop` to the adapter; the meaning of raw `message_delta` normalization has changed.
+
 ## [0.5.1] - 2026-10-12
 
 ### Fixed

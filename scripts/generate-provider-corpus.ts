@@ -77,7 +77,8 @@ for (let i = 0; i < 12; i++) {
     { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "t" + i, name: "test_tool" } },
     { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"a": ' + i + '}' } },
     { type: "content_block_stop", index: 0 },
-    { type: "message_delta", stop_reason: "tool_use" }
+    { type: "message_delta", delta: { stop_reason: "tool_use" } },
+    { type: "message_stop" }
   ]);
 }
 

@@ -10,6 +10,7 @@ const {
   createAiSdkExecutionGuard,
   GeminiStreamAdapter,
   OpenAICompatibleStreamAdapter,
+  AnthropicStreamAdapter,
 } = pkg;
 const { createAjvValidator } = ajvSubpath;
 const { fromStandardSchema } = standardSchemaSubpath;
@@ -25,6 +26,7 @@ for (const [name, value] of Object.entries({
   createAiSdkExecutionGuard,
   GeminiStreamAdapter,
   OpenAICompatibleStreamAdapter,
+  AnthropicStreamAdapter,
   createAjvValidator,
   fromStandardSchema,
   runToolCallIntegrityFixture,
@@ -112,6 +114,25 @@ pushNormalizedCall(unsafeGate, {
 const unsafeDecision = unsafeGate.finish().decisions[0];
 assert(unsafeDecision?.action !== "execute", "length-terminated gate call executed");
 assert(unsafeGate.takeDecision(unsafeDecision.internalId) === undefined, "unsafe gate exposed authority");
+
+for (const messageStopped of [false, true]) {
+  const adapter = new AnthropicStreamAdapter();
+  const gate = createToolCallExecutionGate();
+  const rawEvents = [
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "anthropic-smoke", name: "record" } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"message":"ok"}' } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" } },
+  ];
+  if (messageStopped) rawEvents.push({ type: "message_stop" });
+  for (const raw of rawEvents) for (const event of adapter.push(raw)) gate.push(event);
+  for (const event of adapter.finish({ reason: "complete" })) gate.push(event);
+  const decision = gate.finish().decisions[0];
+  assert((decision?.action === "execute") === messageStopped, "Anthropic message_stop boundary was not enforced");
+  const authority = gate.takeDecision(decision.internalId);
+  assert((authority !== undefined) === messageStopped, "Anthropic authority did not match protocol completion");
+  assert(gate.takeDecision(decision.internalId) === undefined, "Anthropic authority was replayable");
+}
 
 const invalidSchemaGate = createToolCallExecutionGate(undefined, undefined, { write_file: schema });
 pushNormalizedCall(invalidSchemaGate, {

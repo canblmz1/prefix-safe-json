@@ -69,6 +69,7 @@ const truncatedStream = [
   // short - confirmed against the real @ai-sdk/anthropic source.
   { type: "content_block_stop", index: 0 },
   { type: "message_delta", delta: { stop_reason: "max_tokens" } },
+  { type: "message_stop" },
 ];
 
 const truncated = run(
@@ -113,6 +114,7 @@ const completeStream = [
   },
   { type: "content_block_stop", index: 0 },
   { type: "message_delta", delta: { stop_reason: "tool_use" } },
+  { type: "message_stop" },
 ];
 
 const complete = run("Scenario 2: the same call, genuinely complete", completeStream);

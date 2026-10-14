@@ -6,7 +6,7 @@
   "provider": "anthropic",
   "input": {
     "encoding": "utf8-text",
-    "data": "{\"type\":\"message_start\"}\\n{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"t7\",\"name\":\"test_tool\"}}\\n{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"a\\\": 7}\"}}\\n{\"type\":\"content_block_stop\",\"index\":0}\\n{\"type\":\"message_delta\",\"stop_reason\":\"tool_use\"}"
+    "data": "{\"type\":\"message_start\"}\\n{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"t7\",\"name\":\"test_tool\"}}\\n{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"a\\\": 7}\"}}\\n{\"type\":\"content_block_stop\",\"index\":0}\\n{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"}}\\n{\"type\":\"message_stop\"}"
   },
   "stream": {
     "endReason": "complete",
@@ -54,7 +54,8 @@
         "type": "provider_stream_end",
         "sequence": 4,
         "provider": "anthropic",
-        "reason": "complete"
+        "reason": "complete",
+        "providerReason": "tool_use"
       }
     ]
   },

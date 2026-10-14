@@ -200,6 +200,7 @@ describe("Post-terminal provider evidence must reach the coordinator when it cou
       { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"x":1}' } },
       { type: "content_block_stop", index: 0 },
       { type: "message_delta", delta: { stop_reason: "tool_use" } },
+      { type: "message_stop" },
     ];
 
     it("control: a clean Anthropic stream is executable", () => {
