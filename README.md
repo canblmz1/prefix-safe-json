@@ -76,6 +76,14 @@ UI recovery, automatic continuation, or domain validation such as XML
 completeness. The [external fit audit](docs/EXTERNAL_FIT_AUDIT.md) records
 both useful integrations and cases where no additional benefit was shown.
 
+For a concrete difference beyond unsafe termination, the
+[identity comparison](docs/IDENTITY_TRIAL.md) feeds complete, schema-valid
+calls through real `streamText()`: native execution records both calls when
+they reuse an ID; the locked PSJ path refuses that ambiguous identity. With
+distinct IDs, both paths record both calls. These are authored fixtures,
+not live-provider or WorkflowAgent certification. The existing launcher
+includes this comparison, or run `npm run identity` in the installed consumer.
+
 ## Replay an incident and keep it as a regression test
 
 Have a recorded Anthropic or AI SDK tool stream? The experimental
@@ -127,6 +135,14 @@ and one truncated call executes neither. Both cases keep SDK callbacks at
 zero. The installed-consumer check also passes with `ai@7.0.137`, matching the
 version in [the parallel-call truncation report](https://github.com/vercel/ai/issues/22914).
 It does not implement UI state changes or continuation after a truncated step.
+
+The launcher then runs `npm run identity`, including an unlocked native
+control with harmless SDK-executed counters. Expected native / PSJ effects
+are **2 / 2** for distinct IDs and **2 / 0** for duplicate IDs. The PSJ path
+keeps every SDK callback at zero and uses one-shot caller dispatch. CI checks
+all three examples with `ai@7.0.77`, `7.0.128`, `7.0.137` and `7.0.140`.
+See the [identity trial](docs/IDENTITY_TRIAL.md) for the original-event
+boundary and the distinction from WorkflowAgent's result-pairing report.
 
 Using LangChain? The [standalone SDK comparison](examples/langchain-consumer/README.md)
 feeds the same original OpenAI-compatible fixture to `ChatOpenAI.stream()` and
