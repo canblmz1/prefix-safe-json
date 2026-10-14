@@ -41,8 +41,13 @@ wraps `createAiSdkExecutionGuard()`: it translates older stream-part names,
 passes modern parts through, and does not rebuild raw arguments from the
 SDK's parsed `tool-call` projection. The bridge's v4 name does not establish
 an incompatibility with the declared `ai ^7.0.128` dependency. That version
-range is not an exact installed-version result or part of this repository's
-exact `ai@7.0.77` lifecycle proof.
+range alone is not an exact installed-version result or part of this repository's
+exact `ai@7.0.77` lifecycle proof. The pinned
+[`package-lock.json`](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/package-lock.json)
+records `ai@7.0.128` and `prefix-safe-json@0.5.0`. PSJ's isolated npm-consumer
+CI checks its candidate tarball with exact `ai@7.0.128` across five mock-provider
+scenarios, documented in [COMPATIBILITY.md](COMPATIBILITY.md). That consumer
+check does not run Sandbase's application or prove its installed/deployed state.
 
 The
 [confirmation path](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/src/strategy/default-strategy.ts#L740-L836)

@@ -253,15 +253,22 @@ jobs:
 
       - name: Run the standalone npm demo against the packed candidate
         run: |
-          CONSUMER_DIR=$(mktemp -d)
-          cp examples/npm-consumer/package.json examples/npm-consumer/demo.mjs "$CONSUMER_DIR/"
-          cp prefix-safe-json-smoke.tgz "$CONSUMER_DIR/"
-          cd "$CONSUMER_DIR"
-          # Replace only the published PSJ pin; ai/zod remain the example's exact pins.
-          npm pkg set 'dependencies.prefix-safe-json=file:./prefix-safe-json-smoke.tgz'
-          npm install --engine-strict --no-audit --no-fund
-          npm ls prefix-safe-json ai zod
-          npm start
+          set -euo pipefail
+          PSJ_SOURCE_DIR="$PWD"
+          # 7.0.128 is the exact AI SDK pin in the public Sandbase lockfile snapshot.
+          for PSJ_AI_VERSION in 7.0.77 7.0.128; do
+            PSJ_CONSUMER_DIR=$(mktemp -d)
+            cp "$PSJ_SOURCE_DIR/examples/npm-consumer/package.json" "$PSJ_SOURCE_DIR/examples/npm-consumer/demo.mjs" "$PSJ_CONSUMER_DIR/"
+            cp "$PSJ_SOURCE_DIR/prefix-safe-json-smoke.tgz" "$PSJ_CONSUMER_DIR/"
+            (
+              cd "$PSJ_CONSUMER_DIR"
+              npm pkg set 'dependencies.prefix-safe-json=file:./prefix-safe-json-smoke.tgz'
+              npm pkg set "dependencies.ai=$PSJ_AI_VERSION"
+              npm install --engine-strict --no-audit --no-fund
+              npm ls prefix-safe-json ai zod
+              npm start
+            )
+          done
 
       - name: Set up an isolated TS consumer project
         run: |
