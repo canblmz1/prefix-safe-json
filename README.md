@@ -118,7 +118,8 @@ npm ls prefix-safe-json ai zod
 npm start
 ```
 
-The example pins `prefix-safe-json@0.5.2`, `ai@7.0.77`, and `zod@4.4.3`.
+The current checkout pins `prefix-safe-json@0.5.3`, `ai@7.0.77`, and `zod@4.4.3`.
+The dated trial ZIP above remains its frozen `0.5.2` baseline.
 It needs no repository build, workspace aliases, or API key. It drives real
 `streamText().fullStream` using the SDK's official `MockLanguageModelV4` and
 imports the installed package's public entry point and `standard-schema`

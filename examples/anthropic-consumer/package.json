@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.123.0",
-    "prefix-safe-json": "0.5.2"
+    "prefix-safe-json": "0.5.3"
   }
 }
