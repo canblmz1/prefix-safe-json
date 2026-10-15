@@ -1,10 +1,12 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
+import { ToolCallIdTracker } from "./tool-call-id-tracker.js";
 import {
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
   DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
   DUPLICATE_MESSAGE_TERMINAL_DIAGNOSTIC_CODE,
   MESSAGE_CONTENT_AFTER_STOP_REASON_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 interface AnthropicContentBlockDeltaEvent {
@@ -50,6 +52,7 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
   private sequence = 0;
   private finished = false;
   private terminalReason: { reason: StreamEndReason; providerReason: string } | undefined;
+  private toolCallIds = new ToolCallIdTracker();
   // Block-local terminal state (P4.2 / F-1): every content-block index that
   // has already received its own content_block_stop. Uses the adapter's
   // existing `content-block:{index}` sourceKey identity - no second
@@ -124,6 +127,13 @@ export class AnthropicStreamAdapter implements ProviderStreamAdapter<unknown> {
             toolCallId: chunk.content_block.id,
             name: chunk.content_block.name,
           });
+          for (const affected of this.toolCallIds.observe(chunk.content_block.id, sourceKey)) {
+            events.push({
+              type: "provider_diagnostic", sequence: ++this.sequence, provider: this.provider,
+              callRef: { sourceKey: affected }, code: DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
+              severity: "error", message: "Tool use ID is reused by different content blocks in one message",
+            });
+          }
         }
         break;
       }

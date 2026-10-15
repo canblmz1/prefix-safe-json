@@ -1,12 +1,14 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
 import { OpenAICompatibleStreamAdapter } from "./openai-compatible.js";
+import { ToolCallIdTracker } from "./tool-call-id-tracker.js";
 import {
   CONTENT_FILTERED_DIAGNOSTIC_CODE,
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
   DUPLICATE_TOOL_END_DIAGNOSTIC_CODE,
   INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
   DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
 
 interface OpenAIFunctionCallDelta {
@@ -162,6 +164,7 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
   // call.status - see coordinator.ts). Recognized argument evidence for an
   // item already in this set is therefore hardened below instead of merged.
   private doneOutputItemIds = new Set<string>();
+  private responsesToolCallIds = new ToolCallIdTracker();
   
   private finished = false;
 
@@ -230,6 +233,13 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
           toolCallId: chunk.item.call_id,
           name: chunk.item.name,
         });
+        for (const affected of this.responsesToolCallIds.observe(chunk.item.call_id, `output-item:${chunk.item.id}`)) {
+          events.push({
+            type: "provider_diagnostic", sequence: ++this.sequence, provider: this.provider,
+            callRef: { sourceKey: affected }, code: DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
+            severity: "error", message: "Function call ID is reused by different output items in one response",
+          });
+        }
       } else if (chunk.type === "response.function_call_arguments.delta" && chunk.item_id && chunk.delta) {
         if (this.doneOutputItemIds.has(chunk.item_id)) {
           // Item-local post-terminal evidence (P4.1 / F-2): this exact

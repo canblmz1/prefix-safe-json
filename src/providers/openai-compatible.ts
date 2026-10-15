@@ -1,5 +1,6 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
+import { ToolCallIdTracker } from "./tool-call-id-tracker.js";
 import {
   DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
   DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
@@ -149,11 +150,8 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
   // fail-closed guarantee, not a per-choice diagnostic, is the correct fix
   // for a duplicated/conflicting CHOICE-level terminal specifically.
   private choiceTerminalProtocolViolation = false;
-  // Provider IDs must name only one tool coordinate within a choice. Keep
-  // the first owner: each later collision disqualifies it and the new owner
-  // in constant work, without rescanning prior calls or repeating diagnostics.
-  private toolCallIdOwnersByChoice = new Map<number, Map<string, string>>();
-  private duplicateIdSourceKeys = new Set<string>();
+  // Choices are independent identity scopes, even when they reuse an ID.
+  private toolCallIdsByChoice = new Map<number, ToolCallIdTracker>();
 
   private finished = false;
 
@@ -373,30 +371,17 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
                 }
              }
 
-             if (typeof tc.id === "string" && tc.id.length > 0) {
-               let owners = this.toolCallIdOwnersByChoice.get(choiceIndex);
-               if (!owners) {
-                 owners = new Map();
-                 this.toolCallIdOwnersByChoice.set(choiceIndex, owners);
-               }
-               const owner = owners.get(tc.id);
-               if (owner === undefined) {
-                 owners.set(tc.id, sourceKey);
-               } else if (owner !== sourceKey) {
-                 for (const affected of [owner, sourceKey]) {
-                   if (this.duplicateIdSourceKeys.has(affected)) continue;
-                   this.duplicateIdSourceKeys.add(affected);
-                   events.push({
-                     type: "provider_diagnostic",
-                     sequence: ++this.sequence,
-                     provider: this.provider,
-                     callRef: { sourceKey: affected },
-                     code: DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
-                     severity: "error",
-                     message: `Tool call ID is reused by different tool indexes in choice ${choiceIndex}`,
-                   });
-                 }
-               }
+             let identities = this.toolCallIdsByChoice.get(choiceIndex);
+             if (!identities) {
+               identities = new ToolCallIdTracker();
+               this.toolCallIdsByChoice.set(choiceIndex, identities);
+             }
+             for (const affected of identities.observe(tc.id, sourceKey)) {
+               events.push({
+                 type: "provider_diagnostic", sequence: ++this.sequence, provider: this.provider,
+                 callRef: { sourceKey: affected }, code: DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
+                 severity: "error", message: `Tool call ID is reused by different tool indexes in choice ${choiceIndex}`,
+               });
              }
 
              // Arguments delta

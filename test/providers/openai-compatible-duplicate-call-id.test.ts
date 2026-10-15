@@ -73,8 +73,8 @@ describe.each([
     });
 
     it("allows distinct IDs and index-only calls", () => {
-      const { authorities } = run([{ choices: [choice(0, [call(0, "first"), call(1, "second"), call(2)])] }]);
-      expect(authorities.map(Boolean)).toEqual([true, true, true]);
+      const { authorities } = run([{ choices: [choice(0, [call(0, "first"), call(1, "second"), call(2), call(3, "")])] }]);
+      expect(authorities.map(Boolean)).toEqual([true, true, true, true]);
     });
   },
 );

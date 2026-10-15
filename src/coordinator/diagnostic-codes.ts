@@ -82,7 +82,7 @@ export const INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_INVALID";
 /** An OpenAI-compatible event repeated the same explicit choice index. */
 export const DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_DUPLICATE";
 
-/** Different tool coordinates in one OpenAI-compatible choice reused an ID. */
+/** Different provider coordinates in one response/choice identity scope reused an ID. */
 export const DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE = "E_DUPLICATE_TOOL_CALL_ID";
 
 /**
