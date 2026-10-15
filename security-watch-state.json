@@ -1,18 +1,18 @@
 {
-  "date": "2026-10-14",
-  "run": "sixteenth",
+  "date": "2026-10-15",
+  "run": "seventeenth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api still returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 16 in a row). Advisory requires gh api specifically per task instructions, so no further fallback attempted. Public advisory page also still 404s (expected: non-public triage state)."
+      "reason": "gh api still returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 17 in a row). Advisory requires gh api specifically per task instructions, so no further fallback attempted."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com intercepted by the session proxy with the identical 403 message (the proxy, not GitHub, serves that response for any github.com path while this repo is out of scope for the session). No other fallback available."
+      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com intercepted by the session proxy with the identical 403 message. No other fallback available."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same blockers as item 1, for desktop/desktop. WebFetch to the public advisory URL returned 404 again (expected: advisory still in non-public triage state)."
+      "reason": "same blockers as item 1, for desktop/desktop."
     },
     "4_vercel_ai_pr_18770": {
       "status": "checked (via public PR page, not gh api)",
@@ -21,7 +21,7 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "gh api blocked (session 403) and unauthenticated curl fallback also intercepted by the session proxy with the same 403 message. Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-12 snapshot -- no change."
+      "reason": "gh api and unauthenticated curl both blocked (session 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-14 snapshot -- no change."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
@@ -30,7 +30,7 @@
       "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. WebFetch again shows only the opening description plus a bot label event -- consistent with page-scrape imprecision already flagged in prior snapshots; last-activity date unchanged from the 2026-10-12 snapshot (2026-09-09), so carried forward as unchanged."
+      "reason": "same method/blockers as item 4. WebFetch again shows only the opening description plus a bot label event -- consistent with page-scrape imprecision already flagged in prior snapshots; last-activity date unchanged from the 2026-10-14 snapshot (2026-09-09), so carried forward as unchanged."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
@@ -39,7 +39,7 @@
       "comments": 2,
       "review_comments": 6,
       "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape shows the same review set (Copilot summaries + salmanmkc, canblmz1 replies) already captured in the 2026-10-12 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open', approving review still required."
+      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot summaries + salmanmkc, canblmz1 replies) already captured in the 2026-10-14 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open', approving review still required."
     }
   }
 }
