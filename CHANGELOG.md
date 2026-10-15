@@ -8,6 +8,8 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-14
+
 ### Added
 
 - A standalone native-versus-PSJ identity comparison: two complete, schema-valid calls with distinct IDs produce two effects in both paths; reusing one ID produces two native effects and zero caller-owned PSJ effects. The existing demo launcher includes this authored-fixture comparison, and packed-consumer CI also checks AI SDK `7.0.140`. This does not add WorkflowAgent support or repair result pairing.
