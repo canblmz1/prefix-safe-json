@@ -105,6 +105,25 @@ requirement, nor claiming Anthropic message events apply to that protocol.
 
 ### Runtime scope
 
+An additional installed-package check on 2026-10-15 used
+`ai-sdk-ollama@4.5.0`, `ai@7.0.140` and the packed PSJ `0.5.3` candidate,
+with authored native Ollama NDJSON through the real client parser. Native
+`streamText()` ran a harmless counter once for both `done_reason: "stop"`
+and `"length"`: the provider mapped both to unified `tool-calls` while retaining
+the original raw reason. Changing that precedence locally in the installed
+provider made the same control/length comparison **1 / 0**. The temporary patch
+was restored; the [upstream validation request](https://github.com/jagreehal/ai-sdk-ollama/issues/1092)
+contains the executable native reproducer. No live Ollama or whole-repository
+provider test was run.
+
+The locked PSJ comparison produced **0 / 0** effects and no call decisions,
+including for normal completion. This provider emits a final `tool-call`
+projection from an already parsed argument object, without the original
+`tool-input-start` / `delta` / `end` sequence required by the guard. That is
+an integration mismatch, not a working PSJ solution for this path. A native
+provider correction is independently useful; the experiment does not justify
+relaxing the raw-evidence requirement or claiming native Ollama support.
+
 Keep the existing narrow execution-integrity core. Before adding a runtime
 capability, require a reproducible adopter failure and compare the existing
 SDK or application fix. For replay product expansion, require an external
