@@ -27,6 +27,13 @@ effects **1 / 0 / 0 / 0 / 0**, including complete JSON at a token limit and EOF
 after stop-reason metadata but before `message_stop`. For the installed
 LangChain comparison, run `node scripts/try-npm-demo.mjs langchain`.
 
+For OpenAI Chat Completions or a compatible endpoint, run
+`node scripts/try-npm-demo.mjs openai`. The
+[OpenAI consumer trial](../examples/openai-consumer/README.md) checks termination,
+identity and late argument evidence through the installed official SDK. It also
+demonstrates a limit: complete JSON plus a falsely successful server terminal
+still grants authority; PSJ cannot reconstruct the hidden upstream stop reason.
+
 Expected effect counts, in scenario order: **1 / 0 / 0 / 0 / 1**. The third
 scenario has complete, schema-valid JSON but ends with a token-limit reason;
 the tool must still not run. All SDK callbacks stay at zero, and consuming an

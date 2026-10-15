@@ -89,6 +89,22 @@ validation; no performance benchmark or population-wide frequency was measured.
 
 ## Development decision
 
+### Maintainer feedback received on 2026-10-15
+
+The [SideCar maintainer's response](https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817)
+independently confirms that its Anthropic path did not check the token-limit
+reason before dispatch and treated EOF without terminal evidence as `end_turn`.
+They plan an in-tree ML-15 correction and the proposed harmless-counter
+regression shape. Completion of that fix has not been verified here.
+
+They explicitly declined both a PSJ dependency and running the demo, citing
+their primary native Ollama path and its different completion policy. This is
+problem validation and useful technical feedback, not PSJ adoption. It does
+not justify adding native Ollama support without a demonstrated integration
+requirement, nor claiming Anthropic message events apply to that protocol.
+
+### Runtime scope
+
 Keep the existing narrow execution-integrity core. Before adding a runtime
 capability, require a reproducible adopter failure and compare the existing
 SDK or application fix. For replay product expansion, require an external

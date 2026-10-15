@@ -4,15 +4,14 @@
 [![CI](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml/badge.svg)](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-An incremental JSON parser and execution gate for **streamed LLM tool calls**.
+Check original streamed arguments and terminal evidence **before your application
+runs a tool**. `prefix-safe-json` refuses authority for incomplete input,
+conflicting call identity, invalid schemas, or unsafe termination, even when a
+parsed tool-call object looks usable.
 
-`prefix-safe-json` keeps incomplete, conflicting, or unconfirmed streamed arguments from being treated as final tool input. It is designed for callers that need to distinguish:
-
-1. JSON that can be parsed right now,
-2. values that are stable enough to expose, and
-3. arguments that the provider actually completed and confirmed.
-
-It does not execute tools itself.
+Your application consumes a decision once and performs the side effect itself.
+PSJ never executes tools. Provider signals must accurately describe completion;
+see the [provider-honesty limit](examples/openai-consumer/README.md).
 
 ```bash
 pnpm add prefix-safe-json ai zod
@@ -160,6 +159,14 @@ for the [installed-package terminal-boundary trial](examples/anthropic-consumer/
 It checks complete, token-limited, missing-`message_stop`, and post-terminal
 argument cases through the SDK's actual SSE parser. The LangChain comparison
 can also be launched with `node scripts/try-npm-demo.mjs langchain`.
+
+Using the official OpenAI SDK? Run `node scripts/try-npm-demo.mjs openai` for
+the [installed-package Chat Completions trial](examples/openai-consumer/README.md).
+It checks complete and interrupted calls, duplicate IDs and late argument
+evidence through `openai@7.34.0`. It also demonstrates a limit: PSJ cannot detect
+upstream truncation when the provider supplies complete JSON and falsely
+reports successful termination. These are mock-transport checks, not live
+OpenAI or vLLM certification.
 
 ## Why parse success is not enough
 

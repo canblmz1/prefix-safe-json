@@ -143,8 +143,9 @@ than treating `0.x` as a formality:
   `test/unit/execution-gate*.test.ts`, `examples/*.mjs`). This is a
   statement about this repository's own maturity/compatibility intent.
   Sandbase provides public dependency and runtime-integration evidence;
-  production deployment and independent maintainer-run validation have not
-  been confirmed (see `docs/CASE_STUDY_SANDBASE.md`). Currently: `createParser`,
+  a historical independent maintainer run is confirmed for PSJ `0.4.3`.
+  Production deployment and an independent run of the later `0.5.0` snapshot
+  remain unconfirmed (see `docs/CASE_STUDY_SANDBASE.md`). Currently: `createParser`,
   `createToolCallStreamCoordinator`, `createToolCallExecutionGate`,
   `createAiSdkExecutionGuard`, and their associated types (including the
   pre-existing `toolSchemas`/`schemas` raw-JSON-Schema registration option,
