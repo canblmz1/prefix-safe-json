@@ -82,6 +82,9 @@ export const INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_INVALID";
 /** An OpenAI-compatible event repeated the same explicit choice index. */
 export const DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE = "E_CHOICE_INDEX_DUPLICATE";
 
+/** Different tool coordinates in one OpenAI-compatible choice reused an ID. */
+export const DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE = "E_DUPLICATE_TOOL_CALL_ID";
+
 /**
  * A normalized event was pushed into the coordinator after `isFinished` was
  * already set — a genuine post-terminal delivery that is neither a
@@ -127,6 +130,7 @@ export const AUTHORITY_PROTOCOL_VIOLATION_CODES: ReadonlySet<string> = new Set([
   DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
   INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
   DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
   EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE,
   TERMINAL_REASON_CONFLICT_DIAGNOSTIC_CODE,
   PROVIDER_EVENT_IDENTITY_AMBIGUOUS_DIAGNOSTIC_CODE,
