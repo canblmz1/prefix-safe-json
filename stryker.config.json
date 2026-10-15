@@ -26,6 +26,7 @@
     "src/providers/anthropic.ts",
     "src/providers/openrouter.ts",
     "src/providers/openai-compatible.ts",
+    "src/providers/tool-call-id-tracker.ts",
     "src/providers/gemini.ts",
     "src/coordinator/coordinator.ts",
     "src/guard/provider-guard.ts",

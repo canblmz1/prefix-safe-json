@@ -8,7 +8,7 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
-## [0.5.3] - 2026-10-14
+## [0.5.3] - 2026-10-15
 
 ### Added
 
@@ -16,6 +16,7 @@ coverage) a version bump requires.
 
 ### Fixed
 
+- Tool calls that reuse one provider ID at different coordinates within a response/choice now reject both affected calls with `protocol_violation`. This covers OpenAI-compatible tool indexes (including late IDs), OpenAI Responses output items, Anthropic content blocks, and OpenRouter delegation. Distinct IDs, repeated metadata on one coordinate, and independent choices retain their existing behavior. No new public exports or dependencies are added.
 - `createAiSdkExecutionLock()` preserves `__proto__` as an enumerable own tool entry instead of changing the returned tool map's prototype and silently dropping the tool from SDK preparation. Real AI SDK regression tests cover native execution versus locked, one-shot caller dispatch, with `constructor` and `toString` controls. Callback stripping and forced approval remain unchanged.
 
 ## [0.5.2] - 2026-10-14

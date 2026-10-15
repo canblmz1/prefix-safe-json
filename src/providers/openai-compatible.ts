@@ -1,7 +1,9 @@
 import { ProviderName, NormalizedToolStreamEvent, StreamEndReason } from "../coordinator/protocol.js";
 import { ProviderStreamAdapter } from "./adapter.js";
+import { ToolCallIdTracker } from "./tool-call-id-tracker.js";
 import {
   DUPLICATE_CHOICE_INDEX_DIAGNOSTIC_CODE,
+  DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
   INVALID_CHOICE_INDEX_DIAGNOSTIC_CODE,
   TOOL_ARGUMENTS_AFTER_END_DIAGNOSTIC_CODE,
 } from "../coordinator/diagnostic-codes.js";
@@ -148,6 +150,8 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
   // fail-closed guarantee, not a per-choice diagnostic, is the correct fix
   // for a duplicated/conflicting CHOICE-level terminal specifically.
   private choiceTerminalProtocolViolation = false;
+  // Choices are independent identity scopes, even when they reuse an ID.
+  private toolCallIdsByChoice = new Map<number, ToolCallIdTracker>();
 
   private finished = false;
 
@@ -365,6 +369,19 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
                     delta: tc.function.name,
                   });
                 }
+             }
+
+             let identities = this.toolCallIdsByChoice.get(choiceIndex);
+             if (!identities) {
+               identities = new ToolCallIdTracker();
+               this.toolCallIdsByChoice.set(choiceIndex, identities);
+             }
+             for (const affected of identities.observe(tc.id, sourceKey)) {
+               events.push({
+                 type: "provider_diagnostic", sequence: ++this.sequence, provider: this.provider,
+                 callRef: { sourceKey: affected }, code: DUPLICATE_TOOL_CALL_ID_DIAGNOSTIC_CODE,
+                 severity: "error", message: `Tool call ID is reused by different tool indexes in choice ${choiceIndex}`,
+               });
              }
 
              // Arguments delta
