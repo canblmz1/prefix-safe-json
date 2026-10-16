@@ -8,6 +8,10 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Changed
+
+- Development tooling uses Vitest and V8 coverage `4.1.12`, removing the old Tinypool dependency and resolving the affected mocker path. Compatible development dependency resolutions for brace-expansion, js-yaml, qs, source-map-js and undici are refreshed. The published runtime dependencies, Node support and execution-gate behavior are unchanged.
+
 ## [0.5.3] - 2026-10-15
 
 ### Changed

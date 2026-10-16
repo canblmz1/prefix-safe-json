@@ -37,7 +37,7 @@ function toolInputParts(callId: string, toolName: string, argChunks: string[]) {
 // Mirrors the documented dispatch loop verbatim (README.md / EXECUTION_GATE.md
 // / examples/ai-sdk-guard.mjs) against a fake, counted tool registry - this
 // is what "manual sideEffect invocation" actually means in every test below.
-async function dispatch(decisions: readonly { action: string; name?: string; value?: unknown }[], tools: Record<string, ReturnType<typeof vi.fn>>) {
+async function dispatch(decisions: readonly { action: string; name?: string; value?: unknown }[], tools: Record<string, (value: unknown) => unknown>) {
   for (const decision of decisions) {
     if (decision.action === "execute") {
       await tools[decision.name as string]?.(decision.value);
