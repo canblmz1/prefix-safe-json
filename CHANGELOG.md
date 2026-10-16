@@ -8,6 +8,12 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-16
+
+### Added
+
+- A standalone TanStack AI / OpenRouter installed-package comparison checks raw native finish reasons, the final usage trailer and paired results in the next model request. Five authored HTTP/SSE scenarios run through real `chat()` server tools; CI repeats them against the packed candidate. This is not a live-provider run or independent adoption.
+
 ### Fixed
 
 - `OpenRouterStreamAdapter` honors explicit native output-limit reasons (`max_output_tokens`, `max_tokens`, `MAX_TOKENS`, `length`) even when the normalized reason says `tool_calls` or `stop`. Complete, schema-valid JSON cannot override that observed truncation. The adapter also recognizes one documented, content-free final usage frame that repeats the same choice terminal metadata; mismatched metadata, payload-bearing repeats and further accounting frames remain fail-closed. The generic OpenAI-compatible adapter's duplicate-terminal policy is unchanged. These corrections are not included in published `0.5.3`.

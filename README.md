@@ -174,6 +174,11 @@ It checks that accepted tool results reach the next model request with matching
 call IDs, while invalid batches cause zero effects and no continuation request.
 It uses authored SSE through the installed SDK; no live model call is made.
 
+Using TanStack AI with OpenRouter? Run `node scripts/try-npm-demo.mjs tanstack`
+for the [server-tool comparison](examples/tanstack-consumer/README.md), which
+uses PSJ `0.5.4` to check raw native finish reasons, usage trailers and paired
+results in the next request. It uses harmless counters and authored SSE.
+
 ## Why parse success is not enough
 
 Tool-call arguments often arrive as partial JSON. A renderer may reasonably repair or close an unfinished prefix so it can show progressive UI. That is useful for display, but it answers a different question from whether a side effect should run.
