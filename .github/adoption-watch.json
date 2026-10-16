@@ -134,6 +134,24 @@
       "reviewedResponses": []
     },
     {
+      "repository": "anthropics/anthropic-sdk-typescript",
+      "number": 1269,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/anthropics/anthropic-sdk-typescript/discussions/1269",
+      "since": "2026-10-16T18:04:58Z",
+      "purpose": "community-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "TanStack/ai",
+      "number": 1808,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/TanStack/ai/discussions/1808",
+      "since": "2026-10-16T18:05:08Z",
+      "purpose": "community-project-trial",
+      "reviewedResponses": []
+    },
+    {
       "repository": "jagreehal/ai-sdk-ollama",
       "number": 1092,
       "kind": "issue",
