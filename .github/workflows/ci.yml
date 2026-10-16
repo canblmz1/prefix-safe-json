@@ -310,6 +310,17 @@ jobs:
           npm ls prefix-safe-json openai
           npm start
 
+      - name: Run the OpenRouter manual continuation trial against the packed candidate
+        run: |
+          PSJ_OPENROUTER_DIR=$(mktemp -d)
+          cp examples/openrouter-consumer/package.json examples/openrouter-consumer/demo.mjs "$PSJ_OPENROUTER_DIR/"
+          cp prefix-safe-json-smoke.tgz "$PSJ_OPENROUTER_DIR/"
+          cd "$PSJ_OPENROUTER_DIR"
+          npm pkg set 'dependencies.prefix-safe-json=file:./prefix-safe-json-smoke.tgz'
+          npm install --engine-strict --no-audit --no-fund
+          npm ls prefix-safe-json @openrouter/agent @openrouter/sdk zod
+          npm start
+
       - name: Set up an isolated TS consumer project
         run: |
           mkdir -p /tmp/consumer-ts

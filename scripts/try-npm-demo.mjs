@@ -10,11 +10,12 @@ const demos = {
   "ai-sdk": { directory: "npm-consumer", packages: ["ai", "zod"], batch: true },
   anthropic: { directory: "anthropic-consumer", packages: ["@anthropic-ai/sdk"] },
   openai: { directory: "openai-consumer", packages: ["openai"] },
+  openrouter: { directory: "openrouter-consumer", packages: ["@openrouter/agent", "@openrouter/sdk", "zod"] },
   langchain: { directory: "langchain-consumer", packages: ["@langchain/openai", "@langchain/core"] },
 };
 const selected = process.argv[2] ?? "ai-sdk";
 if (process.argv.length > 3 || !Object.hasOwn(demos, selected)) {
-  console.error("Usage: node scripts/try-npm-demo.mjs [ai-sdk|anthropic|openai|langchain]");
+  console.error("Usage: node scripts/try-npm-demo.mjs [ai-sdk|anthropic|openai|openrouter|langchain]");
   process.exit(1);
 }
 const demo = demos[selected];

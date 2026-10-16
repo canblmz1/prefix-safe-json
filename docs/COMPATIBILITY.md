@@ -121,6 +121,18 @@ outside the checkout. It feeds the SDK's unchanged events to the gate and
 checks complete, truncated, token-limited, missing-terminal and post-terminal
 argument cases. CI runs the same consumer against the packed candidate.
 
+## OpenRouter Agent manual continuation
+
+The [standalone OpenRouter consumer](../examples/openrouter-consumer/README.md)
+checks published `@openrouter/agent@0.11.0` and `@openrouter/sdk@0.13.67` with
+`prefix-safe-json@0.5.3`. Manual tools remain caller-owned. Raw HTTP evidence
+feeds `OpenAIStreamAdapter`; accepted results are submitted through a second
+`callModel()` request with matching call IDs. Eight authored scenarios include
+duplicate IDs, token-limit termination, late evidence, mixed-validity batches
+and transport read failure. CI repeats the consumer against the packed candidate.
+This is a bounded fixture check, not live-provider certification or independent
+adoption. See the recipe for decoder, buffering and crash-recovery limits.
+
 ## Runtime dependencies
 
 No provider adapter imports its vendor SDK's package or types. Every
