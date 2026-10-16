@@ -6,11 +6,13 @@ one complete call that runs once and one interrupted call that does not run.
 ## Check the published demo
 
 Without a checkout, download the
-[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-16)
-and follow its extraction and npm commands. It contains example sources and
-licenses and installs published PSJ `0.5.3`. The included examples index lists
-the AI SDK, OpenAI, Anthropic and LangChain choices; the ZIP does not bundle
-the package runtime.
+[six-SDK trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip)
+and extract it. From the extracted directory, run
+`node scripts/try-npm-demo.mjs tanstack`, or choose `ai-sdk`, `openai`,
+`anthropic`, `langchain` or `openrouter`. Every example installs published
+PSJ `0.5.4`. The ZIP contains example sources, the launcher and licenses;
+it downloads the package and SDK dependencies from npm and needs no API key.
+The earlier dated trial downloads remain unchanged.
 
 With Node 22+ and npm available, run from this checkout:
 

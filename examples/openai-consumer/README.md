@@ -7,7 +7,7 @@ node scripts/try-npm-demo.mjs openai
 ```
 
 The launcher copies this directory to a retained temporary project, installs
-published `prefix-safe-json@0.5.3` and official `openai@7.34.0`, prints the
+published `prefix-safe-json@0.5.4` and official `openai@7.34.0`, prints the
 installed versions, and runs the assertions. Alternatively, copy this directory
 outside the checkout, run `npm install --engine-strict`, then `npm start`.
 No API key or repository development dependencies are needed. The SDK's fetch
@@ -52,4 +52,4 @@ The SDK can discard bytes after `[DONE]`; PSJ cannot inspect discarded data.
 The documented [OpenAI streaming format](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
 defines `length` and `tool_calls` as different termination reasons.
 
-[Report your own-project run or integration blocker](../../docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).
+[Report your own-project run or integration blocker](https://github.com/canblmz1/prefix-safe-json/blob/main/docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).

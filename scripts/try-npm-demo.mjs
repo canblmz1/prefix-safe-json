@@ -55,4 +55,4 @@ for (const args of [
   }
 }
 console.log(`Demo passed. You can edit and rerun it in ${consumer}`);
-console.log("To try PSJ in your own project, follow docs/TRY_IN_YOUR_PROJECT.md.");
+console.log("Try PSJ in your own project: https://github.com/canblmz1/prefix-safe-json/blob/main/docs/TRY_IN_YOUR_PROJECT.md");

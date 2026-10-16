@@ -18,6 +18,11 @@ pnpm add prefix-safe-json ai zod
 # or: npm install prefix-safe-json ai zod
 ```
 
+Try a runnable comparison first: [download the six-SDK trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip),
+extract it, then run `node scripts/try-npm-demo.mjs tanstack` with Node 22+.
+It uses published packages, authored streams and harmless counters; no API key
+or repository build is needed. [Choose another SDK](examples/README.md).
+
 ## Safe execution example
 
 ```javascript
@@ -93,10 +98,18 @@ checkout without model requests or tool dispatch.
 ## Run a standalone npm demo
 
 To try it without cloning this repository, download the
-[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-16).
-It contains only the example sources and licenses; its release notes give
-the extraction and npm commands. Choose an AI SDK, OpenAI, Anthropic or
-LangChain consumer; each installs published PSJ `0.5.3`.
+[six-SDK trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip)
+and extract it. With Node 22+ and npm, run this from the extracted directory:
+
+```bash
+node scripts/try-npm-demo.mjs tanstack
+```
+
+Choose `ai-sdk`, `openai`, `anthropic`, `langchain`, `openrouter` or `tanstack`.
+Every example installs published PSJ `0.5.4`; no API key or repository build
+is needed. The ZIP contains example sources, the launcher and licenses;
+dependencies are downloaded from npm. See the [trial index](examples/README.md)
+for the SDK versions and checks. The earlier dated downloads remain unchanged.
 
 With Node 22+ and npm, you can run the published-package demo from this checkout
 without installing the repository's development dependencies:
@@ -118,7 +131,7 @@ npm ls prefix-safe-json ai zod
 npm start
 ```
 
-The current checkout pins `prefix-safe-json@0.5.3`, `ai@7.0.77`, and `zod@4.4.3`.
+The current checkout pins `prefix-safe-json@0.5.4`, `ai@7.0.77`, and `zod@4.4.3`.
 It needs no repository build, workspace aliases, or API key. It drives real
 `streamText().fullStream` using the SDK's official `MockLanguageModelV4` and
 imports the installed package's public entry point and `standard-schema`
@@ -174,11 +187,12 @@ It checks that accepted tool results reach the next model request with matching
 call IDs, while invalid batches cause zero effects and no continuation request.
 It uses authored SSE through the installed SDK; no live model call is made.
 
-Using TanStack AI with OpenRouter? The [verified native-first source trial](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
-compares the installed SDK with a locally built PSJ candidate. It checks raw
-native finish reasons, usage trailers and paired results using harmless counters
-and authored SSE. The [installed-package recipe](examples/tanstack-consumer/README.md),
-`node scripts/try-npm-demo.mjs tanstack`, requires PSJ `0.5.4` to be available on npm.
+Using TanStack AI with OpenRouter? Run `node scripts/try-npm-demo.mjs tanstack`
+for the [installed-package comparison](examples/tanstack-consumer/README.md).
+It checks raw native finish reasons, usage trailers and paired results using
+published PSJ `0.5.4`, harmless counters and authored SSE. The
+[native-first standalone trial](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
+also offers a PSJ-free baseline and an optional comparison from npm or source.
 
 ## Why parse success is not enough
 
