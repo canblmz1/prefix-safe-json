@@ -125,6 +125,15 @@
       "reviewedResponses": []
     },
     {
+      "repository": "TanStack/ai",
+      "number": 1689,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/TanStack/ai/issues/1689#issuecomment-6217941748",
+      "since": "2026-10-16T14:41:54Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
       "repository": "jagreehal/ai-sdk-ollama",
       "number": 1092,
       "kind": "issue",
