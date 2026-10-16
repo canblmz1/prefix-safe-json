@@ -133,6 +133,37 @@ and transport read failure. CI repeats the consumer against the packed candidate
 This is a bounded fixture check, not live-provider certification or independent
 adoption. See the recipe for decoder, buffering and crash-recovery limits.
 
+### Raw Chat Completions terminal metadata (unreleased)
+
+`OpenRouterStreamAdapter` now considers the provider's `native_finish_reason`
+alongside the normalized `finish_reason`. Explicit native output-limit values
+`max_output_tokens`, `max_tokens`, `MAX_TOKENS` and `length` prevent execution,
+including when the normalized reason says `tool_calls` or `stop` and the JSON
+is complete. A native success by itself does not invent a missing normalized
+terminal. Unknown native values retain the normalized reason's existing policy;
+token usage near a configured limit is not used to infer truncation.
+
+OpenRouter documents a final usage chunk that repeats the preceding choice's
+terminal metadata. The adapter accepts one such accounting frame only when
+usage counts are finite nonnegative numbers, every choice already terminated
+with the same normalized/native reasons, and its delta contains only empty/null
+content and/or the assistant role. Duplicate choice indexes, mismatched reasons,
+errors, text/tool payloads and a second accounting trailer retain the strict
+refusal behavior. This exception is specific to OpenRouter; the generic
+OpenAI-compatible adapter still treats repeated terminals as a violation.
+Callers must drain the original stream before `adapter.finish()` and dispatch.
+
+Both issues reproduce with published `0.5.3`: it ignores native output-limit
+metadata and rejects the normal repeated usage trailer. The corrections above
+are unreleased. The external report's malformed-JSON example is distinct from
+the complete-JSON regression used here, and its adapter-side parse fallback is
+already corrected in [TanStack's current source](https://github.com/TanStack/ai/blob/85c2956c68f3226ef409b3a4e54d5be82198931e/packages/ai-openrouter/src/adapters/text.ts#L1186); these notes do not claim that
+PSJ is needed instead of that native fix.
+
+Sources: [OpenRouter response metadata](https://github.com/OpenRouterTeam/docs/blob/c6d74754eefd40a9acb9ba6c9fe86683745106ae/api_reference/overview.mdx),
+[documented final usage chunk](https://github.com/OpenRouterTeam/docs/blob/c6d74754eefd40a9acb9ba6c9fe86683745106ae/api_reference/streaming.mdx),
+and the independently reported [raw/normalized token-limit shape](https://github.com/TanStack/ai/issues/1689).
+
 ## Runtime dependencies
 
 No provider adapter imports its vendor SDK's package or types. Every

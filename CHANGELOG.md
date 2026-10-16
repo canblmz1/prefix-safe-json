@@ -8,9 +8,13 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- `OpenRouterStreamAdapter` honors explicit native output-limit reasons (`max_output_tokens`, `max_tokens`, `MAX_TOKENS`, `length`) even when the normalized reason says `tool_calls` or `stop`. Complete, schema-valid JSON cannot override that observed truncation. The adapter also recognizes one documented, content-free final usage frame that repeats the same choice terminal metadata; mismatched metadata, payload-bearing repeats and further accounting frames remain fail-closed. The generic OpenAI-compatible adapter's duplicate-terminal policy is unchanged. These corrections are not included in published `0.5.3`.
+
 ### Changed
 
-- Development tooling uses Vitest and V8 coverage `4.1.12`, removing the old Tinypool dependency and resolving the affected mocker path. Compatible development dependency resolutions for brace-expansion, js-yaml, qs, source-map-js and undici are refreshed. The published runtime dependencies, Node support and execution-gate behavior are unchanged.
+- Development tooling uses Vitest and V8 coverage `4.1.12`, removing the old Tinypool dependency and resolving the affected mocker path. Compatible development dependency resolutions for brace-expansion, js-yaml, qs, source-map-js and undici are refreshed. This tooling update does not change runtime dependencies, Node support or execution-gate behavior.
 
 ## [0.5.3] - 2026-10-15
 
