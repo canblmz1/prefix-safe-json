@@ -1,5 +1,10 @@
 # TanStack AI / OpenRouter: raw evidence at the server-tool boundary
 
+The [verified native-first source trial](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
+includes a locally built PSJ candidate and works without an npm release of
+that candidate. The installed-package commands below require published
+`prefix-safe-json@0.5.4`.
+
 With Node 22+ and npm, run from the repository checkout:
 
 ```bash
