@@ -158,3 +158,32 @@ separate those requirements. The malformed-provider responses are authored
 fixtures, not observed production frequency; the fixture observer is not a
 general production HTTP adapter. These maintainer-operated runs establish
 neither live-provider validation nor independent adoption.
+
+### OpenRouter Agent comparison, 2026-10-16
+
+The [public reproduction](https://gist.github.com/canblmz1/2b31eaad54223249231b56442e2b1bae)
+pins `@openrouter/agent@0.11.0`, `@openrouter/sdk@0.13.67` and `zod@4.4.3`.
+It exercises actual `callModel()`, the HTTP client/SSE parser, validation and
+counter callbacks through an injected fixture transport. A fresh public-gist
+clone passed without PSJ installed; the optional installed PSJ `0.5.3`
+comparison then passed. Original response bytes are teed into both parsers.
+
+Completed calls produce **1 / 1 native / PSJ effects**, distinct IDs **2 / 2**,
+and two output items sharing a call ID **2 / 0**. The native following request
+contains two function outputs with the same ID. The PSJ path uses documented
+manual tools with zero SDK callbacks, then caller-owned dispatch of one-shot
+authorized raw values. It does not test result submission or continuation.
+
+The published token-limit fixture produces **1 / 0**, but current main at
+`e309ebf3f7be16b6b452cfaf4e7f7900d2b2f640` already has a native truncation
+guard and regression tests. Applying its two equivalent extraction/presence
+checks locally to the installed module makes native token-limit effects zero;
+normal controls are preserved and duplicate IDs still execute twice. The
+temporary patch was restored. Full current main was not built or run.
+
+The [upstream report and trial invitation](https://github.com/OpenRouterTeam/typescript-agent/issues/128)
+acknowledge both that guard and main's separate duplicate-ID doom-loop-cache
+handling. A native pre-dispatch identity check is an alternative to a caller
+library. These authored malformed-provider cases measure neither production
+frequency nor independent adoption. The fixture observer is not a general
+HTTP adapter, and no cross-turn or distributed idempotency is established.
