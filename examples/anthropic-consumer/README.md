@@ -7,7 +7,7 @@ node scripts/try-npm-demo.mjs anthropic
 ```
 
 The launcher copies this demo into a new temporary directory outside the
-checkout, installs published `prefix-safe-json@0.5.3` and the official
+checkout, installs published `prefix-safe-json@0.5.4` and the official
 `@anthropic-ai/sdk@0.123.0`, prints their versions, and runs the assertions.
 It needs no API key or repository toolchain. Alternatively, copy this directory
 outside the checkout and run `npm install --engine-strict`, then `npm start`.
@@ -37,4 +37,4 @@ This is a mock-transport consumer check. Live-provider behavior, application
 retries, and a framework's automatic execution are not tested. Native Ollama
 and third-party gateways are not covered by this recipe.
 
-[Report your own project result or blocker](../../docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).
+[Report your own project result or blocker](https://github.com/canblmz1/prefix-safe-json/blob/main/docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).

@@ -6,6 +6,6 @@
   "scripts": { "start": "node demo.mjs" },
   "dependencies": {
     "openai": "7.34.0",
-    "prefix-safe-json": "0.5.3"
+    "prefix-safe-json": "0.5.4"
   }
 }

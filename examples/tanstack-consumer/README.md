@@ -1,9 +1,9 @@
 # TanStack AI / OpenRouter: raw evidence at the server-tool boundary
 
-The [verified native-first source trial](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
-includes a locally built PSJ candidate and works without an npm release of
-that candidate. The installed-package commands below require published
-`prefix-safe-json@0.5.4`.
+The commands below install published `prefix-safe-json@0.5.4`. The
+[native-first standalone trial](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
+also offers a PSJ-free baseline and an optional comparison from npm or a
+locally built source snapshot.
 
 With Node 22+ and npm, run from the repository checkout:
 
@@ -65,4 +65,4 @@ durable result recording and crash recovery in your application. Do not
 reconstruct raw events from parsed tool objects; one-shot gate authority
 does not provide distributed idempotency or undo a failed handler's effects.
 
-[Report your own-project run or integration blocker](../../docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).
+[Report your own-project run or integration blocker](https://github.com/canblmz1/prefix-safe-json/blob/main/docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).

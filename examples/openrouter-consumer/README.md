@@ -7,7 +7,7 @@ node scripts/try-npm-demo.mjs openrouter
 ```
 
 The launcher copies this directory outside the checkout, installs published
-`prefix-safe-json@0.5.3`, `@openrouter/agent@0.11.0`, `@openrouter/sdk@0.13.67`
+`prefix-safe-json@0.5.4`, `@openrouter/agent@0.11.0`, `@openrouter/sdk@0.13.67`
 and `zod@4.4.3`, then runs the assertions. Alternatively, copy this directory,
 run `npm install --engine-strict --no-audit --no-fund`, then `npm start`.
 No API key or live model call is needed: the HTTP transport is replaced with
@@ -66,4 +66,4 @@ package. PSJ is optional. This example checks a caller-owned dispatch policy
 and result correlation; it is not a claim that the dependency is necessary for
 every OpenRouter application or that an independent maintainer adopted it.
 
-[Report your own-project run or integration blocker](../../docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).
+[Report your own-project run or integration blocker](https://github.com/canblmz1/prefix-safe-json/blob/main/docs/TRY_IN_YOUR_PROJECT.md#report-a-result-or-request-help).
