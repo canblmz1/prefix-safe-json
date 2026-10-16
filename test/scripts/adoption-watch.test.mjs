@@ -99,3 +99,21 @@ test("GitHub login capitalization cannot inflate the manually recorded count", a
   value.goal.confirmedDevelopers = ["Developer", "developer"].map(login => ({ login, project: "example/project", evidence: url }));
   await assert.rejects(() => run(value, async () => { throw new Error("must not fetch"); }), /distinct manually reviewed evidence/);
 });
+
+test("reads submitted PR reviews and inline feedback while excluding private pending drafts", async () => {
+  const value = config();
+  value.targets[0].invitationUrl = "https://github.com/example/project/pull/1#issuecomment-10";
+  const approval = { ...comment(7, "maintainer", "Own-project test passed"), state: "APPROVED", submitted_at: later,
+    created_at: undefined, updated_at: undefined, html_url: "https://github.com/example/project/pull/1#pullrequestreview-7" };
+  const pending = { ...approval, state: "PENDING", body: "private draft must stay private" };
+  const report = await run(value, async input => {
+    const path = new URL(input).pathname;
+    return json(path.endsWith("/reviews") ? [approval, pending] :
+      path.includes("/pulls/") && path.endsWith("/comments") ? [comment(8, "reviewer", "Counter 1/0 confirmed")] : []);
+  });
+  assert.equal(report.targets[0].responses.length, 2);
+  assert.equal(report.targets[0].responses[0].createdAt, later);
+  assert.equal(report.needsManualReview, true);
+  assert.equal(report.goal.manuallyConfirmedCount, 0);
+  assert.equal(JSON.stringify(report).includes(pending.body), false);
+});

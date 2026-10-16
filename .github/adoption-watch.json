@@ -132,6 +132,15 @@
       "since": "2026-10-15T09:58:50Z",
       "purpose": "native-validation",
       "reviewedResponses": []
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 965,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/sandbaseai/sandbase-harness/pull/965",
+      "since": "2026-10-16T09:55:45Z",
+      "purpose": "existing-adopter-upgrade",
+      "reviewedResponses": []
     }
   ]
 }

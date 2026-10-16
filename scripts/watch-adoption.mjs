@@ -73,7 +73,8 @@ export async function collectAdoptionReport(config, { token, fetchImpl = globalT
     }
   }
   const restComment = item => ({ author: { login: item.user?.login }, bot: item.user?.type === "Bot",
-    body: item.body, url: item.html_url, createdAt: item.created_at, updatedAt: item.updated_at });
+    body: item.body, url: item.html_url, createdAt: item.created_at ?? item.submitted_at,
+    updatedAt: item.updated_at ?? item.submitted_at });
   async function discussionComments(target) {
     const [owner, name] = target.repository.split("/");
     const comments = [];
@@ -116,6 +117,12 @@ export async function collectAdoptionReport(config, { token, fetchImpl = globalT
     try {
       const comments = target.kind === "discussion" ? await discussionComments(target) :
         (await pages(`/repos/${target.repository}/issues/${target.number}/comments`)).map(restComment);
+      if (target.invitationUrl.split("#")[0] === `https://github.com/${target.repository}/pull/${target.number}`) {
+        const reviews = await pages(`/repos/${target.repository}/pulls/${target.number}/reviews`);
+        // Pending reviews are private drafts and do not belong in a public report.
+        comments.push(...reviews.filter(item => item.state !== "PENDING").map(restComment));
+        comments.push(...(await pages(`/repos/${target.repository}/pulls/${target.number}/comments`)).map(restComment));
+      }
       const responses = comments.map(item => reviewResponse(item, target.since, config.maintainer, target.reviewedResponses ?? [])).filter(Boolean);
       targets.push({ ...base, status: "checked", responses,
         needsManualReview: responses.some(item => item.needsManualReview) });
