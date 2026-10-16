@@ -10,7 +10,7 @@ npm start
 
 This pins `@langchain/openai@1.5.8` and `@langchain/core@1.2.9`, the versions
 in [LangChain.js #11469](https://github.com/langchain-ai/langchainjs/issues/11469),
-and published `prefix-safe-json@0.5.2`. It uses the installed `ChatOpenAI.stream()`
+and published `prefix-safe-json@0.5.3`. It uses the installed `ChatOpenAI.stream()`
 with a local mock fetch response. No API key or live request is required.
 
 The same original OpenAI-compatible envelopes feed PSJ's existing adapter;

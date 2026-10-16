@@ -6,9 +6,11 @@ one complete call that runs once and one interrupted call that does not run.
 ## Check the published demo
 
 Without a checkout, download the
-[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-14)
+[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-16)
 and follow its extraction and npm commands. It contains example sources and
-licenses and installs published PSJ `0.5.2`; it does not bundle a new runtime.
+licenses and installs published PSJ `0.5.3`. The included examples index lists
+the AI SDK, OpenAI, Anthropic and LangChain choices; the ZIP does not bundle
+the package runtime.
 
 With Node 22+ and npm available, run from this checkout:
 
@@ -26,6 +28,13 @@ The [Anthropic consumer trial](../examples/anthropic-consumer/README.md) checks
 effects **1 / 0 / 0 / 0 / 0**, including complete JSON at a token limit and EOF
 after stop-reason metadata but before `message_stop`. For the installed
 LangChain comparison, run `node scripts/try-npm-demo.mjs langchain`.
+
+For OpenAI Chat Completions or a compatible endpoint, run
+`node scripts/try-npm-demo.mjs openai`. The
+[OpenAI consumer trial](../examples/openai-consumer/README.md) checks termination,
+identity and late argument evidence through the installed official SDK. It also
+demonstrates a limit: complete JSON plus a falsely successful server terminal
+still grants authority; PSJ cannot reconstruct the hidden upstream stop reason.
 
 Expected effect counts, in scenario order: **1 / 0 / 0 / 0 / 1**. The third
 scenario has complete, schema-valid JSON but ends with a token-limit reason;

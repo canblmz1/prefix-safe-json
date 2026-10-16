@@ -1,0 +1,11 @@
+{
+  "name": "prefix-safe-json-openai-consumer-demo",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node demo.mjs" },
+  "dependencies": {
+    "openai": "7.34.0",
+    "prefix-safe-json": "0.5.3"
+  }
+}

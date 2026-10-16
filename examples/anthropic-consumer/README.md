@@ -7,7 +7,7 @@ node scripts/try-npm-demo.mjs anthropic
 ```
 
 The launcher copies this demo into a new temporary directory outside the
-checkout, installs published `prefix-safe-json@0.5.2` and the official
+checkout, installs published `prefix-safe-json@0.5.3` and the official
 `@anthropic-ai/sdk@0.123.0`, prints their versions, and runs the assertions.
 It needs no API key or repository toolchain. Alternatively, copy this directory
 outside the checkout and run `npm install --engine-strict`, then `npm start`.

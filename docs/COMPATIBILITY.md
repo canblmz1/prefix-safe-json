@@ -68,7 +68,7 @@ mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
 For an installed-package consumer check, copy
 [`examples/npm-consumer/`](../examples/npm-consumer/) outside the checkout and
 run `npm install --engine-strict --no-audit --no-fund`, then `npm start` on
-Node 22+. It pins `prefix-safe-json@0.5.2`, `ai@7.0.77`, and `zod@4.4.3`, uses
+Node 22+. It pins `prefix-safe-json@0.5.3`, `ai@7.0.77`, and `zod@4.4.3`, uses
 public imports (including `prefix-safe-json/standard-schema`), and exercises
 real `streamText().fullStream` with the official `MockLanguageModelV4`.
 CI separately substitutes the current packed candidate for the published PSJ
@@ -116,7 +116,7 @@ is checked with the installed official SDK against a local SSE fixture, not a
 live provider.
 
 The [standalone Anthropic consumer](../examples/anthropic-consumer/README.md)
-installs published `prefix-safe-json@0.5.2` with `@anthropic-ai/sdk@0.123.0`
+installs published `prefix-safe-json@0.5.3` with `@anthropic-ai/sdk@0.123.0`
 outside the checkout. It feeds the SDK's unchanged events to the gate and
 checks complete, truncated, token-limited, missing-terminal and post-terminal
 argument cases. CI runs the same consumer against the packed candidate.
@@ -143,8 +143,9 @@ than treating `0.x` as a formality:
   `test/unit/execution-gate*.test.ts`, `examples/*.mjs`). This is a
   statement about this repository's own maturity/compatibility intent.
   Sandbase provides public dependency and runtime-integration evidence;
-  production deployment and independent maintainer-run validation have not
-  been confirmed (see `docs/CASE_STUDY_SANDBASE.md`). Currently: `createParser`,
+  a historical independent maintainer run is confirmed for PSJ `0.4.3`.
+  Production deployment and an independent run of the later `0.5.0` snapshot
+  remain unconfirmed (see `docs/CASE_STUDY_SANDBASE.md`). Currently: `createParser`,
   `createToolCallStreamCoordinator`, `createToolCallExecutionGate`,
   `createAiSdkExecutionGuard`, and their associated types (including the
   pre-existing `toolSchemas`/`schemas` raw-JSON-Schema registration option,
