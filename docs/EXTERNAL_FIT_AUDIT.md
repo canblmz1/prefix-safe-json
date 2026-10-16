@@ -130,3 +130,31 @@ SDK or application fix. For replay product expansion, require an external
 developer to bring an actual incident and use the resulting check again.
 Until then, keep replay experimental. Do not add retry orchestration, diagram
 repair, token-budget management or a dashboard on the strength of these reports.
+
+### MARCO dispatch comparison, 2026-10-16
+
+An installed `marco-harness@0.4.1` / PSJ `0.5.3` comparison exercises the
+actual OpenAI-compatible provider, SSE parser, Harness, validation and harmless
+counter handler. MARCO's registry `gitHead` matches source commit
+`dcb07aafc0016798512291d4df2af7feaf966430`. The
+[standalone reproduction and seven scenario results](https://gist.github.com/canblmz1/612593a10cee155b25ea3d517ad4db66)
+were downloaded again and run from a fresh directory. The native reproduction
+installs MARCO alone; PSJ is optional for the comparison.
+
+Two distinct IDs produce **2 / 2 native / PSJ effects**. Two different stream
+indexes sharing one ID produce **2 / 0**; late argument bytes after successful
+termination produce **1 / 0**. The PSJ path tees the same response body, drains
+original evidence before `beforeToolCall`, then uses one-shot authority and its
+raw value at that hook. Native token-limit, missing-terminal and malformed-JSON
+controls already produce zero effects, so those cases show no added suppression
+benefit here. No upstream source change or new PSJ runtime feature was needed.
+
+This demonstrates a narrow caller-boundary fit. The hook does **not** repair
+MARCO history: denied duplicate calls still produce same-ID error results.
+A native check should reject ambiguous identity before dispatch and keep
+duplicate result IDs out of subsequent requests. The
+[upstream report and technical trial invitation](https://github.com/pyrotank41/marco-harness/issues/10)
+separate those requirements. The malformed-provider responses are authored
+fixtures, not observed production frequency; the fixture observer is not a
+general production HTTP adapter. These maintainer-operated runs establish
+neither live-provider validation nor independent adoption.
