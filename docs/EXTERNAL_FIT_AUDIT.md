@@ -187,3 +187,63 @@ handling. A native pre-dispatch identity check is an alternative to a caller
 library. These authored malformed-provider cases measure neither production
 frequency nor independent adoption. The fixture observer is not a general
 HTTP adapter, and no cross-turn or distributed idempotency is established.
+
+A separate [manual continuation recipe](../examples/openrouter-consumer/README.md)
+now tests accepted result submission and the final assistant response through
+the same pinned SDKs. Its eight authored scenarios include LF/CRLF controls,
+two distinct calls, duplicate IDs, token limits, late evidence, an invalid
+sibling and a transport read failure. Denied batches cause zero effects and
+no follow-up request. This extends the earlier comparison; the dated gist
+above remains unchanged.
+
+### TanStack / OpenRouter source trial, 2026-10-16
+
+The [public native-first reproduction](https://gist.github.com/canblmz1/ba1e62d792da37d3f420c328f56d81be)
+pins `@tanstack/ai@0.69.0`, `@tanstack/ai-openrouter@0.22.0`,
+`@openrouter/sdk@0.13.20` and Zod `4.6.5`. Its default npm lockfile contains
+no PSJ dependency. A fresh anonymous download passed all nine file hashes,
+then `npm ci` and five native fixtures. An optional comparison clones public
+PSJ source `c7376ea453122e7677f3ee7bc6d3183d34866fbd`, builds and packs it
+locally, and installs that tarball outside the source checkout. The complete
+public recipe was run again: installed adapter bytes match the source build,
+and the package is a tarball rather than a workspace link. This source trial
+requires no npm publication of the candidate.
+
+| Authored scenario | Native effects | Source-candidate effects |
+| --- | ---: | ---: |
+| Complete JSON and normal final usage trailer | 1 | 1 |
+| Malformed JSON, native output limit and usage trailer | 1 | 0 |
+| Complete JSON, native output limit and usage trailer | 1 | 0 |
+| Complete JSON, native output limit without usage trailer | 1 | 0 |
+| Complete JSON, normalized `length` termination | 1 | 0 |
+
+The real `chat()` server-tool wrapper waits for a tee of the original HTTP
+evidence, checks the execution context's call ID, and consumes one-shot
+authority before a harmless effect. TanStack's own loop sends exactly one
+paired result and completes the following streamed response. Assertions
+require the gate-refusal message, so an unrelated callback failure cannot
+substitute for a denied effect. The recipe checks one call per response,
+not arbitrary multi-call or durable workflows.
+
+The independently reported [malformed-input fallback](https://github.com/TanStack/ai/issues/1689)
+also reproduces in the older published `0.66.0` / `0.21.2` pair. TanStack's
+[pinned current source](https://github.com/TanStack/ai/blob/85c2956c68f3226ef409b3a4e54d5be82198931e/packages/ai-openrouter/src/adapters/text.ts#L1186)
+already removes the fallback; its entire main branch was not built or run.
+That native correction is useful independently of PSJ. The complete-JSON
+and missing-usage cases are authored extensions, not production-frequency
+reports or evidence that every application needs a strict caller policy.
+
+This investigation exposed two defects in PSJ's own published `0.5.3`
+OpenRouter adapter: known native output-limit metadata was ignored, and a
+normal repeated final usage frame caused refusal. The existing adapter's
+[source correction](https://github.com/canblmz1/prefix-safe-json/pull/60)
+handles both without new runtime dependencies or public exports. The source
+candidate above targets `0.5.4`; the public trial builds it locally and does
+not claim that an npm release was used.
+
+The [technical invitation](https://github.com/TanStack/ai/issues/1689#issuecomment-6217941748)
+discloses PSJ affiliation and offers help testing the raw boundary in the
+reporter's own project. These are maintainer-operated mock-transport checks,
+not a live OpenRouter run, whole-framework certification or independent
+adoption. Decoder EOF behavior, transport buffering, cancellation and
+application-owned authorization/recovery limits are recorded in the gist.
