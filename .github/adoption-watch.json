@@ -177,6 +177,24 @@
       "since": "2026-10-16T09:55:45Z",
       "purpose": "existing-adopter-upgrade",
       "reviewedResponses": []
+    },
+    {
+      "repository": "slimclaw/slimclaw",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/slimclaw/slimclaw/issues/1",
+      "since": "2026-10-16T18:37:18Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "nbonamy/multi-llm-ts",
+      "number": 29,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/nbonamy/multi-llm-ts/issues/29",
+      "since": "2026-10-16T18:54:56Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
