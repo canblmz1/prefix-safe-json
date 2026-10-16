@@ -11,7 +11,7 @@ Choose one directory:
 | `npm-consumer` | AI SDK `7.0.77`, Zod `4.4.3` | Termination, validation, interleaved calls and identity |
 | `openai-consumer` | OpenAI `7.34.0` | Chat Completions termination, identity and provider-honesty limit |
 | `anthropic-consumer` | Anthropic `0.123.0` | Final `message_stop`, truncation and late input |
-| `langchain-consumer` | LangChain OpenAI `1.6.2`, core `1.2.17` | Parsed candidates versus original provider evidence |
+| `langchain-consumer` | LangChain OpenAI `1.5.8`, core `1.2.9` | Parsed candidates versus original provider evidence |
 
 From the chosen directory run `npm install --engine-strict --no-audit --no-fund`,
 then `npm start`. For `npm-consumer`, also run `npm run batch` and
