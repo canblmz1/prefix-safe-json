@@ -16,7 +16,9 @@ no npm packages, executes no third-party project code, changes no threads and
 sends no invitations. This is ongoing evidence collection; coding, technical
 follow-up and confirmation of independent project use require maintainer work.
 
-Issue comments, discussion comments and nested replies are paginated. A
+Issue comments, submitted pull-request reviews, inline review comments,
+discussion comments and nested replies are paginated. Private pending review
+drafts are excluded. A
 reviewed comment edited to different text is flagged again. API failures are
 reported as failures with a nonzero exit code, not as an absence of replies.
 Integration forms receive the `integration` label; older unlabelled forms
