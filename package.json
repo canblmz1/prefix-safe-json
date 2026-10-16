@@ -100,7 +100,7 @@
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/clarinet": "^0.12.3",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "^3.2.6",
+    "@vitest/coverage-v8": "^4.1.12",
     "ai-v5": "npm:ai@5.0.244",
     "ai-v6": "npm:ai@6.0.264",
     "ai-v7": "npm:ai@7.0.77",
@@ -114,15 +114,18 @@
     "tsx": "^4.16.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^3.2.6",
+    "vitest": "^4.1.12",
     "zod": "4.4.3"
   },
   "pnpm": {
     "overrides": {
-      "qs": "^6.15.2",
+      "qs": "^6.16.0",
       "vite": "^6.4.3",
       "nanoid": "^3.3.18",
-      "undici": "^7.28.0"
+      "undici": "^7.29.1",
+      "brace-expansion@1": "^1.1.21",
+      "brace-expansion@5": "^5.0.12",
+      "js-yaml@4": "^4.3.2"
     }
   }
 }
