@@ -93,10 +93,10 @@ checkout without model requests or tool dispatch.
 ## Run a standalone npm demo
 
 To try it without cloning this repository, download the
-[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-14).
+[standalone trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/tag/trial-2026-10-16).
 It contains only the example sources and licenses; its release notes give
-the extraction and npm commands. It installs published PSJ `0.5.2`, not a new
-or unpublished package version.
+the extraction and npm commands. Choose an AI SDK, OpenAI, Anthropic or
+LangChain consumer; each installs published PSJ `0.5.3`.
 
 With Node 22+ and npm, you can run the published-package demo from this checkout
 without installing the repository's development dependencies:
@@ -119,7 +119,6 @@ npm start
 ```
 
 The current checkout pins `prefix-safe-json@0.5.3`, `ai@7.0.77`, and `zod@4.4.3`.
-The dated trial ZIP above remains its frozen `0.5.2` baseline.
 It needs no repository build, workspace aliases, or API key. It drives real
 `streamText().fullStream` using the SDK's official `MockLanguageModelV4` and
 imports the installed package's public entry point and `standard-schema`
