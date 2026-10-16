@@ -1,0 +1,18 @@
+{
+  "name": "prefix-safe-json-tanstack-consumer-demo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node demo.mjs"
+  },
+  "dependencies": {
+    "@tanstack/ai": "0.69.0",
+    "@tanstack/ai-openrouter": "0.22.0",
+    "@openrouter/sdk": "0.13.20",
+    "prefix-safe-json": "0.5.4",
+    "zod": "4.6.5"
+  }
+}

@@ -1,7 +1,7 @@
 # Installed-package trials
 
-These examples require Node 22+ and npm. Each directory installs published
-`prefix-safe-json@0.5.3` in an independent project and uses a mock transport or
+These examples require Node 22+ and npm. Each directory installs the PSJ
+version pinned in its manifest in an independent project and uses a mock transport or
 mock model. No API key, model server or repository build is needed.
 
 Choose one directory:
@@ -13,6 +13,7 @@ Choose one directory:
 | `anthropic-consumer` | Anthropic `0.123.0` | Final `message_stop`, truncation and late input |
 | `langchain-consumer` | LangChain OpenAI `1.5.8`, core `1.2.9` | Parsed candidates versus original provider evidence |
 | `openrouter-consumer` | OpenRouter Agent `0.11.0`, SDK `0.13.67` | Manual dispatch, whole-batch refusal and matched results in the next model request |
+| `tanstack-consumer` | TanStack AI `0.69.0`, OpenRouter `0.22.0`, SDK `0.13.20` | Raw native finish reasons, usage trailers and paired server-tool results; requires PSJ `0.5.4` |
 
 From the chosen directory run `npm install --engine-strict --no-audit --no-fund`,
 then `npm start`. For `npm-consumer`, also run `npm run batch` and

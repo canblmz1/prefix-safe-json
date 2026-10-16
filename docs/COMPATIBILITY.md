@@ -133,7 +133,7 @@ and transport read failure. CI repeats the consumer against the packed candidate
 This is a bounded fixture check, not live-provider certification or independent
 adoption. See the recipe for decoder, buffering and crash-recovery limits.
 
-### Raw Chat Completions terminal metadata (unreleased)
+### Raw Chat Completions terminal metadata (0.5.4)
 
 `OpenRouterStreamAdapter` now considers the provider's `native_finish_reason`
 alongside the normalized `finish_reason`. Explicit native output-limit values
@@ -155,7 +155,7 @@ Callers must drain the original stream before `adapter.finish()` and dispatch.
 
 Both issues reproduce with published `0.5.3`: it ignores native output-limit
 metadata and rejects the normal repeated usage trailer. The corrections above
-are unreleased. The external report's malformed-JSON example is distinct from
+are included in `0.5.4`. The external report's malformed-JSON example is distinct from
 the complete-JSON regression used here, and its adapter-side parse fallback is
 already corrected in [TanStack's current source](https://github.com/TanStack/ai/blob/85c2956c68f3226ef409b3a4e54d5be82198931e/packages/ai-openrouter/src/adapters/text.ts#L1186); these notes do not claim that
 PSJ is needed instead of that native fix.
@@ -163,6 +163,12 @@ PSJ is needed instead of that native fix.
 Sources: [OpenRouter response metadata](https://github.com/OpenRouterTeam/docs/blob/c6d74754eefd40a9acb9ba6c9fe86683745106ae/api_reference/overview.mdx),
 [documented final usage chunk](https://github.com/OpenRouterTeam/docs/blob/c6d74754eefd40a9acb9ba6c9fe86683745106ae/api_reference/streaming.mdx),
 and the independently reported [raw/normalized token-limit shape](https://github.com/TanStack/ai/issues/1689).
+
+The [TanStack installed-package comparison](../examples/tanstack-consumer/README.md)
+checks `@tanstack/ai@0.69.0` with `@tanstack/ai-openrouter@0.22.0` and
+`@openrouter/sdk@0.13.20`. Five raw HTTP/SSE fixture scenarios compare native
+execution with caller-owned guarded effects and verify paired results in the
+next request. It requires PSJ `0.5.4`; CI repeats it against the packed candidate.
 
 ## Runtime dependencies
 
