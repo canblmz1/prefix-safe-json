@@ -1,0 +1,40 @@
+name: Adoption follow-up
+
+on:
+  schedule:
+    - cron: '23 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  discussions: read
+
+concurrency:
+  group: adoption-follow-up
+  cancel-in-progress: false
+
+jobs:
+  public-feedback:
+    if: github.repository == 'canblmz1/prefix-safe-json'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+      - name: Check watcher contracts
+        run: node --test test/scripts/adoption-watch.test.mjs
+      - name: Read public trial replies and integration reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/watch-adoption.mjs
+      - name: Preserve evidence report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: adoption-follow-up-${{ github.run_id }}
+          path: artifacts/adoption-watch/
+          if-no-files-found: warn
+          retention-days: 30

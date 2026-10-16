@@ -1,5 +1,6 @@
 name: Integration result or blocker
 description: Share a result from trying PSJ in your own project, or get help with a blocker.
+labels: [integration]
 title: "[Integration]: "
 body:
   - type: markdown

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "maintainer": "canblmz1",
+  "repository": "canblmz1/prefix-safe-json",
+  "goal": {
+    "target": 5,
+    "countingRule": "Manual confirmation of independent developers running PSJ inside their own projects. Operator fixtures, downloads and native-only fixes do not qualify.",
+    "confirmedDevelopers": []
+  },
+  "integrationReportsSince": "2026-10-14T00:00:00Z",
+  "reviewedIntegrationReports": [],
+  "targets": [
+    {
+      "repository": "langchain-ai/langchainjs",
+      "number": 11469,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6166247064",
+      "since": "2026-10-14T10:26:16Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "zgsm-ai/costrict",
+      "number": 1360,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/zgsm-ai/costrict/issues/1360#issuecomment-6166248036",
+      "since": "2026-10-14T10:26:19Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 117,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/sandbaseai/sandbase-harness/pull/117#issuecomment-6166248694",
+      "since": "2026-10-14T10:26:21Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "Blackcat-Informatics/purrassist",
+      "number": 17,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/Blackcat-Informatics/purrassist/issues/17#issuecomment-6166249274",
+      "since": "2026-10-14T10:26:23Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "TYNYBAY/dobby-sdk",
+      "number": 7,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/TYNYBAY/dobby-sdk/issues/7#issuecomment-6166249750",
+      "since": "2026-10-14T10:26:25Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "anomalyco/opencode",
+      "number": 38747,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/anomalyco/opencode/issues/38747#issuecomment-6167701769",
+      "since": "2026-10-14T11:51:57Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "code-yeongyu/oh-my-openagent",
+      "number": 9864,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/code-yeongyu/oh-my-openagent/issues/9864#issuecomment-6167702370",
+      "since": "2026-10-14T11:51:59Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "nedonatelli/sidecar",
+      "number": 164,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6172465563",
+      "since": "2026-10-14T15:54:32Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817",
+          "bodySha256": "f9e534a045cbe301de06f761c3ddf5e22ffb2a8a480304328c566196e78c6289",
+          "classification": "problem and regression-test-shape validation, not PSJ adoption"
+        }
+      ]
+    },
+    {
+      "repository": "vercel/ai",
+      "number": 22914,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/vercel/ai/issues/22914#issuecomment-6172958009",
+      "since": "2026-10-14T16:19:20Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "DayuanJiang/next-ai-draw-io",
+      "number": 993,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/DayuanJiang/next-ai-draw-io/discussions/993",
+      "since": "2026-10-14T16:26:26Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "pyrotank41/marco-harness",
+      "number": 10,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/pyrotank41/marco-harness/issues/10",
+      "since": "2026-10-16T08:40:45Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "OpenRouterTeam/typescript-agent",
+      "number": 128,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/OpenRouterTeam/typescript-agent/issues/128",
+      "since": "2026-10-16T09:20:02Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "jagreehal/ai-sdk-ollama",
+      "number": 1092,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092",
+      "since": "2026-10-15T09:58:50Z",
+      "purpose": "native-validation",
+      "reviewedResponses": []
+    }
+  ]
+}

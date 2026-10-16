@@ -54,6 +54,9 @@ jobs:
     - name: Run Tests
       run: pnpm run test
 
+    - name: Verify adoption watcher contracts
+      run: node --test test/scripts/adoption-watch.test.mjs
+
     - name: Build
       run: pnpm run build
 
