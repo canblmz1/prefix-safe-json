@@ -53,6 +53,7 @@ function mapLegacyFinishReason(providerReason: string): StreamEndReason {
 
 export interface OpenAIEvent {
   choices?: OpenAIChoice[];
+  error?: unknown;
   type?: string;
   output_index?: number;
   item?: {
@@ -197,6 +198,27 @@ export class OpenAIStreamAdapter implements ProviderStreamAdapter<unknown> {
     }
 
     const chunk = rawEvent as OpenAIEvent;
+
+    // Chat Completions can report an in-band error without a Responses type.
+    // Fail every stream mode closed, including legacy calls and late errors.
+    if (chunk.error !== undefined && chunk.error !== null) {
+      events.push({
+        type: "provider_diagnostic",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        code: "E_PROVIDER_ERROR",
+        severity: "error",
+        message: "Provider reported an error in the stream",
+      }, {
+        type: "provider_stream_end",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        reason: "provider_error",
+        providerReason: "error",
+      });
+      this.finished = true;
+      return events;
+    }
     
     // Handle Responses API
     if (chunk.type?.startsWith("response.") || chunk.type === "error") {
