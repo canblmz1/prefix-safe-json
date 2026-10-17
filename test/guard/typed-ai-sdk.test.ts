@@ -32,6 +32,9 @@ describe("typed raw-input guard", () => {
     for (const part of call()) guard.push(part);
     expect(guard.takeDecision("call-1")).toBeUndefined();
     const final = guard.finish();
+    expect(final.decisions[0]).toMatchObject({ action: "execute", executable: true, reason: "complete" });
+    expect(guard.snapshot()[0]).toMatchObject({ action: "execute", executable: true, reason: "complete" });
+    expect(final.diagnostics.filter(d => d.code === "E_UNREGISTERED_TOOL")).toEqual([]);
     const id = expectDefined(final.decisions[0]).internalId;
     const authority = guard.takeDecision(id);
     expect(authority?.value).toEqual({ path: "a.txt", content: "hello" });
@@ -91,11 +94,51 @@ describe("typed raw-input guard", () => {
     const final = guard.finish();
     const decision = expectDefined(final.decisions[0]);
     expect(decision.action).toBe("reject");
+    expect(decision.executable).toBe(false);
     expect(decision.reason).toBe("schema_invalid");
     expect("value" in decision).toBe(false);
-    expect(final.diagnostics.some(d => d.code === "E_UNREGISTERED_TOOL")).toBe(true);
-    expect(guard.snapshot()[0]?.action).toBe("reject");
+    const diagnostic = expectDefined(final.diagnostics.find(d => d.code === "E_UNREGISTERED_TOOL"));
+    expect(diagnostic.severity).toBe("error");
+    expect(diagnostic.internalId).toBe(decision.internalId);
+    expect(diagnostic.message.trim().length).toBeGreaterThan(0);
+    expect(guard.snapshot()[0]).toMatchObject({ action: "reject", executable: false, reason: "schema_invalid" });
     expect(guard.takeDecision(decision.internalId)).toBeUndefined();
+  });
+
+  it("preserves retry observations for a registered call cut off by the provider", () => {
+    const { guard, final } = run(schema, '{"path":"a.txt","content":"hello"}', "length");
+    expect(final.decisions[0]).toMatchObject({ action: "retry", executable: false, reason: "stream_incomplete" });
+    expect(guard.snapshot()[0]).toMatchObject({ action: "retry", executable: false, reason: "stream_incomplete" });
+    expect(final.diagnostics.filter(d => d.code === "E_UNREGISTERED_TOOL")).toEqual([]);
+  });
+
+  it("retains incomplete-stream evidence for an unknown name without granting authority", () => {
+    const guard = createTypedAiSdkExecutionGuard({ inputSchemas: { write_file: schema } });
+    for (const part of call("other", "{}", "length")) guard.push(part);
+    const final = guard.finish();
+    const decision = expectDefined(final.decisions[0]);
+    expect(decision).toMatchObject({ action: "retry", executable: false, reason: "stream_incomplete" });
+    expect(final.diagnostics.some(d => d.code === "E_UNREGISTERED_TOOL")).toBe(true);
+    expect(guard.takeDecision(decision.internalId)).toBeUndefined();
+  });
+
+  it("reports only the unknown member of a mixed tool batch as unregistered", () => {
+    const guard = createTypedAiSdkExecutionGuard({ inputSchemas: { write_file: schema } });
+    for (const part of call().slice(0, -1)) guard.push(part);
+    guard.push({ type: "tool-input-start", id: "call-2", toolName: "other" });
+    guard.push({ type: "tool-input-delta", id: "call-2", delta: "{}" });
+    guard.push({ type: "tool-input-end", id: "call-2" });
+    guard.push({ type: "finish", finishReason: "tool-calls" });
+    const final = guard.finish();
+    const registered = expectDefined(final.decisions.find(d => d.name === "write_file"));
+    const unknown = expectDefined(final.decisions.find(d => d.name === "other"));
+    expect(registered).toMatchObject({ action: "execute", executable: true });
+    expect(unknown).toMatchObject({ action: "reject", executable: false });
+    const unregistered = final.diagnostics.filter(d => d.code === "E_UNREGISTERED_TOOL");
+    expect(unregistered).toHaveLength(1);
+    expect(unregistered[0]?.internalId).toBe(unknown.internalId);
+    expect(guard.takeDecision(registered.internalId)?.name).toBe("write_file");
+    expect(guard.takeDecision(unknown.internalId)).toBeUndefined();
   });
 
   it("does not change registration when the caller mutates the original map", () => {

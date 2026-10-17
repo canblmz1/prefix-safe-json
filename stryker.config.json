@@ -30,6 +30,7 @@
     "src/providers/gemini.ts",
     "src/coordinator/coordinator.ts",
     "src/guard/provider-guard.ts",
+    "src/guard/typed-ai-sdk.ts",
     "src/guard/ai-sdk-execution-lock.ts",
     "src/validation/types.ts",
     "src/validation/ajv-validator.ts",
