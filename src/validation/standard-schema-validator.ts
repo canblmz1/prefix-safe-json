@@ -7,7 +7,7 @@ import type { ToolInputValidator, ToolValidationResult } from "./types.js";
  * - just its documented shape, which Zod 4+, Valibot, ArkType, and others
  * already implement without any package of ours needing to know that.
  */
-interface StandardSchemaV1Like {
+export interface StandardSchemaV1Like {
   readonly "~standard": {
     readonly version: 1;
     readonly vendor: string;
@@ -130,12 +130,23 @@ function assertStandardSchemaV1(schema: unknown): asserts schema is StandardSche
  * `docs/VALIDATION.md#the-standard-schema-transformation-boundary`.
  */
 export function fromStandardSchema(schema: StandardSchemaV1Like): ToolInputValidator {
+  return createStandardSchemaValidator(schema);
+}
+
+/** @internal Typed guards additionally require an unchanged JSON output. */
+export function createStandardSchemaValidator(schema: StandardSchemaV1Like, unchangedOutput = false): ToolInputValidator {
   assertStandardSchemaV1(schema);
   const standard = schema["~standard"];
   return {
     validate(value: unknown): ToolValidationResult {
-      const result: unknown = standard.validate(value);
+      // A typed boundary validates a copy: defaults/coercions or a mutating
+      // validator must never alter the raw value against which we compare.
+      const candidate: unknown = unchangedOutput ? structuredClone(value) : value;
+      const result: unknown = standard.validate(candidate);
       if (isThenable(result)) {
+        // Reject synchronously, but also observe an eventual async rejection
+        // so a misconfigured validator cannot cause an unhandled rejection.
+        void Promise.resolve(result).catch(() => undefined);
         throw new Error(
           "prefix-safe-json: fromStandardSchema() only supports synchronous Standard Schema validators. " +
             "This schema's validate() returned a Promise - implement ToolInputValidator directly if you " +
@@ -172,7 +183,31 @@ export function fromStandardSchema(schema: StandardSchemaV1Like): ToolInputValid
             describeForError(result),
         );
       }
+      if (unchangedOutput && !sameJsonValue(value, result.value)) {
+        return { valid: false, errors: ["Typed input validation must preserve the raw JSON value; transformations, defaults and removed keys are not accepted."] };
+      }
       return { valid: true };
     },
   };
+}
+
+/** Compare JSON structure without depending on object property order. */
+function sameJsonValue(raw: unknown, output: unknown): boolean {
+  const pending: Array<[unknown, unknown]> = [[raw, output]];
+  while (pending.length > 0) {
+    const [left, right] = pending.pop() as [unknown, unknown];
+    if (Object.is(left, right)) continue;
+    if (!isRecord(left) || !isRecord(right)) return false;
+    if (Array.isArray(left) !== Array.isArray(right)) return false;
+    const prototype = Object.getPrototypeOf(right);
+    if (prototype !== null && prototype !== Object.prototype && prototype !== Array.prototype) return false;
+    const keys = Object.keys(left);
+    if (keys.length !== Object.keys(right).length) return false;
+    if (Array.isArray(left) && left.length !== right["length"]) return false;
+    for (const key of keys) {
+      if (!Object.hasOwn(right, key)) return false;
+      pending.push([left[key], right[key]]);
+    }
+  }
+  return true;
 }

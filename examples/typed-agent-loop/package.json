@@ -1,0 +1,20 @@
+{
+  "name": "psj-typed-agent-loop-example",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "node check-readme.mjs && tsc --noEmit",
+    "build": "node check-readme.mjs && tsc",
+    "start": "npm run build && node dist/demo.mjs"
+  },
+  "dependencies": {
+    "ai": "7.0.143",
+    "prefix-safe-json": "file:./prefix-safe-json-candidate.tgz",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

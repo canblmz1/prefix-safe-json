@@ -12,3 +12,4 @@ reports/mutation
 *.tgz
 artifacts/
 test/docs/.generated/
+examples/typed-agent-loop/readme-check.mts

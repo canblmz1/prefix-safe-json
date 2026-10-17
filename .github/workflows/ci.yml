@@ -277,6 +277,17 @@ jobs:
             )
           done
 
+      - name: Compile and run the typed caller-owned agent loop
+        run: |
+          PSJ_TYPED_DIR=$(mktemp -d)
+          cp examples/typed-agent-loop/package.json examples/typed-agent-loop/tsconfig.json examples/typed-agent-loop/demo.mts examples/typed-agent-loop/check-readme.mjs "$PSJ_TYPED_DIR/"
+          cp prefix-safe-json-smoke.tgz "$PSJ_TYPED_DIR/prefix-safe-json-candidate.tgz"
+          cd "$PSJ_TYPED_DIR"
+          npm install --engine-strict --no-audit --no-fund
+          npm ls prefix-safe-json ai zod typescript
+          npm run check
+          npm start
+
       - name: Compare LangChain parsing with the packed raw-evidence guard
         run: |
           PSJ_LANGCHAIN_DIR=$(mktemp -d)

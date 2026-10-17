@@ -68,7 +68,7 @@ mechanism; its lock guarantee comes from removing callbacks. `ai@6.0.264` and
 For an installed-package consumer check, copy
 [`examples/npm-consumer/`](../examples/npm-consumer/) outside the checkout and
 run `npm install --engine-strict --no-audit --no-fund`, then `npm start` on
-Node 22+. It pins `prefix-safe-json@0.5.3`, `ai@7.0.77`, and `zod@4.4.3`, uses
+Node 22+. It pins `prefix-safe-json@0.5.4`, `ai@7.0.77`, and `zod@4.4.3`, uses
 public imports (including `prefix-safe-json/standard-schema`), and exercises
 real `streamText().fullStream` with the official `MockLanguageModelV4`.
 CI separately substitutes the current packed candidate for the published PSJ
@@ -100,6 +100,16 @@ can remove callbacks from its tool definitions, but the raw-stream guard recipe
 requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
 See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
 
+## Typed AI SDK input guard (unreleased)
+
+`createTypedAiSdkExecutionGuard` is Experimental and available from
+`prefix-safe-json/standard-schema` in the development candidate, not npm
+0.5.4. Its packed strict TypeScript consumer uses `ai@7.0.143`, Zod `4.4.3`
+and Node 22+. Five authored scenarios check a caller-owned two-request loop,
+refused token-limit/duplicate-ID batches, cancellation before generation and
+tool failure without retries. They do not imply live-model, UI or production
+verification. Existing untyped guard behavior and compatibility are unchanged.
+
 ## Anthropic message completion
 
 The Anthropic adapter requires both `message_delta.delta.stop_reason` and the
@@ -116,7 +126,7 @@ is checked with the installed official SDK against a local SSE fixture, not a
 live provider.
 
 The [standalone Anthropic consumer](../examples/anthropic-consumer/README.md)
-installs published `prefix-safe-json@0.5.3` with `@anthropic-ai/sdk@0.123.0`
+installs published `prefix-safe-json@0.5.4` with `@anthropic-ai/sdk@0.123.0`
 outside the checkout. It feeds the SDK's unchanged events to the gate and
 checks complete, truncated, token-limited, missing-terminal and post-terminal
 argument cases. CI runs the same consumer against the packed candidate.
@@ -125,7 +135,7 @@ argument cases. CI runs the same consumer against the packed candidate.
 
 The [standalone OpenRouter consumer](../examples/openrouter-consumer/README.md)
 checks published `@openrouter/agent@0.11.0` and `@openrouter/sdk@0.13.67` with
-`prefix-safe-json@0.5.3`. Manual tools remain caller-owned. Raw HTTP evidence
+`prefix-safe-json@0.5.4`. Manual tools remain caller-owned. Raw HTTP evidence
 feeds `OpenAIStreamAdapter`; accepted results are submitted through a second
 `callModel()` request with matching call IDs. Eight authored scenarios include
 duplicate IDs, token-limit termination, late evidence, mixed-validity batches
