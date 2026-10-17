@@ -82,6 +82,12 @@ refusal/error scenarios. It runs against the actual tarball without an API
 key. The caller owns dispatch and continuation. Schema transformations,
 defaults and removed keys are refused; [validation details](docs/VALIDATION.md#typed-raw-input-guard).
 
+To try the published version without cloning this repository, download the
+[0.6.0 typed-loop example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+extract it, then run `npm install --engine-strict --no-audit --no-fund` and
+`npm start` inside the extracted directory. Node 22+ is required. The example
+uses authored model responses and memory counters; no API key is needed.
+
 ## When this adds value
 
 Use PSJ when your application owns tool dispatch and needs original-stream
