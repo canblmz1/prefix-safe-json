@@ -8,6 +8,12 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-17
+
+### Fixed
+
+- Chat Completions adapters preserve top-level provider error envelopes before processing tool data. OpenAI-compatible, OpenAI plural `tool_calls` and legacy `function_call` streams cannot obtain execution authority from successful choice termination followed by provider failure. Healthy streams, usage-only frames and null/absent error placeholders retain their existing behavior.
+
 ## [0.6.0] - 2026-10-17
 
 ### Added

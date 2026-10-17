@@ -41,6 +41,7 @@ describe.each(formats)("%s provider error envelopes", format => {
       expect(decision.evidence).toMatchObject({ streamEndReason: "provider_error", providerReason: "error" });
       expect(events.filter(e => e.type === "provider_stream_end")).toHaveLength(1);
       expect(events).toContainEqual(expect.objectContaining({ type: "provider_diagnostic", code: "E_PROVIDER_ERROR", severity: "error" }));
+      expect(events.find(e => e.type === "provider_diagnostic")?.message).toBeTruthy();
     }
     expect(gate.takeDecision(decision.internalId)).toBeUndefined();
   });
@@ -68,6 +69,7 @@ describe.each(formats)("%s provider error envelopes", format => {
   it("ignores tool data co-resident with an error and stays closed", () => {
     const { adapter, gate, events, accept, start, terminal, push } = setup(format);
     push({ ...start(), error: { message: "Provider failed" } });
+    expect(events.some(e => e.type === "tool_call_start")).toBe(false);
     push(start()); push(terminal()); accept(adapter.finish({ reason: "complete" }));
     const final = gate.finish();
     expect(events[0]).toMatchObject({ type: "provider_diagnostic", code: "E_PROVIDER_ERROR" });
