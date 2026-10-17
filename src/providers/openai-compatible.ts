@@ -27,6 +27,7 @@ interface OpenAIChoice {
 
 export interface OpenAICompatibleEvent {
   choices?: OpenAIChoice[];
+  error?: unknown;
 }
 
 // Reason values a choice's own finish_reason can map to, ordered most- to
@@ -183,6 +184,21 @@ export class OpenAICompatibleStreamAdapter implements ProviderStreamAdapter<unkn
     }
 
     const chunk = rawEvent as OpenAICompatibleEvent;
+
+    // An in-band failure dominates any successful choice-local terminal.
+    // Handle it before choices so a failed envelope cannot also add tool data.
+    if (chunk.error !== undefined && chunk.error !== null) {
+      events.push({
+        type: "provider_diagnostic",
+        sequence: ++this.sequence,
+        provider: this.provider,
+        code: "E_PROVIDER_ERROR",
+        severity: "error",
+        message: "Provider reported an error in the stream",
+      });
+      events.push(...this.finish({ reason: "provider_error", providerReason: "error" }));
+      return events;
+    }
 
     if (Array.isArray(chunk.choices)) {
       const choiceCounts = new Map<number, number>();
