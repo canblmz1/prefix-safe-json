@@ -35,7 +35,7 @@ import {
 } from "prefix-safe-json";
 import { fromStandardSchema } from "prefix-safe-json/standard-schema";
 
-const writeFileSchema = z.object({ path: z.string(), content: z.string() });
+const writeFileSchema = z.object({ path: z.string(), content: z.string() }).strict();
 
 const tools = createAiSdkExecutionLock({
   write_file: {
@@ -57,7 +57,8 @@ const { decisions, diagnostics } = guard.finish();
 for (const decision of decisions) {
   const authority = guard.takeDecision(decision.internalId);
   if (authority) {
-    await writeFile(authority.value.path, authority.value.content);
+    const input = writeFileSchema.parse(authority.value);
+    await writeFile(input.path, input.content);
   } else {
     console.warn(`skipped ${decision.name}: ${decision.action} (${decision.reason})`);
   }
@@ -70,6 +71,16 @@ if (decisions.length === 0 && diagnostics.length > 0) {
 `model` and `prompt` are yours. The lock stops the SDK from running `write_file` itself; the guard checks each streamed call against the same schema and hands out a one-shot decision. The caller owns dispatch, and a call the guard doesn't hand out never runs.
 
 Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
+
+## Typed inputs and a complete agent loop (unreleased)
+
+The development candidate adds Experimental `createTypedAiSdkExecutionGuard`
+in `prefix-safe-json/standard-schema`; it is **not included in npm 0.5.4**.
+The [strict TypeScript agent-loop example](examples/typed-agent-loop/) checks
+inferred raw inputs, matching result IDs and a final model answer, plus four
+refusal/error scenarios. It runs against the actual tarball without an API
+key. The caller owns dispatch and continuation. Schema transformations,
+defaults and removed keys are refused; [validation details](docs/VALIDATION.md#typed-raw-input-guard-unreleased).
 
 ## When this adds value
 

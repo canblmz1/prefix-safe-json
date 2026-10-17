@@ -266,6 +266,32 @@ match the arguments they actually execute. This adapter is not, and does
 not claim to be, a replacement for a project's normal parsing/
 transformation pipeline.
 
+### Typed raw-input guard (unreleased)
+
+`createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` is an
+Experimental opt-in boundary; it is not in npm 0.5.4. Pass `inputSchemas`
+instead of separate `schemas` or `validators`; mixing these registrations
+throws at construction, including through a JavaScript object spread.
+`takeDecision()` returns a
+union of registered tool names and their schema-inferred argument types.
+Narrowing `authority.name` also narrows `authority.value` for that tool.
+Schemas with no Standard Schema type metadata retain the `JsonValue` type.
+
+Successful validation must return JSON structurally equal to the original
+raw input. Object key order and reference identity do not matter. Coercions,
+defaults, stripped properties and other changes produce `schema_invalid`;
+non-JSON outputs cannot become typed raw arguments. Validation receives a
+copy so mutating transforms cannot change the comparison's raw input.
+Validation remains trusted, deterministic and free of external side effects.
+Only synchronous validation is supported. Unregistered names receive no
+authority and an `E_UNREGISTERED_TOOL` diagnostic on `finish()`.
+
+Snapshots and `finish()` remain untyped observations; consume authority
+through `takeDecision()` after draining the stream. The existing untyped
+guard, gate, validator interface and `fromStandardSchema` transformation
+policy are unchanged. See the [packed TypeScript agent-loop example](../examples/typed-agent-loop/)
+for a complete caller-owned continuation and its tested limits.
+
 ## JSON Schema / Ajv
 
 Passing a raw JSON Schema object via `toolSchemas`/`schemas` works

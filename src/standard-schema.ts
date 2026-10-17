@@ -9,3 +9,10 @@
 // ---------------------------------------------------------------------------
 
 export { fromStandardSchema } from "./validation/standard-schema-validator.js";
+export { createTypedAiSdkExecutionGuard } from "./guard/typed-ai-sdk.js";
+export type {
+  ToolInputSchemas,
+  TypedExecuteDecision,
+  TypedAiSdkExecutionGuard,
+  TypedAiSdkExecutionGuardOptions,
+} from "./guard/typed-ai-sdk.js";

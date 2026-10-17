@@ -8,6 +8,16 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Added
+
+- Experimental `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` infers registered tool names and argument types. Its synchronous Standard Schema validators must preserve the raw JSON value; transformations, defaults and stripped keys fail closed, and unregistered tools receive no authority. The existing untyped guard and validation-only adapter retain their behavior.
+- A strict TypeScript, packed-package agent-loop example checks caller-owned dispatch, matching result IDs and model continuation, plus refused token-limit/duplicate-ID batches, cancellation and tool failure without automatic retries.
+
+### Fixed
+
+- The README's published-API example explicitly narrows raw arguments through its strict Zod schema, so copying it into TypeScript no longer requires an unchecked cast.
+- Asynchronous Standard Schema validation remains unsupported, but rejected promises are observed before synchronous refusal to prevent an unhandled rejection.
+
 ## [0.5.4] - 2026-10-16
 
 ### Added
