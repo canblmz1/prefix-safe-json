@@ -5,8 +5,10 @@ saved raw HTTP/SSE response bytes through your installed AI SDK and provider,
 records harmless counter executions, and checks a reviewed expectation file.
 It makes no model requests and invokes no application tools.
 
-This package is private and unpublished. It is not part of the PSJ 0.6.1
-runtime tarball. Node 22+ is required. The first protocol is OpenAI-compatible
+Version 0.1.0 is an experimental preview distributed as a
+[GitHub release tarball](https://github.com/canblmz1/prefix-safe-json/releases/tag/psj-regression-v0.1.0).
+It is not published on the npm registry or part of the PSJ 0.6.1 runtime
+tarball. Node 22+ is required. The first protocol is OpenAI-compatible
 Chat Completions SSE with AI SDK 7 and `@ai-sdk/openai-compatible` 3.
 
 ## What it checks
@@ -28,7 +30,23 @@ Replaying only old decoded SDK events cannot exercise an upgraded SDK parser.
 This harness instead passes the same transport bytes through the installed
 `@ai-sdk/openai-compatible` SSE parser and `ai.streamText()` on every run.
 
-## Build and try the unpublished package
+## Install the preview
+
+In an AI SDK 7 application with the supported peers installed:
+
+```bash
+npm install --save-dev --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-regression-v0.1.0/psj-regression-0.1.0.tgz
+npm exec --offline -- psj-regression doctor --json
+npm exec --offline -- psj-regression init --out ./tool-regression
+npm exec --offline -- psj-regression check ./tool-regression/suite.json --expect ./tool-regression/expected.json
+```
+
+The release includes `SHA256SUMS` for independent download verification.
+Commit the application lockfile so the tarball integrity and peer versions
+remain pinned. `private: true` prevents accidental npm publication; it does
+not prevent installing this development dependency from the release URL.
+
+## Build from source
 
 From this directory:
 
@@ -55,7 +73,7 @@ Peers are `ai >=7.0.77 <8`, `@ai-sdk/openai-compatible >=3 <4` and
 `prefix-safe-json >=0.6.0 <0.7`. Keep these application-owned versions pinned
 and review the versions printed by `doctor`. The development lockfile uses
 AI SDK 7.0.143, provider 3.0.71 and published PSJ 0.6.0. CI also installs the
-core candidate tarball; it does not publish either package.
+core candidate tarball. The companion has a separate GitHub preview release.
 
 ## A small incident-to-regression workflow
 

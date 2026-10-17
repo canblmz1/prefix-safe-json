@@ -126,8 +126,9 @@ checkout without model requests or tool dispatch.
 To test an SDK upgrade with original HTTP/SSE bytes, use the separate
 [experimental regression development package](packages/regression/README.md).
 It checks actual installed SDK inputs, harmless effects and paired results
-in CI. The companion is private and unpublished; it is not an installed
-command in the PSJ runtime package.
+in CI. Install its [experimental preview tarball](https://github.com/canblmz1/prefix-safe-json/releases/tag/psj-regression-v0.1.0)
+as a development dependency; it is distributed separately from the PSJ
+runtime package.
 
 ## Run a standalone npm demo
 
