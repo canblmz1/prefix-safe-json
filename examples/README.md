@@ -1,5 +1,10 @@
 # Installed-package trials
 
+For typed argument inference and a complete caller-owned tool-result-to-model
+loop, use the [TypeScript agent-loop example](typed-agent-loop/) with PSJ
+`0.6.0`, AI SDK `7.0.143` and Zod `4.4.3`. It checks five authored scenarios.
+The six earlier SDK trials below retain their published `0.5.4` pins.
+
 These examples require Node 22+ and npm. Each directory installs the PSJ
 version pinned in its manifest in an independent project and uses a mock transport or
 mock model. No API key, model server or repository build is needed.

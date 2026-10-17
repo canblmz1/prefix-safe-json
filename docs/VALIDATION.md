@@ -266,10 +266,10 @@ match the arguments they actually execute. This adapter is not, and does
 not claim to be, a replacement for a project's normal parsing/
 transformation pipeline.
 
-### Typed raw-input guard (unreleased)
+### Typed raw-input guard
 
 `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` is an
-Experimental opt-in boundary; it is not in npm 0.5.4. Pass `inputSchemas`
+Experimental opt-in boundary added in 0.6.0. Pass `inputSchemas`
 instead of separate `schemas` or `validators`; mixing these registrations
 throws at construction, including through a JavaScript object spread.
 `takeDecision()` returns a

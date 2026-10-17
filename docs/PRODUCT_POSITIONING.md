@@ -122,7 +122,7 @@ what a first-time reader should have to choose between:
 | Surface | Examples | Classification |
 | --- | --- | --- |
 | High-level guard | `createAiSdkExecutionGuard`, `createAiSdkExecutionLock` | **CORE** — the recommended entry point for AI SDK users |
-| Typed input guard (unreleased) | `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` | **INTEGRATION / EXPERIMENTAL** — opt-in synchronous schema inference; requires unchanged raw JSON values and caller-owned dispatch |
+| Typed input guard (0.6.0+) | `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` | **INTEGRATION / EXPERIMENTAL** — opt-in synchronous schema inference; requires unchanged raw JSON values and caller-owned dispatch |
 | Execution gate | `createToolCallExecutionGate` | **CORE** — the recommended entry point for every other provider |
 | Provider adapters | `OpenAIStreamAdapter`, `AnthropicStreamAdapter`, `GeminiStreamAdapter`, `OpenRouterStreamAdapter`, `OpenAICompatibleStreamAdapter`, `AiSdkStreamAdapter` | **INTEGRATION** — what the gate composes with per provider |
 | Validation (schemas) | `toolSchemas`/`schemas` option (raw JSON Schema) | **CORE** — unchanged pre-0.5 behavior, Stable |
