@@ -5,7 +5,8 @@ It compiles strict TypeScript against the installed package, not repository
 source imports. Node 22+ and npm are required. It needs no API key or model
 server; the installed AI SDK uses authored model fixtures and memory counters.
 
-Copy this directory outside the repository, then run:
+Download and extract the [0.6.0 example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+or copy this directory outside the repository, then run:
 
 ```bash
 npm install --engine-strict --no-audit --no-fund
