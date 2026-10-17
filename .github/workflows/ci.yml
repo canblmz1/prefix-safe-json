@@ -283,6 +283,7 @@ jobs:
           cp examples/typed-agent-loop/package.json examples/typed-agent-loop/tsconfig.json examples/typed-agent-loop/demo.mts examples/typed-agent-loop/check-readme.mjs "$PSJ_TYPED_DIR/"
           cp prefix-safe-json-smoke.tgz "$PSJ_TYPED_DIR/prefix-safe-json-candidate.tgz"
           cd "$PSJ_TYPED_DIR"
+          npm pkg set 'dependencies.prefix-safe-json=file:./prefix-safe-json-candidate.tgz'
           npm install --engine-strict --no-audit --no-fund
           npm ls prefix-safe-json ai zod typescript
           npm run check

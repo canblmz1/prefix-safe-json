@@ -100,11 +100,11 @@ can remove callbacks from its tool definitions, but the raw-stream guard recipe
 requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
 See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
 
-## Typed AI SDK input guard (unreleased)
+## Typed AI SDK input guard (0.6.0)
 
 `createTypedAiSdkExecutionGuard` is Experimental and available from
-`prefix-safe-json/standard-schema` in the development candidate, not npm
-0.5.4. Its packed strict TypeScript consumer uses `ai@7.0.143`, Zod `4.4.3`
+`prefix-safe-json/standard-schema` starting in 0.6.0. Its packed strict
+TypeScript consumer uses `ai@7.0.143`, Zod `4.4.3`
 and Node 22+. Five authored scenarios check a caller-owned two-request loop,
 refused token-limit/duplicate-ID batches, cancellation before generation and
 tool failure without retries. They do not imply live-model, UI or production

@@ -1,22 +1,30 @@
-# Typed, caller-owned agent loop (unreleased)
+# Typed, caller-owned agent loop
 
-This example uses a new Experimental API that is not in npm `0.5.4`.
-It compiles strict TypeScript against a packed candidate, not repository
+This example uses an Experimental API added in PSJ `0.6.0`.
+It compiles strict TypeScript against the installed package, not repository
 source imports. Node 22+ and npm are required. It needs no API key or model
 server; the installed AI SDK uses authored model fixtures and memory counters.
 
-From the PSJ repository root:
+Copy this directory outside the repository, then run:
+
+```bash
+npm install --engine-strict --no-audit --no-fund
+npm start
+```
+
+To test an unpublished candidate, run from the PSJ repository root:
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm build
 pnpm pack --out examples/typed-agent-loop/prefix-safe-json-candidate.tgz
+npm --prefix examples/typed-agent-loop pkg set dependencies.prefix-safe-json=file:./prefix-safe-json-candidate.tgz
 npm --prefix examples/typed-agent-loop install --engine-strict --no-audit --no-fund
 npm --prefix examples/typed-agent-loop run check
 npm --prefix examples/typed-agent-loop start
 ```
 
-CI copies these sources and the actual tarball to an empty consumer directory
+CI substitutes the actual tarball into an empty consumer directory
 before installing. No workspace aliases or source imports are used.
 
 | Scenario | Model requests | Successful effects | Result |

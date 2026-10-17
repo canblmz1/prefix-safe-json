@@ -8,6 +8,8 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-17
+
 ### Added
 
 - Experimental `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` infers registered tool names and argument types. Its synchronous Standard Schema validators must preserve the raw JSON value; transformations, defaults and stripped keys fail closed, and unregistered tools receive no authority. The existing untyped guard and validation-only adapter retain their behavior.
