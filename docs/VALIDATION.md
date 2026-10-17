@@ -270,7 +270,9 @@ transformation pipeline.
 
 `createTypedAiSdkExecutionGuard` in `prefix-safe-json/standard-schema` is an
 Experimental opt-in boundary; it is not in npm 0.5.4. Pass `inputSchemas`
-instead of separate `schemas` or `validators`. `takeDecision()` returns a
+instead of separate `schemas` or `validators`; mixing these registrations
+throws at construction, including through a JavaScript object spread.
+`takeDecision()` returns a
 union of registered tool names and their schema-inferred argument types.
 Narrowing `authority.name` also narrows `authority.value` for that tool.
 Schemas with no Standard Schema type metadata retain the `JsonValue` type.

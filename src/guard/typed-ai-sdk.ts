@@ -45,6 +45,11 @@ export interface TypedAiSdkExecutionGuardOptions<TSchemas extends ToolInputSchem
 export function createTypedAiSdkExecutionGuard<const TSchemas extends ToolInputSchemas>(
   options: TypedAiSdkExecutionGuardOptions<TSchemas>,
 ): TypedAiSdkExecutionGuard<TSchemas> {
+  // Extra properties survive structural typing and object spreads. Never
+  // silently ignore a caller's additional validation policy at runtime.
+  if ("schemas" in options || "validators" in options) {
+    throw new Error("createTypedAiSdkExecutionGuard: use inputSchemas only; schemas and validators cannot be combined with the typed guard.");
+  }
   // Snapshot the registry: later caller mutations cannot change which names
   // are allowed without changing the validators already held by the gate.
   const validators = Object.fromEntries(Object.entries(options.inputSchemas).map(

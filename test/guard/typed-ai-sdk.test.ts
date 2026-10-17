@@ -21,6 +21,12 @@ function run(inputSchema: typeof schema | z.ZodType, input: string, reason = "to
 }
 
 describe("typed raw-input guard", () => {
+  it.each(["schemas", "validators"])("refuses an extra %s policy instead of silently ignoring it", key => {
+    // Object spreads/variables can legally carry additional fields in TS.
+    const options = { inputSchemas: { write_file: schema }, [key]: { write_file: {} } };
+    expect(() => createTypedAiSdkExecutionGuard(options)).toThrow(/use inputSchemas only/);
+  });
+
   it("infers the registered tool's input fields and consumes authority once", () => {
     const guard = createTypedAiSdkExecutionGuard({ inputSchemas: { write_file: schema } });
     for (const part of call()) guard.push(part);
