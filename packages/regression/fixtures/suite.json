@@ -1,0 +1,124 @@
+{
+  "formatVersion": 1,
+  "protocol": "openai-chat-completions-sse",
+  "tools": {
+    "record": {
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "result": {
+        "recorded": true
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "complete",
+      "positiveControl": true,
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "complete.sse",
+          "chunkBytes": 13
+        },
+        {
+          "body": "answer.sse",
+          "chunkBytes": 7
+        }
+      ]
+    },
+    {
+      "id": "interleaved",
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "interleaved.sse",
+          "chunkBytes": 13
+        },
+        {
+          "body": "answer.sse",
+          "chunkBytes": 7
+        }
+      ]
+    },
+    {
+      "id": "token-limit",
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "length.sse",
+          "chunkBytes": 13
+        }
+      ]
+    },
+    {
+      "id": "duplicate-id",
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "duplicate.sse",
+          "chunkBytes": 13
+        },
+        {
+          "body": "answer.sse",
+          "chunkBytes": 7
+        }
+      ]
+    },
+    {
+      "id": "missing-terminal",
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "missing-terminal.sse",
+          "chunkBytes": 13
+        },
+        {
+          "body": "answer.sse",
+          "chunkBytes": 7
+        }
+      ]
+    },
+    {
+      "id": "malformed-arguments",
+      "provenance": {
+        "classification": "authored",
+        "note": "Synthetic raw-transport regression control; not a production incident."
+      },
+      "responses": [
+        {
+          "body": "malformed.sse",
+          "chunkBytes": 13
+        },
+        {
+          "body": "answer.sse",
+          "chunkBytes": 7
+        }
+      ]
+    }
+  ]
+}

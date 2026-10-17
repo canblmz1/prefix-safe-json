@@ -13,15 +13,19 @@ Extract it, enter `examples/npm-consumer`, install with npm and run
 From a repository checkout with Node 22+ and npm:
 
 ```bash
-node scripts/try-npm-demo.mjs
+node scripts/try-npm-demo.mjs ai-sdk
 ```
 
-The launcher creates an isolated project using published PSJ `0.5.2` and
+The current launcher creates an isolated project using published PSJ `0.5.4` and
 `ai@7.0.77`. After the original five cases and the batch comparison, it runs
 `npm run identity`. To rerun only this comparison, use that command in the
 retained consumer directory. You can also copy all files from
 [`examples/npm-consumer/`](../examples/npm-consumer/) into a separate project,
 install its pinned dependencies and run `npm run identity` there.
+
+The earlier dated ZIP retains its original package pins. The current
+launcher's default `typed` choice is a separate full-loop trial; select
+`ai-sdk` explicitly to run this native/PSJ identity comparison.
 
 ## Expected result
 

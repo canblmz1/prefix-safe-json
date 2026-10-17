@@ -3,60 +3,68 @@
 Start with a harmless tool in a development branch. The first useful result is
 one complete call that runs once and one interrupted call that does not run.
 
-## Check the published demo
+## Check whether this fits your boundary
 
-Without a checkout, download the
-[six-SDK trial ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip)
-and extract it. From the extracted directory, run
-`node scripts/try-npm-demo.mjs tanstack`, or choose `ai-sdk`, `openai`,
-`anthropic`, `langchain` or `openrouter`. Every example installs published
-PSJ `0.5.4`. The ZIP contains example sources, the launcher and licenses;
-it downloads the package and SDK dependencies from npm and needs no API key.
-The earlier dated trial downloads remain unchanged.
+Before installing, check three things:
 
-With Node 22+ and npm available, run from this checkout:
+1. Can you read original argument deltas and the provider's final completion
+   reason? A parsed tool-call object alone is insufficient.
+2. Can you prevent the SDK or framework from running the tool before your
+   application has checked the stream? A guard added after dispatch is too late.
+3. Does your application need a check beyond its current native behavior?
+   Run the failure you care about through that behavior first.
+
+If the original events or a pre-execution hook are unavailable, use the
+framework's native fix or first add that hook. Do not reconstruct raw
+argument evidence by serializing an already parsed object. If the native
+behavior already meets your needs, PSJ may add no value for that case.
+
+## Run the complete published example
+
+With Node 22+ and npm, run from a current checkout:
 
 ```bash
 node scripts/try-npm-demo.mjs
 ```
 
-This installs the pinned published packages in a new temporary directory,
-prints the installed versions, and runs the standalone demo. It needs no API
-key or repository dependencies. The directory stays available for editing and
-rerunning. Installation requires access to the npm registry.
+The default `typed` choice creates a separate temporary directory and installs
+published PSJ `0.6.0`, AI SDK `7.0.143` and Zod `4.4.3`. No repository
+development dependencies, API key or model server are required. npm registry
+access is needed; the directory is retained for editing.
 
-For the official Anthropic SDK, run `node scripts/try-npm-demo.mjs anthropic`.
-The [Anthropic consumer trial](../examples/anthropic-consumer/README.md) checks
-effects **1 / 0 / 0 / 0 / 0**, including complete JSON at a token limit and EOF
-after stop-reason metadata but before `message_stop`. For the installed
-LangChain comparison, run `node scripts/try-npm-demo.mjs langchain`.
+Without a checkout, download and extract the
+[0.6.0 TypeScript loop ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+then run `npm install --engine-strict --no-audit --no-fund` and `npm start`.
+The [example README](../examples/typed-agent-loop/README.md) explains its policy.
 
-For OpenAI Chat Completions or a compatible endpoint, run
-`node scripts/try-npm-demo.mjs openai`. The
-[OpenAI consumer trial](../examples/openai-consumer/README.md) checks termination,
-identity and late argument evidence through the installed official SDK. It also
-demonstrates a limit: complete JSON plus a falsely successful server terminal
-still grants authority; PSJ cannot reconstruct the hidden upstream stop reason.
+| Authored scenario | Expected result |
+| --- | --- |
+| Complete input and distinct IDs | Two authorized effects, paired results in the second model request, final answer |
+| Complete JSON with token-limit termination | Zero effects and no continuation request |
+| Duplicate call IDs | Zero effects and no continuation request |
+| Cancelled before generation | Zero model requests and zero effects |
+| First tool throws | One attempted effect; no automatic retry or continuation |
 
-Expected effect counts, in scenario order: **1 / 0 / 0 / 0 / 1**. The third
-scenario has complete, schema-valid JSON but ends with a token-limit reason;
-the tool must still not run. All SDK callbacks stay at zero, and consuming an
-execution decision a second time produces no authority.
+These fixtures verify the full caller-owned loop. They do not establish
+integration in your application or compatibility with your live provider.
 
-The AI SDK launcher then runs the interleaved batch check: effects **2 / 0**
-for two complete calls and for a token-limited step containing a complete call
-plus a truncated call. A completed call inside that interrupted step must not
-run. You can rerun that comparison with `npm run batch` in the retained
-temporary project. Application retry policy and UI state remain caller-owned.
+## Compare another SDK
 
-The demo uses a mock provider. Running it alone does not establish integration
-in your project or compatibility with your live provider.
+Pass `ai-sdk`, `openai`, `anthropic`, `langchain`, `openrouter` or
+`tanstack` to the launcher for an SDK-specific trial. Those six earlier
+trials retain published PSJ `0.5.4`; exact SDK versions and limitations are
+listed in the [trial index](../examples/README.md).
 
-The launcher also runs `npm run identity`: native / PSJ effect counts are
-**2 / 2** for two distinct IDs and **2 / 0** for two complete calls sharing
-an ID. Unlike the locked cases, its native control intentionally executes
-harmless counters. The [identity trial](IDENTITY_TRIAL.md) explains when this
-demonstrates an additional check and when your provider already resolves IDs.
+For example, `node scripts/try-npm-demo.mjs ai-sdk` runs the original five
+single-step checks, the interleaved batch check, and a native/PSJ identity
+comparison. Distinct IDs have native/PSJ effect counts **2 / 2**; duplicate
+IDs have **2 / 0**. The [identity trial](IDENTITY_TRIAL.md) explains the
+original-event boundary. Native behavior that already refuses token limits
+is useful independently of PSJ.
+
+The [six-SDK ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip)
+retains its original launcher and six choices. It does not include the newer
+`typed` trial. Earlier dated downloads keep their original sources and pins.
 
 ## Connect your existing AI SDK stream
 
@@ -65,6 +73,20 @@ with your own model, prompt, and a harmless tool. Keep the same schema in the
 tool definition and guard validator. Pass the locked tools to `streamText()`;
 feed every `fullStream` part to the guard, drain the stream, then dispatch only
 from `takeDecision().value` when authority is present.
+
+This changes the execution flow: move the tool's effect out of SDK callbacks,
+consume authority after the stream ends, then send each accepted result with
+its original `toolCallId` into your application's next model request. Merely
+locking callbacks and draining the stream does not continue an agent.
+Copy the [complete loop](../examples/typed-agent-loop/demo.mts) if you need
+that continuation; the README's shorter example handles one stream only.
+
+The example requires every call in a batch to have authority before starting
+effects. That is a caller policy, not a rollback transaction. Keep your own
+timeout, cancellation, retry, persistence and result-serialization policies.
+The typed guard accepts synchronous Standard Schema validators that preserve
+the original JSON structure; transforms, inserted defaults and removed keys
+are refused. Strict Zod objects are a suitable starting point.
 
 Replace the example's file write with an in-memory counter for the first test.
 Do not attach your real side effect to the SDK's `execute` or input callbacks.

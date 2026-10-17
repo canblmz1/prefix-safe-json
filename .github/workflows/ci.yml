@@ -300,6 +300,38 @@ jobs:
           npm ls prefix-safe-json @langchain/openai @langchain/core
           npm start
 
+      - name: Test the offline SDK regression companion
+        run: |
+          npm ci --prefix packages/regression --ignore-scripts --no-audit --no-fund
+          npm --prefix packages/regression test
+
+      - name: Verify installed regression CLI against application-owned SDK versions
+        run: |
+          PSJ_SOURCE_DIR="$PWD"
+          PSJ_REGRESSION_PACK_DIR=$(mktemp -d)
+          (cd packages/regression && npm pack --pack-destination "$PSJ_REGRESSION_PACK_DIR")
+          for PSJ_AI_VERSION in 7.0.77 7.0.143; do
+            PSJ_REGRESSION_CONSUMER=$(mktemp -d)
+            (
+              cd "$PSJ_REGRESSION_CONSUMER"
+              npm init -y
+              npm install --save-dev --ignore-scripts --engine-strict --no-audit --no-fund \
+                "ai@$PSJ_AI_VERSION" "@ai-sdk/openai-compatible@3.0.71" \
+                "prefix-safe-json@file:$PSJ_SOURCE_DIR/prefix-safe-json-smoke.tgz" \
+                "psj-regression@file:$PSJ_REGRESSION_PACK_DIR/psj-regression-0.1.0.tgz"
+              npm exec --offline -- psj-regression doctor --json
+              npm exec --offline -- psj-regression init --out ./tool-regression
+              npm exec --offline -- psj-regression check tool-regression/suite.json --expect tool-regression/expected.json --json > report.json
+              PSJ_EXPECT_AI="$PSJ_AI_VERSION" node --input-type=module -e '
+                import {readFileSync} from "node:fs";
+                const report = JSON.parse(readFileSync("report.json", "utf8"));
+                if (report.versions.ai !== process.env.PSJ_EXPECT_AI || report.expectations.pass !== true) {
+                  throw new Error("The installed peer version or regression verdict was wrong");
+                }
+              '
+            )
+          done
+
       - name: Run the official Anthropic SDK trial against the packed candidate
         run: |
           PSJ_ANTHROPIC_DIR=$(mktemp -d)

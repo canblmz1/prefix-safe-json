@@ -1,0 +1,2 @@
+# Blank lines terminate SSE events and must remain in captured byte streams.
+fixtures/*.sse -text whitespace=-blank-at-eof
