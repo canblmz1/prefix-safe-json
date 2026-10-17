@@ -210,6 +210,15 @@
       "since": "2026-10-17T11:52:17Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "vierisid/jarvis",
+      "number": 1097,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/vierisid/jarvis/issues/1097",
+      "since": "2026-10-17T12:57:30Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
