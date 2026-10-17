@@ -167,7 +167,13 @@
       "invitationUrl": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092",
       "since": "2026-10-15T09:58:50Z",
       "purpose": "native-validation",
-      "reviewedResponses": []
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092#issuecomment-6235264006",
+          "bodySha256": "13a63785fd0af88297396148a46f209f166d61a1dcf573416dcac5557072a932",
+          "classification": "upstream-native-fix-merged-release-pending-not-psj-adoption"
+        }
+      ]
     },
     {
       "repository": "sandbaseai/sandbase-harness",

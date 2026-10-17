@@ -7,6 +7,11 @@ import process from "node:process";
 import console from "node:console";
 
 const demos = {
+  typed: {
+    directory: "typed-agent-loop",
+    packages: ["ai", "zod"],
+    files: ["demo.mts", "tsconfig.json", "check-readme.mjs"],
+  },
   "ai-sdk": { directory: "npm-consumer", packages: ["ai", "zod"], batch: true },
   anthropic: { directory: "anthropic-consumer", packages: ["@anthropic-ai/sdk"] },
   openai: { directory: "openai-consumer", packages: ["openai"] },
@@ -14,9 +19,9 @@ const demos = {
   tanstack: { directory: "tanstack-consumer", packages: ["@tanstack/ai", "@tanstack/ai-openrouter", "@openrouter/sdk", "zod"] },
   langchain: { directory: "langchain-consumer", packages: ["@langchain/openai", "@langchain/core"] },
 };
-const selected = process.argv[2] ?? "ai-sdk";
+const selected = process.argv[2] ?? "typed";
 if (process.argv.length > 3 || !Object.hasOwn(demos, selected)) {
-  console.error("Usage: node scripts/try-npm-demo.mjs [ai-sdk|anthropic|openai|openrouter|tanstack|langchain]");
+  console.error("Usage: node scripts/try-npm-demo.mjs [typed|ai-sdk|anthropic|openai|openrouter|tanstack|langchain]");
   process.exit(1);
 }
 const demo = demos[selected];
@@ -28,7 +33,7 @@ if (Number(process.versions.node.split(".")[0]) < 22) {
 
 const consumer = await mkdtemp(join(tmpdir(), "psj-demo-"));
 console.log(`Installing the published ${selected} demo in ${consumer}`);
-for (const file of ["package.json", "demo.mjs", ...(demo.batch ? ["batch-demo.mjs", "identity-demo.mjs"] : [])]) {
+for (const file of ["package.json", ...(demo.files ?? ["demo.mjs"]), ...(demo.batch ? ["batch-demo.mjs", "identity-demo.mjs"] : [])]) {
   await copyFile(new URL(`../examples/${demo.directory}/${file}`, import.meta.url), join(consumer, file));
 }
 

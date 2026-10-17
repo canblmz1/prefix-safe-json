@@ -5,6 +5,18 @@ loop, use the [TypeScript agent-loop example](typed-agent-loop/) with PSJ
 `0.6.0`, AI SDK `7.0.143` and Zod `4.4.3`. It checks five authored scenarios.
 The six earlier SDK trials below retain their published `0.5.4` pins.
 
+From a current checkout, the default command runs the typed loop in a new
+temporary project:
+
+```bash
+node scripts/try-npm-demo.mjs
+```
+
+Pass `typed` explicitly for the same trial. The complete control makes two
+model requests, dispatches both authorized calls and returns a final answer.
+The other four scenarios cover token limits, duplicate IDs, cancellation and
+a tool error. These are authored fixtures, not live model requests.
+
 These examples require Node 22+ and npm. Each directory installs the PSJ
 version pinned in its manifest in an independent project and uses a mock transport or
 mock model. No API key, model server or repository build is needed.

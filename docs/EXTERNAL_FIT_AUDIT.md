@@ -116,6 +116,15 @@ was restored; the [upstream validation request](https://github.com/jagreehal/ai-
 contains the executable native reproducer. No live Ollama or whole-repository
 provider test was run.
 
+On 2026-10-17, the [provider maintainer confirmed the reproducer](https://github.com/jagreehal/ai-sdk-ollama/issues/1092#issuecomment-6235264006)
+on both `streamText()` and `generateText()`, and reported that the correction
+preserves the normal control while preventing token-limited dispatch.
+[PR #1093](https://github.com/jagreehal/ai-sdk-ollama/pull/1093) merged at
+`cc1d4f7cecad793cae021409022e542b4b4a6ce0` with a regression test. The
+maintainer stated that the fix would ship in the next patch release; npm
+publication of that correction was not verified at this check. This is
+independent validation of the native provider defect and fix, not PSJ adoption.
+
 The locked PSJ comparison produced **0 / 0** effects and no call decisions,
 including for normal completion. This provider emits a final `tool-call`
 projection from an already parsed argument object, without the original
