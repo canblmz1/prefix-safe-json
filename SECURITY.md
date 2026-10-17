@@ -7,8 +7,9 @@ Report vulnerabilities through GitHub's private reporting form:
 https://github.com/canblmz1/prefix-safe-json/security/advisories/new
 
 Do not open a public issue containing exploit details before coordinated
-disclosure. If the private form is unavailable, contact the maintainer through
-the GitHub profile without including sensitive reproduction details publicly.
+disclosure. If the private form is unavailable, email the maintainer at
+[canbilmez433@gmail.com](mailto:canbilmez433@gmail.com). This is also the
+primary contact for the project's OSS Scanner enrollment.
 
 Reports should include the affected version, impact, reproduction steps, and
 any suggested mitigation. The maintainer will acknowledge the report when
