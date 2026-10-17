@@ -219,6 +219,15 @@
       "since": "2026-10-17T12:57:30Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "mangfufu/director-desk",
+      "number": 8,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/mangfufu/director-desk/issues/8",
+      "since": "2026-10-17T13:19:29Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
