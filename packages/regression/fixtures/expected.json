@@ -1,0 +1,247 @@
+{
+  "formatVersion": 1,
+  "cases": [
+    {
+      "id": "complete",
+      "native": {
+        "requests": 2,
+        "executions": [
+          {
+            "toolCallId": "call_a",
+            "name": "record",
+            "input": {
+              "message": "alpha"
+            }
+          }
+        ],
+        "toolResultIds": [
+          "call_a"
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 0
+      },
+      "guarded": {
+        "requests": 2,
+        "executions": [
+          {
+            "toolCallId": "call_a",
+            "name": "record",
+            "input": {
+              "message": "alpha"
+            }
+          }
+        ],
+        "toolResultIds": [
+          "call_a"
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 0,
+        "decisions": [
+          {
+            "action": "execute",
+            "reason": "complete",
+            "name": "record",
+            "toolCallId": "call_a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "interleaved",
+      "native": {
+        "requests": 2,
+        "executions": [
+          {
+            "toolCallId": "call_a",
+            "name": "record",
+            "input": {
+              "message": "alpha"
+            }
+          },
+          {
+            "toolCallId": "call_b",
+            "name": "record",
+            "input": {
+              "message": "beta"
+            }
+          }
+        ],
+        "toolResultIds": [
+          "call_a",
+          "call_b"
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 0
+      },
+      "guarded": {
+        "requests": 2,
+        "executions": [
+          {
+            "toolCallId": "call_a",
+            "name": "record",
+            "input": {
+              "message": "alpha"
+            }
+          },
+          {
+            "toolCallId": "call_b",
+            "name": "record",
+            "input": {
+              "message": "beta"
+            }
+          }
+        ],
+        "toolResultIds": [
+          "call_a",
+          "call_b"
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 0,
+        "decisions": [
+          {
+            "action": "execute",
+            "reason": "complete",
+            "name": "record",
+            "toolCallId": "call_a"
+          },
+          {
+            "action": "execute",
+            "reason": "complete",
+            "name": "record",
+            "toolCallId": "call_b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "token-limit",
+      "native": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 0
+      },
+      "guarded": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 0,
+        "decisions": [
+          {
+            "action": "retry",
+            "reason": "stream_incomplete",
+            "name": "record",
+            "toolCallId": "call_a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-id",
+      "native": {
+        "requests": 2,
+        "executions": [
+          {
+            "toolCallId": "call_a",
+            "name": "record",
+            "input": {
+              "message": "alpha"
+            }
+          },
+          {
+            "toolCallId": {
+              "sdkAssigned": 1
+            },
+            "name": "record",
+            "input": {
+              "message": "beta"
+            }
+          }
+        ],
+        "toolResultIds": [
+          "call_a",
+          {
+            "sdkAssigned": 1
+          }
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 0
+      },
+      "guarded": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 0,
+        "decisions": [
+          {
+            "action": "reject",
+            "reason": "protocol_violation",
+            "name": "record",
+            "toolCallId": "call_a"
+          },
+          {
+            "action": "reject",
+            "reason": "protocol_violation",
+            "name": "record",
+            "toolCallId": "call_a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing-terminal",
+      "native": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 1
+      },
+      "guarded": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 1,
+        "decisions": [
+          {
+            "action": "retry",
+            "reason": "stream_incomplete",
+            "name": "record",
+            "toolCallId": "call_a"
+          }
+        ]
+      }
+    },
+    {
+      "id": "malformed-arguments",
+      "native": {
+        "requests": 2,
+        "executions": [],
+        "toolResultIds": [
+          "call_a"
+        ],
+        "finalText": "Recorded α and β.",
+        "errorCount": 1
+      },
+      "guarded": {
+        "requests": 1,
+        "executions": [],
+        "toolResultIds": [],
+        "finalText": "",
+        "errorCount": 1,
+        "decisions": [
+          {
+            "action": "retry",
+            "reason": "truncated",
+            "name": "record",
+            "toolCallId": "call_a"
+          }
+        ]
+      }
+    }
+  ]
+}
