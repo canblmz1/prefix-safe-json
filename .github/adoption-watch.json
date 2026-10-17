@@ -194,6 +194,21 @@
       "invitationUrl": "https://github.com/nbonamy/multi-llm-ts/issues/29",
       "since": "2026-10-16T18:54:56Z",
       "purpose": "psj-project-trial",
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/nbonamy/multi-llm-ts/issues/29#issuecomment-6226621249",
+          "bodySha256": "7f9386f4414698b3fc87abb47faf4cec6b8ebc7da5cf39ed7031de575b2070a6",
+          "classification": "upstream-native-fix-published-not-psj-adoption"
+        }
+      ]
+    },
+    {
+      "repository": "havingautism/Codemini-CLI",
+      "number": 53,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/havingautism/Codemini-CLI/issues/53",
+      "since": "2026-10-17T11:52:17Z",
+      "purpose": "psj-project-trial",
       "reviewedResponses": []
     }
   ]
