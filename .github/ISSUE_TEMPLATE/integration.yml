@@ -33,7 +33,7 @@ body:
     attributes:
       label: Versions and stream boundary
       description: Node, prefix-safe-json, provider or SDK version; fullStream or raw provider events.
-      placeholder: "Node 22; prefix-safe-json 0.5.1; ai 7.0.77; streamText().fullStream"
+      placeholder: "Node 22; prefix-safe-json 0.6.1; ai/provider versions; caller-owned fullStream or psj-ai-sdk preview"
     validations:
       required: true
   - type: textarea
@@ -48,3 +48,8 @@ body:
     attributes:
       label: Evidence
       description: Optional commit, test, or redacted output showing your own integration. A maintainer may ask for clarification before recording adoption.
+  - type: textarea
+    id: continued_use
+    attributes:
+      label: Would you keep using it?
+      description: Did you keep it in normal development or CI? If you reran it after an SDK update or another incident, link that run. If you removed it, what made it unnecessary? Intent and repeated use are tracked separately.
