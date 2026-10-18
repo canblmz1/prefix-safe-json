@@ -276,6 +276,15 @@
       "since": "2026-10-18T21:37:36Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "rarebit-one/harness-kernel",
+      "number": 76,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6255777258",
+      "since": "2026-10-18T22:11:08Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }

@@ -71,7 +71,7 @@ has yet been confirmed.
 
 ## Phoronis: a provider upgrade changes greeting-call identity
 
-[Draft PR 12](https://github.com/skrylnikov/Phoronis-tg-bot/pull/12)
+[Evaluation PR 12](https://github.com/skrylnikov/Phoronis-tg-bot/pull/12)
 adds twelve authored SSE cases beside the existing mocked-SDK greeting tests.
 The actual `chatGeneration` function and its inline administrator check run;
 the Telegram API and repository are harmless spies. No production import or
@@ -108,6 +108,41 @@ maintainer's fork remains operator verification.
 
 The PR asks whether the original-response checks justify retaining a development
 dependency in ordinary provider upgrades. Independent use remains unconfirmed.
+
+## harness-kernel: an existing consumer reports lost response evidence
+
+The maintainer's [finishReason issue](https://github.com/rarebit-one/harness-kernel/issues/76)
+reports a consumer receiving a length-limited response as an ordinary turn and
+cut-off tool arguments as `{}`. That is independent problem evidence, not
+interest in PSJ or confirmation of its use.
+
+The [targeted evaluation invitation](https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6255777258)
+provides a [four-file runnable comparison](https://gist.github.com/canblmz1/df6707aaa4c3cf53813b2865c3e99c41).
+It installs published `@rarebit-one/harness-kernel@0.10.0` and PSJ 0.6.1;
+OpenAI SDK 7.38.0 is locked. Its unchanged compatible provider, actual SDK
+parser and `runAgent` execute against authored non-streaming JSON responses.
+The tool is an in-memory counter, and a global-fetch replacement prevents live
+model calls. No kernel source is patched or copied.
+
+All 16 paired cases pass after frozen installation on Node 22.23.2. Healthy
+controls call once, retain the original result ID in the next provider request
+and reach the final answer. The native length-limited, malformed, duplicate-key,
+schema-invalid and missing-finish cases each call once; a malformed sibling and
+duplicate original IDs each call twice. The compared policy releases zero
+`tool.called` events or continuation requests for those batches. Native malformed
+arguments become `{}`; duplicate argument keys retain the last value.
+
+The custom complete-response mapper checks original ID uniqueness itself,
+registers schemas from the actual request and uses PSJ's gate for raw argument
+and schema decisions. Execution consumes one decision matching the original
+ID, name and exact input. It is an evaluation helper, not a streaming adapter
+or production transport implementation. Whole-response refusal is an explicit
+policy, and no full kernel, live provider or consumer application is certified.
+
+The invitation supports exposing finishReason independently and asks whether
+retaining the PSJ comparison is useful for provider upgrades or whether native
+regressions are preferable. The maintainer has not confirmed a run or recurring
+use. This comparison adds zero developers to the adoption count.
 
 ## Evidence still needed
 
