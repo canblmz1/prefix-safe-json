@@ -249,6 +249,15 @@
       "since": "2026-10-18T19:01:35Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "whitefoxx/localmd",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/whitefoxx/localmd/pull/1",
+      "since": "2026-10-18T19:59:48Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
