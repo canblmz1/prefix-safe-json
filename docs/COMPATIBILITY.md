@@ -100,6 +100,22 @@ can remove callbacks from its tool definitions, but the raw-stream guard recipe
 requires `streamText()` and cannot be reconstructed from parsed `toolCalls`.
 See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text).
 
+## Separate AI SDK guarded-chat preview
+
+The [guarded chat package](../packages/ai-sdk/README.md) preserves ordinary
+function-tool callbacks and native SDK result continuation. It checks original
+OpenAI-compatible Chat Completions SSE before releasing each response to the
+SDK. Its installed-consumer matrix includes AI SDK/provider pairs
+`7.0.29`/`3.0.11`, `7.0.128`/`3.0.71`, and `7.0.143`/`3.0.71`.
+Each case runs actual SDK transport parsing and tool callbacks, not a mock
+LanguageModel projection. Strict external TypeScript consumers are compiled.
+
+It is a separate experimental GitHub preview, requires Node 22+, and adds no
+core-runtime dependency. Full-response buffering delays first output. Only its
+documented function-tool policy is supported; this does not extend the core
+AiSdkStreamAdapter's contract to LanguageModelV4 or certify live providers,
+full applications, browser extensions or independent adoption.
+
 ## Typed AI SDK input guard (0.6.0)
 
 `createTypedAiSdkExecutionGuard` is Experimental and available from

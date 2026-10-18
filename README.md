@@ -9,8 +9,9 @@ application's tools. `prefix-safe-json` checks the original argument stream,
 completion signals and schema **before your application runs a tool**, even
 when the SDK's parsed arguments look usable.
 
-Your application consumes a decision once and performs the side effect itself.
-PSJ never executes tools. Provider signals must accurately describe completion;
+The core package returns one-shot decisions; your application performs the
+side effect. The separate integration below keeps tool execution in the SDK.
+Provider signals must accurately describe completion;
 see the [provider-honesty limit](examples/openai-consumer/README.md).
 
 ```bash
@@ -18,7 +19,24 @@ pnpm add prefix-safe-json ai zod
 # or: npm install prefix-safe-json ai zod
 ```
 
-Start with the [complete TypeScript agent-loop example](examples/typed-agent-loop/):
+For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
+[guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
+`execute` callbacks and the SDK's automatic tool-result continuation:
+
+```typescript
+import { createGuardedChat } from "psj-ai-sdk";
+import { stepCountIs } from "ai";
+
+const chat = createGuardedChat({ name: "provider", baseURL, apiKey });
+const result = chat({ model: modelId, tools, prompt, stopWhen: stepCountIs(5) });
+```
+
+It buffers each complete response before releasing tool calls, which delays
+the first text chunk. See its separate preview install and supported tool
+policies before choosing it. Run the [offline example](examples/guarded-chat/)
+without a key. The core runtime gains no AI SDK dependency.
+
+For caller-owned dispatch, use the [complete TypeScript agent-loop example](examples/typed-agent-loop/):
 [download its ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 extract it, then run `npm install --engine-strict --no-audit --no-fund` and
 `npm start` with Node 22+. It uses published PSJ `0.6.1`, runs tools, sends
@@ -138,7 +156,10 @@ From this checkout, with Node 22+ and npm:
 node scripts/try-npm-demo.mjs
 ```
 
-The default `typed` trial installs published PSJ `0.6.1`, AI SDK `7.0.143`
+The default `guarded` trial installs the separate integration preview, published
+PSJ `0.6.1`, AI SDK `7.0.143` and OpenAI-compatible provider `3.0.71`.
+It uses ordinary SDK callbacks and automatic result continuation. The
+explicit `typed` trial installs published PSJ `0.6.1`, AI SDK `7.0.143`
 and Zod `4.4.3` in a separate temporary project. It checks a complete
 tool → result → model loop, token limits, duplicate IDs, cancellation and a
 tool error. The complete control returns a final answer; refused batches do
@@ -148,7 +169,8 @@ Choose another boundary by passing one of these names:
 
 | Choice | PSJ pin | What to inspect |
 | --- | --- | --- |
-| `typed` (default) | `0.6.1` | [Typed inputs and caller-owned continuation](examples/typed-agent-loop/) |
+| `guarded` (default) | `0.6.1` + separate preview | [Native callbacks and automatic continuation](examples/guarded-chat/) |
+| `typed` | `0.6.1` | [Typed inputs and caller-owned continuation](examples/typed-agent-loop/) |
 | `ai-sdk` | `0.5.4` | [Termination, interleaved calls and native/PSJ identity comparison](docs/IDENTITY_TRIAL.md) |
 | `openai` | `0.5.4` | [Original Chat Completions evidence and provider-honesty limit](examples/openai-consumer/README.md) |
 | `anthropic` | `0.5.4` | [Final message termination and interrupted streams](examples/anthropic-consumer/README.md) |

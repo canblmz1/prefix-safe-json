@@ -7,6 +7,10 @@ import process from "node:process";
 import console from "node:console";
 
 const demos = {
+  guarded: {
+    directory: "guarded-chat",
+    packages: ["ai", "@ai-sdk/openai-compatible", "psj-ai-sdk", "zod"],
+  },
   typed: {
     directory: "typed-agent-loop",
     packages: ["ai", "zod"],
@@ -19,9 +23,9 @@ const demos = {
   tanstack: { directory: "tanstack-consumer", packages: ["@tanstack/ai", "@tanstack/ai-openrouter", "@openrouter/sdk", "zod"] },
   langchain: { directory: "langchain-consumer", packages: ["@langchain/openai", "@langchain/core"] },
 };
-const selected = process.argv[2] ?? "typed";
+const selected = process.argv[2] ?? "guarded";
 if (process.argv.length > 3 || !Object.hasOwn(demos, selected)) {
-  console.error("Usage: node scripts/try-npm-demo.mjs [typed|ai-sdk|anthropic|openai|openrouter|tanstack|langchain]");
+  console.error("Usage: node scripts/try-npm-demo.mjs [guarded|typed|ai-sdk|anthropic|openai|openrouter|tanstack|langchain]");
   process.exit(1);
 }
 const demo = demos[selected];
