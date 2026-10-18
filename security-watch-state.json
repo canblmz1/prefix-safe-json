@@ -1,18 +1,18 @@
 {
-  "date": "2026-10-17",
-  "run": "nineteenth",
+  "date": "2026-10-18",
+  "run": "twentieth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 19 in a row). Unauthenticated curl to api.github.com was also intercepted by the session proxy with the identical 403 message (proxy-level block, not GitHub). The public advisory URL returns 404 (non-public triage state, as expected). Advisory requires gh api specifically per task instructions, so no further fallback attempted."
+      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 20 in a row). Unauthenticated curl to api.github.com was also intercepted by the session proxy with the identical 403 message (proxy-level block, not GitHub). Advisory requires gh api specifically per task instructions, so no further fallback attempted."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message; public PR URL (github.com/.../pull/1) returns 404, consistent with this being a private GHSA collaboration fork. No fallback available."
+      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message. No fallback available (private GHSA collaboration fork, no public page)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same blockers as item 1, for desktop/desktop. Public advisory URL also returns 404 (non-public triage state)."
+      "reason": "same blockers as item 1, for desktop/desktop."
     },
     "4_vercel_ai_pr_18770": {
       "status": "checked (via public PR page, not gh api)",
@@ -21,7 +21,7 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-16 snapshot -- no change. (Page again shows the later commit 20d88ed with no visible timestamp; same pre-existing page-scrape imprecision flagged in prior snapshots.)"
+      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-17 snapshot -- no change."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
@@ -30,7 +30,7 @@
       "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. WebFetch again shows only the opening description plus a bot label event -- consistent with page-scrape imprecision already flagged in prior snapshots; last-activity date unchanged from the 2026-10-16 snapshot (2026-09-09), so carried forward as unchanged."
+      "reason": "same method/blockers as item 4. Last-activity date unchanged from the 2026-10-17 snapshot (2026-09-09), so carried forward as unchanged."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
@@ -39,7 +39,7 @@
       "comments": 2,
       "review_comments": 6,
       "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot summaries + salmanmkc, canblmz1 replies) already captured in the 2026-10-16 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open'. (Today's scrape again undercounted the exact comment/review numbers relative to the stored baseline, same known scrape-imprecision -- carried forward as unchanged since actors/dates match.)"
+      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot summaries + salmanmkc, canblmz1 replies) already captured in the 2026-10-17 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open'. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
     }
   }
 }
