@@ -23,6 +23,13 @@ For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
 [guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
 `execute` callbacks and the SDK's automatic tool-result continuation:
 
+Install its separate preview into your application alongside the supported
+SDK/provider peers:
+
+```sh
+npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.1.0/psj-ai-sdk-0.1.0.tgz
+```
+
 ```typescript
 import { createGuardedChat } from "psj-ai-sdk";
 import { stepCountIs } from "ai";
