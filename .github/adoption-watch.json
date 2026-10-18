@@ -258,6 +258,15 @@
       "since": "2026-10-18T19:59:48Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "agentuse/agentuse",
+      "number": 25,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/agentuse/agentuse/pull/25",
+      "since": "2026-10-18T21:10:43Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
