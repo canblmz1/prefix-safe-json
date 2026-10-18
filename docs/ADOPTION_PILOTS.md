@@ -152,11 +152,11 @@ provides a [locked, five-file evaluation](https://gist.github.com/canblmz1/1f425
 through published `dedalus-labs@0.1.0-alpha.8`, its unchanged client/parser,
 `DedalusRunner` and plain-function registry. No SDK source is patched or copied.
 
-All 26 native/PSJ-policy cases pass after frozen installation on Node 22.23.2.
+All 30 native/PSJ-policy cases pass on Node 22.23.2 after frozen installation.
 In JSON and SSE modes, malformed original arguments become `{}` and reach the
 native memory-only function; its successful result appears in the next SDK
-request. Healthy controls retain exact input, original result ID and final
-answer. The tested PSJ policy refuses malformed, length-limited, duplicate-ID,
+request. Healthy single/two-call controls retain exact inputs, both original
+result IDs and the final answer. The tested PSJ policy refuses malformed, length-limited, duplicate-ID,
 schema-invalid and incomplete-SSE cases before a callback or continuation.
 Whole-batch refusal and schema checks remain explicit application choices.
 
