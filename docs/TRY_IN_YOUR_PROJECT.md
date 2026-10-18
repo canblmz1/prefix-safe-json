@@ -28,12 +28,12 @@ node scripts/try-npm-demo.mjs
 ```
 
 The default `typed` choice creates a separate temporary directory and installs
-published PSJ `0.6.0`, AI SDK `7.0.143` and Zod `4.4.3`. No repository
+published PSJ `0.6.1`, AI SDK `7.0.143` and Zod `4.4.3`. No repository
 development dependencies, API key or model server are required. npm registry
 access is needed; the directory is retained for editing.
 
 Without a checkout, download and extract the
-[0.6.0 TypeScript loop ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+[0.6.1 TypeScript loop ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 then run `npm install --engine-strict --no-audit --no-fund` and `npm start`.
 The [example README](../examples/typed-agent-loop/README.md) explains its policy.
 

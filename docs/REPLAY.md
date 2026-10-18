@@ -13,8 +13,9 @@ For SDK-upgrade checks, the separate [regression companion](../packages/regressi
 passes saved HTTP/SSE bodies through the installed AI SDK and provider before
 checking tool inputs and continuation. This replay CLI checks recorded
 decoded events instead; it does not exercise an upgraded SDK's parser.
-The companion is a private, unpublished prototype with its own package and
-tests, not a new command shipped in the PSJ runtime tarball.
+The companion has its own package, tests and
+[experimental preview tarball](https://github.com/canblmz1/prefix-safe-json/releases/tag/psj-regression-v0.1.0).
+Install it separately as a development dependency.
 
 ## Try the missing-terminal incident
 
