@@ -285,6 +285,15 @@
       "since": "2026-10-18T22:11:08Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "dedalus-labs/dedalus-agents-typescript",
+      "number": 15,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15#issuecomment-6256214676",
+      "since": "2026-10-18T22:57:21Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }
