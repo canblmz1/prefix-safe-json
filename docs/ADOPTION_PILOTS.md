@@ -144,6 +144,35 @@ retaining the PSJ comparison is useful for provider upgrades or whether native
 regressions are preferable. The maintainer has not confirmed a run or recurring
 use. This comparison adds zero developers to the adoption count.
 
+## Dedalus: local functions after malformed argument JSON
+
+An [existing client/server tool PR](https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15)
+invites feedback on runner behavior. The [targeted response](https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15#issuecomment-6256214676)
+provides a [locked, five-file evaluation](https://gist.github.com/canblmz1/1f425c53a2bb13d74e320d47358111b9)
+through published `dedalus-labs@0.1.0-alpha.8`, its unchanged client/parser,
+`DedalusRunner` and plain-function registry. No SDK source is patched or copied.
+
+All 30 native/PSJ-policy cases pass on Node 22.23.2 after frozen installation.
+In JSON and SSE modes, malformed original arguments become `{}` and reach the
+native memory-only function; its successful result appears in the next SDK
+request. Healthy single/two-call controls retain exact inputs, both original
+result IDs and the final answer. The tested PSJ policy refuses malformed, length-limited, duplicate-ID,
+schema-invalid and incomplete-SSE cases before a callback or continuation.
+Whole-batch refusal and schema checks remain explicit application choices.
+
+The finite-fixture preflight uses the wire adapter for SSE and an explicit
+complete-JSON mapper that checks original ID uniqueness itself. Bare functions
+receive no call ID from this runner: callback binding relies on verified
+sequential fixture order plus exact name/input; result IDs are checked in the
+next request. It is not general concurrent dispatch or approval binding.
+
+The trial covers only plain local functions, without remote MCP or provider
+execution. It is not a production transport wrapper or full SDK/app validation.
+PR head `f5cd48c` was read but not built/run; new ToolDefinition, Zod and client
+continuation behavior is unverified. This is existing published behavior, not
+a claimed regression introduced by that PR. Native parse-error checks remain
+useful independently. Own-project or recurring PSJ use is still unconfirmed.
+
 ## Evidence still needed
 
 The PRs ask whether the additional development dependency is worth retaining
