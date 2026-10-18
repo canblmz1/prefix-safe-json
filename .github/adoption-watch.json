@@ -267,6 +267,15 @@
       "since": "2026-10-18T21:10:43Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "skrylnikov/Phoronis-tg-bot",
+      "number": 12,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/skrylnikov/Phoronis-tg-bot/pull/12",
+      "since": "2026-10-18T21:37:36Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }

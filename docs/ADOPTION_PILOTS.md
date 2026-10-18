@@ -69,6 +69,46 @@ transformation contracts. The PR asks whether these checks justify retaining
 the dependency for ordinary SDK upgrades. No independent run or repeated use
 has yet been confirmed.
 
+## Phoronis: a provider upgrade changes greeting-call identity
+
+[Draft PR 12](https://github.com/skrylnikov/Phoronis-tg-bot/pull/12)
+adds twelve authored SSE cases beside the existing mocked-SDK greeting tests.
+The actual `chatGeneration` function and its inline administrator check run;
+the Telegram API and repository are harmless spies. No production import or
+existing locked version changes. The only added package is published PSJ 0.6.1
+as a development dependency; AJV is already present.
+
+An unchanged application/test snapshot produces different native update counts
+for two calls sharing one original wire ID:
+
+| Installed AI / compatible provider | Native update calls | PSJ preflight update calls |
+| --- | ---: | ---: |
+| 7.0.77 / 3.0.35, retained project pins | 0 | 0 |
+| 7.0.77 / 3.0.71 | 2 | 0 |
+| 7.0.143 / 3.0.71 | 2 | 0 |
+
+The upgraded path returns one original result ID and one SDK-assigned ID. The
+zero-update native expectation deliberately fails after the provider change;
+the guarded case still passes. This is a concrete SDK-upgrade review task,
+not a captured production incident or an automatic claim of an SDK defect.
+
+Healthy controls retain one update, the original result ID and final answer.
+Both non-admin controls retain zero updates. The current native length and EOF
+cases already release no update; malformed-sibling behavior differs by the
+chosen whole-response policy. The helper buffers finite fixtures, not live
+traffic, and does not replace approval, normalization or transport handling.
+
+Operator validation on retained pins: all 404 unit tests, the focused 26 cases,
+source/test typecheck, lint and frozen installation pass on Windows with pinned
+Bun 1.4.0 and Node 22.23.2. The full upgraded pair has 25 passing cases and one
+expected native-policy failure across the same two files; typecheck passes.
+That is boundary evidence, not complete application-upgrade certification.
+Upstream Actions requires maintainer approval. Any separate run in the PSJ
+maintainer's fork remains operator verification.
+
+The PR asks whether the original-response checks justify retaining a development
+dependency in ordinary provider upgrades. Independent use remains unconfirmed.
+
 ## Evidence still needed
 
 The PRs ask whether the additional development dependency is worth retaining
@@ -82,7 +122,7 @@ New independent developers confirmed by these pilots: **zero**. CI initiated by
 the PSJ maintainer, public downloads and a proposed patch do not change that
 count. The campaign's five-developer goal remains open.
 
-The existing four-hour adoption workflow tracks the PR and surfaces public
+The existing four-hour adoption workflow tracks the PRs and surfaces public
 feedback for manual review. It sends no reminders and does not infer adoption.
 
 ## Existing adopter maintenance
