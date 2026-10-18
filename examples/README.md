@@ -1,18 +1,24 @@
 # Installed-package trials
 
+For normal AI SDK `execute` callbacks and automatic tool-result continuation,
+start with the [guarded chat example](guarded-chat/). It installs the separate
+experimental integration preview alongside published PSJ `0.6.1`. Its complete
+case reaches a final answer; three refused batch cases run no callbacks.
+The first integration buffers each full response, delaying its first chunk.
+
 For typed argument inference and a complete caller-owned tool-result-to-model
 loop, use the [TypeScript agent-loop example](typed-agent-loop/) with PSJ
-`0.6.0`, AI SDK `7.0.143` and Zod `4.4.3`. It checks five authored scenarios.
+`0.6.1`, AI SDK `7.0.143` and Zod `4.4.3`. It checks five authored scenarios.
 The six earlier SDK trials below retain their published `0.5.4` pins.
 
-From a current checkout, the default command runs the typed loop in a new
+From a current checkout, the default command runs guarded chat in a new
 temporary project:
 
 ```bash
 node scripts/try-npm-demo.mjs
 ```
 
-Pass `typed` explicitly for the same trial. The complete control makes two
+Pass `typed` explicitly for the caller-owned trial. Its complete control makes two
 model requests, dispatches both authorized calls and returns a final answer.
 The other four scenarios cover token limits, duplicate IDs, cancellation and
 a tool error. These are authored fixtures, not live model requests.

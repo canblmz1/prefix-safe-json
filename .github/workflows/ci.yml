@@ -492,6 +492,47 @@ jobs:
   # version needed to install/build this repository's devDependencies. The
   # Node 22 package-smoke job above builds one tarball; every matrix leg below
   # downloads and executes those identical bytes in an isolated npm project.
+  guarded-chat:
+    name: Guarded chat (installed SDK matrix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Build and test the integration package
+        working-directory: packages/ai-sdk
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Run actual installed SDK parsers and strict consumer types
+        run: |
+          PSJ_SOURCE_DIR="$PWD"
+          for PSJ_PAIR in '7.0.29 3.0.11' '7.0.128 3.0.71' '7.0.143 3.0.71'; do
+            read -r PSJ_AI_VERSION PSJ_PROVIDER_VERSION <<< "$PSJ_PAIR"
+            PSJ_CHAT_DIR=$(mktemp -d)
+            mkdir "$PSJ_CHAT_DIR/test"
+            sed 's#"../dist/index.js"#"psj-ai-sdk"#' packages/ai-sdk/test/integration.test.mjs > "$PSJ_CHAT_DIR/test/integration.test.mjs"
+            cp packages/ai-sdk/test/consumer.mts "$PSJ_CHAT_DIR/"
+            cp examples/guarded-chat/demo.mjs "$PSJ_CHAT_DIR/"
+            (
+              cd "$PSJ_CHAT_DIR"
+              npm init -y
+              npm pkg set type=module
+              npm install --ignore-scripts --engine-strict --no-audit --no-fund \
+                "$RUNNER_TEMP/psj-ai-sdk-0.1.0.tgz" 'prefix-safe-json@0.6.1' \
+                "ai@$PSJ_AI_VERSION" "@ai-sdk/openai-compatible@$PSJ_PROVIDER_VERSION" \
+                'zod@4.4.3' 'typescript@5.9.3' '@types/node@22.19.15' '@types/json-schema@7.0.15'
+              node --test test/integration.test.mjs
+              node node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext consumer.mts
+              node demo.mjs
+            )
+          done
+
   runtime-package-smoke:
     name: Packed runtime smoke (Node ${{ matrix.node-version }})
     needs: package-smoke
