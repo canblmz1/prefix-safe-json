@@ -70,9 +70,9 @@ npm exec --offline -- psj-regression check ./tool-regression/suite.json --expect
 ```
 
 Peers are `ai >=7.0.77 <8`, `@ai-sdk/openai-compatible >=3 <4` and
-`prefix-safe-json >=0.6.0 <0.7`. Keep these application-owned versions pinned
+`prefix-safe-json >=0.6.1 <0.7`. Keep these application-owned versions pinned
 and review the versions printed by `doctor`. The development lockfile uses
-AI SDK 7.0.143, provider 3.0.71 and published PSJ 0.6.0. CI also installs the
+AI SDK 7.0.143, provider 3.0.71 and published PSJ 0.6.1. CI also installs the
 core candidate tarball. The companion has a separate GitHub preview release.
 
 ## A small incident-to-regression workflow

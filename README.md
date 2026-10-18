@@ -19,9 +19,9 @@ pnpm add prefix-safe-json ai zod
 ```
 
 Start with the [complete TypeScript agent-loop example](examples/typed-agent-loop/):
-[download its ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+[download its ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 extract it, then run `npm install --engine-strict --no-audit --no-fund` and
-`npm start` with Node 22+. It uses published PSJ `0.6.0`, runs tools, sends
+`npm start` with Node 22+. It uses published PSJ `0.6.1`, runs tools, sends
 their matched results back to the model, and returns a final answer. Five
 authored scenarios use memory counters; no API key or repository build is needed.
 [Choose another SDK](examples/README.md).
@@ -86,7 +86,7 @@ key. The caller owns dispatch and continuation. Schema transformations,
 defaults and removed keys are refused; [validation details](docs/VALIDATION.md#typed-raw-input-guard).
 
 To try the published version without cloning this repository, download the
-[0.6.0 typed-loop example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+[0.6.1 typed-loop example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 extract it, then run `npm install --engine-strict --no-audit --no-fund` and
 `npm start` inside the extracted directory. Node 22+ is required. The example
 uses authored model responses and memory counters; no API key is needed.
@@ -138,7 +138,7 @@ From this checkout, with Node 22+ and npm:
 node scripts/try-npm-demo.mjs
 ```
 
-The default `typed` trial installs published PSJ `0.6.0`, AI SDK `7.0.143`
+The default `typed` trial installs published PSJ `0.6.1`, AI SDK `7.0.143`
 and Zod `4.4.3` in a separate temporary project. It checks a complete
 tool → result → model loop, token limits, duplicate IDs, cancellation and a
 tool error. The complete control returns a final answer; refused batches do
@@ -148,7 +148,7 @@ Choose another boundary by passing one of these names:
 
 | Choice | PSJ pin | What to inspect |
 | --- | --- | --- |
-| `typed` (default) | `0.6.0` | [Typed inputs and caller-owned continuation](examples/typed-agent-loop/) |
+| `typed` (default) | `0.6.1` | [Typed inputs and caller-owned continuation](examples/typed-agent-loop/) |
 | `ai-sdk` | `0.5.4` | [Termination, interleaved calls and native/PSJ identity comparison](docs/IDENTITY_TRIAL.md) |
 | `openai` | `0.5.4` | [Original Chat Completions evidence and provider-honesty limit](examples/openai-consumer/README.md) |
 | `anthropic` | `0.5.4` | [Final message termination and interrupted streams](examples/anthropic-consumer/README.md) |
@@ -161,7 +161,7 @@ model server or repository build. Installation requires npm registry access.
 A passing fixture is not a live-provider or own-project integration result.
 The older [six-SDK ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.5.4/prefix-safe-json-0.5.4-trials.zip)
 retains its original six choices and `0.5.4` pins; `typed` is available in
-the current checkout and the separate `0.6.0` ZIP linked above.
+the current checkout and the separate `0.6.1` ZIP linked above.
 
 To connect a real application, follow the [integration guide](docs/TRY_IN_YOUR_PROJECT.md).
 Your application must retain original evidence, stop automatic execution and

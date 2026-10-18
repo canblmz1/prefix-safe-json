@@ -5,10 +5,25 @@
   "description": "Offline raw-stream regression checks through the installed AI SDK",
   "type": "module",
   "license": "MIT OR Apache-2.0",
-  "engines": { "node": ">=22" },
-  "bin": { "psj-regression": "./dist/cli.js" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist", "fixtures", "README.md", "LICENSE-MIT", "LICENSE-APACHE"],
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "psj-regression": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "fixtures",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
@@ -17,12 +32,12 @@
   "peerDependencies": {
     "ai": ">=7.0.77 <8",
     "@ai-sdk/openai-compatible": ">=3.0.0 <4",
-    "prefix-safe-json": ">=0.6.0 <0.7"
+    "prefix-safe-json": ">=0.6.1 <0.7"
   },
   "devDependencies": {
     "ai": "7.0.143",
     "@ai-sdk/openai-compatible": "3.0.71",
-    "prefix-safe-json": "0.6.0",
+    "prefix-safe-json": "0.6.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.5.0"
   }

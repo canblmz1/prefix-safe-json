@@ -9,7 +9,7 @@ From a current PSJ checkout, run `node scripts/try-npm-demo.mjs` (or pass
 `typed` explicitly). It copies this example into a separate temporary
 directory, installs its published dependencies and runs the five scenarios.
 
-Download and extract the [0.6.0 example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.0/prefix-safe-json-0.6.0-typed-loop.zip),
+Download and extract the [0.6.1 example ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 or copy this directory outside the repository, then run:
 
 ```bash
