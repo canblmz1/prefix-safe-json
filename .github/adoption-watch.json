@@ -122,7 +122,13 @@
       "invitationUrl": "https://github.com/OpenRouterTeam/typescript-agent/issues/128",
       "since": "2026-10-16T09:20:02Z",
       "purpose": "psj-project-trial",
-      "reviewedResponses": []
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/OpenRouterTeam/typescript-agent/issues/128#issuecomment-6239700732",
+          "bodySha256": "27371def3ea1d2725738f462b53ce5a21d864c7cc760f8a7964b390957450f35",
+          "classification": "external-contributor-reports-native-guard-proposal-not-psj-adoption"
+        }
+      ]
     },
     {
       "repository": "TanStack/ai",
@@ -232,6 +238,15 @@
       "kind": "issue",
       "invitationUrl": "https://github.com/mangfufu/director-desk/issues/8",
       "since": "2026-10-17T13:19:29Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "mcp-use/webmcp-inspector",
+      "number": 5,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/mcp-use/webmcp-inspector/issues/5",
+      "since": "2026-10-18T19:01:35Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
     }
