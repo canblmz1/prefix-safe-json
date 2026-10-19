@@ -110,7 +110,7 @@ SDK. Its installed-consumer matrix includes AI SDK/provider pairs
 Each case runs actual SDK transport parsing and tool callbacks, not a mock
 LanguageModel projection. Strict external TypeScript consumers are compiled.
 
-It is a separate experimental GitHub preview, requires Node 22+, and adds no
+It is a separately versioned experimental npm package, requires Node 22+, and adds no
 core-runtime dependency. Version 0.2 streams a display-only text/reasoning
 prefix while tool/control frames and all later bytes wait for EOF. Text is
 provisional; unknown provider fields can cause buffering. Version 0.3 supports
@@ -120,6 +120,10 @@ replacement remains refused. The integration's function-tool policy is narrower
 than the full SDK lifecycle; this does not extend the core
 AiSdkStreamAdapter's contract to LanguageModelV4 or certify live providers,
 full applications, browser extensions or independent adoption.
+
+Companion 0.3.2 also checks error/fatal diagnostics for calls absent from the
+core decisions list before consuming any authority. The core's per-call
+contract remains unchanged. See the [batch contract](BATCH_CONTRACT.md).
 
 ## Typed AI SDK input guard (0.6.0)
 

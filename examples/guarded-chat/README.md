@@ -2,8 +2,9 @@
 
 Run `node scripts/try-npm-demo.mjs` from a PSJ checkout, or copy this directory
 outside the repository and run `npm install --ignore-scripts && npm start`.
-Node 22+ is required. The preview is a separate GitHub tarball; core PSJ remains
-the published `0.6.1` package.
+Node 22+ is required. The companion and core are separate npm packages pinned
+to `0.3.2` and `0.6.2`. For prepublication review, use the two
+prepared tarballs from the [evaluation kit](../../docs/COMPANION_EVALUATION.md).
 
 The offline provider supplies authored HTTP/SSE bytes to the installed real
 OpenAI-compatible parser. Ordinary `execute` callbacks run in the native SDK.
@@ -31,4 +32,4 @@ AI SDK/provider pair is `7.0.143`/`3.0.71`; native JSON/schema/finish checks are
 included as controls. See the [evaluation kit](../../docs/COMPANION_EVALUATION.md)
 for candidate-artifact installation, observed callback counts, integration
 costs and independent keep/remove questions. The whole-batch diagnostic fix
-requires companion 0.3.2; the older published demo pin does not include it.
+requires companion 0.3.2; older previews do not include it.

@@ -55,7 +55,7 @@ The core npm package does not export `createGuardedChat`. Package publication
 uses the [separate release workflow](RELEASING.md); a GitHub preview release
 does not itself establish that a registry version exists.
 
-Before the candidate versions are published, use the two tested tarballs as
+For prepublication review, use the two tested tarballs as
 described in the [evaluation kit](../../docs/COMPANION_EVALUATION.md). Older
 0.3.0/0.3.1 builds do not include the whole-batch diagnostic fix in 0.3.2.
 

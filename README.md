@@ -18,12 +18,12 @@ For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
 [guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
 `execute` callbacks and the SDK's automatic tool-result continuation:
 
-For a new application, install its separate preview and a tested SDK/provider
+For a new application, install the separately versioned companion and a tested SDK/provider
 pair together. In an existing application, keep your supported locked peer
 versions; see the integration's installation instructions.
 
 ```sh
-npm install --save-exact prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
+npm install --save-exact psj-ai-sdk@0.3.2 prefix-safe-json@0.6.2 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
 ```
 
 ```typescript
@@ -39,6 +39,12 @@ batch validation. Optional local recording saves refused responses for
 offline wire-policy replay and explicit CI expectations. See the integration's
 supported policies and provisional-text limits. Run the [offline example](examples/guarded-chat/)
 without a key. The core runtime gains no AI SDK dependency.
+
+For prepublication review, use the two packed
+artifacts described in the [evaluation kit](docs/COMPANION_EVALUATION.md).
+The [whole-batch contract](docs/BATCH_CONTRACT.md) distinguishes the fixed
+0.3.2 policy from older previews. The kit also compares identical responses
+through the current native SDK, a small native check and the companion.
 
 For caller-owned dispatch, install `prefix-safe-json` from npm and use the
 [complete TypeScript agent-loop example](examples/typed-agent-loop/):
@@ -163,8 +169,8 @@ From this checkout, with Node 22+ and npm:
 node scripts/try-npm-demo.mjs
 ```
 
-The default `guarded` trial installs the separate integration preview, published
-PSJ `0.6.1`, AI SDK `7.0.143` and OpenAI-compatible provider `3.0.71`.
+The default `guarded` trial installs companion `0.3.2`, core
+PSJ `0.6.2`, AI SDK `7.0.143` and OpenAI-compatible provider `3.0.71`.
 It uses ordinary SDK callbacks and automatic result continuation. The
 explicit `typed` trial installs published PSJ `0.6.1`, AI SDK `7.0.143`
 and Zod `4.4.3` in a separate temporary project. It checks a complete
@@ -176,7 +182,7 @@ Choose another boundary by passing one of these names:
 
 | Choice | PSJ pin | What to inspect |
 | --- | --- | --- |
-| `guarded` (default) | `0.6.1` + separate preview | [Native callbacks and automatic continuation](examples/guarded-chat/) |
+| `guarded` (default) | core `0.6.2` + companion `0.3.2` | [Native callbacks and automatic continuation](examples/guarded-chat/) |
 | `typed` | `0.6.1` | [Typed inputs and caller-owned continuation](examples/typed-agent-loop/) |
 | `ai-sdk` | `0.5.4` | [Termination, interleaved calls and native/PSJ identity comparison](docs/IDENTITY_TRIAL.md) |
 | `openai` | `0.5.4` | [Original Chat Completions evidence and provider-honesty limit](examples/openai-consumer/README.md) |

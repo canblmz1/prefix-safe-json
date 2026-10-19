@@ -54,10 +54,11 @@ node scripts/try-npm-demo.mjs
 ```
 
 The default `guarded` choice creates a separate temporary directory and installs
-the separate integration preview, published PSJ `0.6.1`, AI SDK `7.0.143`,
+companion `0.3.2`, core PSJ `0.6.2`, AI SDK `7.0.143`,
 OpenAI-compatible provider `3.0.71` and Zod `4.4.3`. No repository development
-dependencies, API key or model server are required. Registry and GitHub release
-access are needed; the directory is retained for editing.
+dependencies, API key or model server are required. Registry access is needed;
+the directory is retained for editing. For prepublication review, use the two
+prepared tarballs in the [evaluation kit](COMPANION_EVALUATION.md).
 
 It checks complete paired continuation, duplicate wire IDs, output-limit
 termination and an invalid sibling. Ordinary SDK callbacks stay in place;
