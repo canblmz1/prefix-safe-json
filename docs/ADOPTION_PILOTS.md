@@ -4,8 +4,10 @@ The new integration reduces the first supported AI SDK path to a provider
 factory and a normal call with ordinary tool callbacks. SDK-owned result
 serialization and continuation are exercised by the
 [installed guarded-chat example](../examples/guarded-chat/README.md).
-The preview's full-response buffering and narrower tool policy remain costs
-to evaluate, not reasons to assume a developer will adopt it.
+The 0.2 preview streams a conservative display-only prefix and can record
+refused responses locally for wire-policy replay. Its narrower tool policy,
+provisional text and replay scope remain costs to evaluate; the features do
+not establish that a developer will retain it.
 
 ## localmd: SDK-upgrade regression checks
 
@@ -23,9 +25,9 @@ must release no callbacks or continuation request.
 
 Operator evidence:
 
-- The existing two tests and the proposed four cases pass under the project's
+- The initial 0.1 preview's existing two tests and four proposed cases pass under the project's
   installed SDK and public preview tarball.
-- The same two files also pass in an isolated SDK 7.0.143/provider 3.0.71
+- Those same two files also pass in an isolated SDK 7.0.143/provider 3.0.71
   consumer. That is a boundary test, not a whole-application upgrade claim.
 - The isolated project typecheck and 1,551 unit tests pass. Proposed frozen
   dependency metadata passes `npm ci --dry-run`; no existing locked version
@@ -33,6 +35,23 @@ Operator evidence:
 - Full browser validation remains incomplete. The attempted suite encountered
   citation-picker and graph failures. The draft records that limitation and
   the additional serving warning in an unchanged-source browser control.
+
+The trial now pins the public integration preview **0.2.0** and adds three
+Node-only checks beside those four cases: text before EOF while callbacks
+wait, a recorded token-limited response, and an interrupted recording that
+stays ineligible on offline replay. Healthy completion retains the original
+result ID and final answer and creates no recording in default refused-only
+mode. Captures use temporary directories that are removed afterward. The
+source and installed provider remain at AI 7.0.29/provider 3.0.11.
+
+The focused nine checks, full 1,554-test unit suite and project typecheck pass
+in the operator's checkout. Only the preview package changes version; no
+other existing locked version changes or new package is added. Node imports
+follow the repository's existing test-only convention without widening its
+browser types. These are authored offline cases, not independent use or a
+captured production incident. The draft asks for the maintainer's own run,
+installed versions and a keep/remove decision; recurring use needs a later
+independently confirmed rerun after an actual SDK update or incident.
 
 The application's existing `prepareStep`, provider selection and permission
 flow stay in production. The proposed use is an offline SDK regression check;
@@ -255,3 +274,15 @@ TypeScript programs pass locally. All eight checks on head `f2866b9` pass,
 including Ubuntu's 3,670 passing tests, 19 recorded skips and two browser smoke
 scenarios. Sandbase's integration is historical; the proposed upgrade is not
 a new independent developer or confirmed maintainer deployment.
+
+A separate [default-branch check](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/package.json)
+on October 19 finds the historical PSJ **0.5.0** dependency still retained.
+The [default strategy](https://github.com/sandbaseai/sandbase-harness/blob/427b52a96a5309ca23268407f85c237468ab6a4e/src/strategy/default-strategy.ts)
+still imports the execution lock and constructs the guard in its agent path.
+The [October 12 CI run](https://github.com/sandbaseai/sandbase-harness/actions/runs/38202171387),
+triggered by `AllureCurtain` pushing that same `427b52a` head, passes all four
+jobs. Its log includes three passing `post-terminal-authority` integration
+cases, 3,670 passing tests, 19 skips and two browser smoke cases. This is
+independent evidence that the older integration remains in maintained code
+and CI. It does not verify deployment, adoption of the proposed 0.6.1 upgrade,
+use of the new 0.2 preview features or another new developer for the campaign.
