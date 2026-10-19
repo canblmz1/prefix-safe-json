@@ -144,6 +144,26 @@ retaining the PSJ comparison is useful for provider upgrades or whether native
 regressions are preferable. The maintainer has not confirmed a run or recurring
 use. This comparison adds zero developers to the adoption count.
 
+On October 19, the [maintainer reported native fixes](https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6264504755)
+published as `0.11.0-next.1` under npm's `next` tag. The
+[newly run 26-case comparison](https://gist.github.com/canblmz1/a0c387796fc2a724500169364285734c)
+confirms that malformed calls and a length-limited terminal answer are refused
+natively, with error results followed by a clean answer. A complete nonterminal
+call on a length turn remains allowed intentionally. Cut prose retains the
+native length outcome. The old 0.10.0 recipe is explicitly a preserved baseline.
+
+The new public `argumentsText` and `finishReason` fields remove fetch
+interception from the optional helper: `runConversation(guardAgentOptions(options))`.
+It wraps the provider result and ordinary string-tool executors; the unchanged
+SDK/kernel own HTTP handling, results and continuation. All 26 cases pass after
+frozen installation, including exact original argument text, input and result
+IDs. Extra batch/schema/identity refusal remains an optional application policy,
+not a claim that the native fix failed. This is a one-run sequential evaluation
+for the OpenAI dialect, without general approval, concurrency, cancellation or
+production certification. The [material follow-up](https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6265509144)
+acknowledges the native solution and offers the smaller development comparison.
+The maintainer's native release is not PSJ adoption; no PSJ run is confirmed.
+
 ## Dedalus: local functions after malformed argument JSON
 
 An [existing client/server tool PR](https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15)
