@@ -294,6 +294,15 @@
       "since": "2026-10-18T22:57:21Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
+    },
+    {
+      "repository": "codexu/note-gen",
+      "number": 1298,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/codexu/note-gen/pull/1298",
+      "since": "2026-10-18T23:26:45Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
     }
   ]
 }

@@ -173,6 +173,44 @@ continuation behavior is unverified. This is existing published behavior, not
 a claimed regression introduced by that PR. Native parse-error checks remain
 useful independently. Own-project or recurring PSJ use is still unconfirmed.
 
+## NoteGen: run the comparison in the actual checkout
+
+The [draft test PR](https://github.com/codexu/note-gen/pull/1298) adds
+`pnpm test:agent-boundary`, one exact development dependency on PSJ 0.6.1,
+the test and scope documentation. Its 11-line lock addition reuses the
+project's existing Ajv 8.20.0. No application source or production dependency
+changes. This removes the separate source-download/setup step of the
+[standalone recipe](https://gist.github.com/canblmz1/ebc99297eb380288782bd5757b90913a).
+
+The checkout's unchanged runtime, context manager, permission engine, retry
+manager, queue and recorder run with explicit provider/application-service
+stubs. The provider supplies finite chunk-object iterables, and the registered
+read tool records inputs in memory. Unknown imports fail before evaluation;
+unexpected network, MCP, store, skill or image access throws. The trial does
+not run the Rust SSE decoder, Tauri host, real provider, approval workflow,
+argument repair, note mutation or desktop/mobile UI. Raw HTTP-byte preservation
+is outside its boundary.
+
+All 24 native/guarded cases pass. Healthy one/two-call controls assert exact
+inputs, original result IDs in the next request and the final answer. Native
+malformed-JSON, iterator-error and user-stop controls already prevent callbacks.
+The optional PSJ policy additionally refuses length/content-filter completion,
+missing finish evidence, late provider errors, duplicate IDs, schema-invalid
+input and malformed siblings. Whole-batch/schema refusal is explicit. Its
+one-shot ID/name/input binding is verified for these sequential fixtures only.
+Other native outcomes are observations; a native refusal is accepted rather
+than freezing permissive behavior as a required contract.
+
+Windows Node 22.23.2 passes frozen installation, the new 24 cases, five existing
+helper cases, full type checking, test-file lint and the plugin protocol check.
+The [fork's Linux Node 24.21.0 verification](https://github.com/canblmz1/note-gen/actions/runs/39176480055)
+passes the same 24/five cases and protocol check, after asserting exact source
+head `7ff5fcd`. Its manual workflow stays in the fork. A temporary native
+terminal/error check also passes all 24 cases; the original runtime bytes were
+restored afterward and no native patch is proposed. These are operator runs,
+not independent use or full application compatibility. The PR asks whether
+retaining this development check earns its dependency and maintenance cost.
+
 ## Evidence still needed
 
 The PRs ask whether the additional development dependency is worth retaining
