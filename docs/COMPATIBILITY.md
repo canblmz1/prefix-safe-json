@@ -103,8 +103,8 @@ See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk
 ## Separate AI SDK guarded-chat preview
 
 The [guarded chat package](../packages/ai-sdk/README.md) preserves ordinary
-function-tool callbacks and native SDK result continuation. It checks original
-OpenAI-compatible Chat Completions SSE before releasing each response to the
+function-tool and runtime-defined (`dynamicTool`) callbacks and native SDK result
+continuation. It checks original OpenAI-compatible Chat Completions SSE before releasing each response to the
 SDK. Its installed-consumer matrix includes AI SDK/provider pairs
 `7.0.29`/`3.0.11`, `7.0.128`/`3.0.71`, and `7.0.143`/`3.0.71`.
 Each case runs actual SDK transport parsing and tool callbacks, not a mock

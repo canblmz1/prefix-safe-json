@@ -64,7 +64,7 @@ export function createGuardedChat(settings: GuardedChatSettings) {
     const schemas = new Map<string, ReturnType<typeof asSchema>>();
     const wrapped = Object.create(null) as ToolSet;
     for (const [name, definition] of Object.entries(options.tools)) {
-      if ((definition.type !== undefined && definition.type !== "function") || typeof definition.execute !== "function" ||
+      if ((definition.type !== undefined && definition.type !== "function" && definition.type !== "dynamic") || typeof definition.execute !== "function" ||
           definition.onInputStart || definition.onInputDelta || definition.onInputAvailable || definition.needsApproval) {
         throw new Error(`Tool ${name} needs an ordinary execute function and no input hooks or approval continuation. Use the caller-owned API for other execution policies.`);
       }

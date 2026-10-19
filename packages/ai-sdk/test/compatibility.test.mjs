@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { stepCountIs, jsonSchema } from "ai";
+import { dynamicTool, streamText, stepCountIs, jsonSchema } from "ai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createGuardedChat } from "../dist/index.js";
 
 const chunk = (delta, finish_reason = null) => ({ id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture", choices: [{ index: 0, delta, finish_reason }] });
@@ -10,6 +11,51 @@ const answer = frame(chunk({ content: "Done." })) + frame(chunk({}, "stop")) + "
 const schema = jsonSchema({ type: "object", properties: {}, additionalProperties: false });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const tick = () => new Promise(resolve => setTimeout(resolve, 30));
+
+test("runtime-defined tools retain native execution, original IDs and continuation", async () => {
+  for (const guarded of [false, true]) {
+    const requests = [], effects = [];
+    const settings = { name: "fixture", baseURL: "https://fixture.invalid/v1", fetch: async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return new Response(requests.length === 1 ? call("record", "dynamic-id") : answer, { headers: { "content-type": "text/event-stream" } });
+    } };
+    const tools = { record: dynamicTool({ inputSchema: schema, execute: async (input, context) => {
+      effects.push({ input, id: context.toolCallId });
+      return "recorded";
+    } }) };
+    const options = { tools, prompt: "Record", stopWhen: stepCountIs(3) };
+    const result = guarded ? createGuardedChat(settings)({ ...options, model: "fixture" }) :
+      streamText({ ...options, model: createOpenAICompatible(settings).chatModel("fixture"), maxRetries: 0 });
+    await result.consumeStream();
+    assert.deepEqual(effects, [{ input: {}, id: "dynamic-id" }]);
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].tools[0].type, "function");
+    assert.deepEqual(requests[1].messages.filter(m => m.role === "tool").map(m => m.tool_call_id), ["dynamic-id"]);
+    assert.equal((await result.steps)[0].toolCalls[0].dynamic, true);
+    assert.equal(await result.text, "Done.");
+  }
+});
+
+for (const problem of ["invalid_schema", "unknown_tool", "duplicate_id"]) test(`runtime-defined tools have zero effects for a batch with ${problem}`, async () => {
+  let effects = 0;
+  const decisions = [];
+  const sibling = { index: 1, id: problem === "duplicate_id" ? "first-id" : "second-id", type: "function",
+    function: { name: problem === "unknown_tool" ? "unregistered" : "record", arguments: problem === "invalid_schema" ? '{"extra":true}' : "{}" } };
+  const body = frame(chunk({ tool_calls: [
+    { index: 0, id: "first-id", type: "function", function: { name: "record", arguments: "{}" } }, sibling,
+  ] })) + frame(chunk({}, "tool_calls")) + "data: [DONE]\n\n";
+  const chat = createGuardedChat({ name: "fixture", baseURL: "https://fixture.invalid/v1", onDecision: event => decisions.push(event),
+    fetch: async () => new Response(body, { headers: { "content-type": "text/event-stream" } }) });
+  await chat({ model: "fixture", tools: { record: dynamicTool({ inputSchema: schema, execute: async () => { effects++; } }) }, prompt: "Record", onError() {} }).consumeStream();
+  assert.equal(effects, 0);
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].status, "refused");
+});
+
+for (const policy of [{ needsApproval: true }, { onInputAvailable() {} }]) test(`runtime-defined tools still reject ${Object.keys(policy)[0]}`, () => {
+  const chat = createGuardedChat({ name: "fixture", baseURL: "https://fixture.invalid/v1" });
+  assert.throws(() => chat({ model: "fixture", tools: { record: dynamicTool({ inputSchema: schema, execute: async () => "done", ...policy }) }, prompt: "Record" }), /no input hooks or approval continuation/u);
+});
 
 test("ordinary instructions and sampling settings do not require rewriting an SDK call", async () => {
   let request;

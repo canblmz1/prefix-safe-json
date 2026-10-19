@@ -1,5 +1,5 @@
 import { createGuardedChat } from "psj-ai-sdk";
-import { stepCountIs, tool } from "ai";
+import { dynamicTool, jsonSchema, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { createFileRecorder, replayRecording } from "psj-ai-sdk/recording";
 
@@ -19,6 +19,12 @@ void text;
 chat({ model: "fixture", tools, prompt: "x", instructions: "Be concise", reasoning: "none", topP: 0.9,
   prepareStep: ({ messages, stepNumber }) => ({ messages, activeTools: stepNumber === 0 ? ["record"] : [], temperature: 0 }) });
 const calls = await result.toolCalls;
+const runtimeTools = { external: dynamicTool({ inputSchema: jsonSchema({ type: "object" }), execute: async input => input }) };
+const runtimeResult = chat({ model: "fixture", tools: runtimeTools, prompt: "Run external", prepareStep: () => ({ activeTools: ["external"] }) });
+for (const call of await runtimeResult.toolCalls) {
+  const input: unknown = call.input;
+  void input;
+}
 for (const call of calls) {
   if (call.dynamic) continue;
   const message: string = call.input.message;

@@ -79,7 +79,9 @@ unlisted patches are not individually certified.
 - Provider keys, headers and raw arguments are not included in guard events.
   Nothing is transmitted to the package maintainer.
 
-Ordinary local function tools with `execute` are supported. Input lifecycle
+Ordinary local function tools and SDK `dynamicTool` definitions with `execute`
+are supported. Runtime-defined tools use the same schema, original-ID and
+whole-batch checks; the SDK retains their dynamic-call metadata. Input lifecycle
 hooks, provider-executed tools, approval continuation, input
 refinement, model replacement and call repair are refused rather than quietly
 bypassing the original-response boundary. For those workflows, retain the
