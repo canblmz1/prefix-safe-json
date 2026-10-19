@@ -2,8 +2,8 @@
 
 Experimental OpenAI-compatible Chat Completions integration for AI SDK 7.
 Keep ordinary `execute` callbacks and let the SDK return their results to the
-model. The package reads the original response, checks the entire tool batch,
-then releases the unchanged response bytes to the SDK.
+model. Text and reasoning can stream while the package checks the original
+response. Tool calls wait for the entire response and batch validation.
 
 ```typescript
 import { createGuardedChat } from "psj-ai-sdk";
@@ -33,7 +33,7 @@ the native SDK result, including `fullStream`, `steps` and response helpers.
 Distributed separately from the core runtime as a GitHub preview tarball:
 
 ```sh
-npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.1.0/psj-ai-sdk-0.1.0.tgz
+npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.2.0/psj-ai-sdk-0.2.0.tgz
 ```
 
 Install the supported application-owned peers too: `ai`,
@@ -48,10 +48,15 @@ unlisted patches are not individually certified.
 
 ## What changes
 
-- Each response is buffered completely **before the SDK can execute a tool**.
-  This delays the first text/reasoning chunk until that response ends. It is
-  appropriate when that latency is acceptable; it is not a transparent
-  low-latency streaming replacement.
+- Display-only text/reasoning frames stream before EOF by default. The first
+  tool-bearing, terminal, control or unknown frame **and every subsequent
+  byte** wait for EOF and whole-batch validation. Mixed text/tool frames wait
+  too; original bytes and order are preserved. Unrecognized provider fields
+  can cause buffering. `textStreaming: "buffered"` retains the 0.1.0 behavior.
+- Displayed text is provisional. A later refusal can terminate the native
+  response body after text has appeared; handle errors when consuming the
+  stream as well as `onError`. Displayed text never authorizes a tool. This
+  feature is not verification of generated prose or a latency guarantee.
 - The buffer defaults to 8 MiB per physical response. `maxResponseBytes` can
   select 1 byte to 64 MiB. Oversized, interrupted or invalid UTF-8 responses
   are refused before any call from that response is released.
@@ -98,6 +103,66 @@ They are authored tests, not production-incident or independent-user evidence.
 
 For already-saved captures, use the separate
 [offline regression CLI](../regression/README.md).
+
+## Record a failure and replay its wire policy
+
+Opt into local recording with one setting; no manual stream reader is needed:
+
+```typescript
+import { createFileRecorder } from "psj-ai-sdk/recording";
+
+const chat = createGuardedChat({
+  name: "my-provider", baseURL, apiKey,
+  onCapture: createFileRecorder({
+    directory: ".psj/captures",
+    onSaved: path => console.log("Saved response:", path),
+  }),
+});
+```
+
+The default records only refused successful-HTTP SSE responses. `mode: "all"`
+also retains allowed responses, useful for a positive control. Each response
+gets a separate directory with exact `response.sse` bytes and `recording.json`:
+SHA-256, byte length, wire tool schemas, whether EOF was observed, and the
+original batch decision. Interrupted and size-limited bodies are explicitly
+incomplete; recording respects `maxResponseBytes`. Request prompts, headers,
+keys and tool results are not captured. Response text, arguments and schema
+descriptions can contain sensitive data: keep the directory local and add
+`.psj/` to your application's `.gitignore`. Retention/deletion is caller-owned.
+Recording is off unless `onCapture` is supplied, and nothing is uploaded.
+
+```sh
+npx --no-install psj-chat replay .psj/captures/response-XXXXXX/recording.json --json
+# An explicit status expectation can fail CI (exit 1 on mismatch):
+npx --no-install psj-chat replay path/to/recording.json --expect refused --json
+```
+
+```typescript
+import { replayRecording } from "psj-ai-sdk/recording";
+import assert from "node:assert/strict";
+const report = await replayRecording("path/to/recording.json");
+assert.equal(report.replayed.status, "refused");
+assert.equal(report.replayed.reason, "stream_incomplete"); // choose your reviewed reason
+```
+
+Replay checks the saved hash and current PSJ wire policy without a key,
+network, SDK execution or application tools. Incomplete captures always refuse.
+Reports omit bodies, arguments and schema content. `allowed` means wire-eligible;
+custom application validators, transforms, execution and SDK continuation are
+outside this replay. For example, a recorded `application_schema_invalid` can
+be wire-eligible on replay. To test the actual SDK and continuation, use the
+separate regression CLI with reviewed harmless stubs and a positive control.
+Replay does not generate or approve CI expectations automatically.
+
+`onCapture` also accepts your own async local writer. It receives a detached
+`GuardCapture`; changing it cannot change approved inputs. Recording completes
+before tool authority is installed. If it fails for an otherwise allowed
+batch, that batch refuses with `recording_error`; a refusal remains refused
+even if recording fails. `allowed` in a recording describes validation, never
+proof that tools ran. Consume/cancel the native stream so requests can settle.
+The file recorder and replay entry point require Node; the main import does
+not import filesystem code. Non-2xx HTTP responses and unsupported content
+types are outside this recorder's scope.
 
 Optional `onDecision(event)` receives only `status`, `toolCalls` and a refusal
 reason. `allowed` means a batch was validated, not that its tools ran. Reports

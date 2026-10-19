@@ -11,5 +11,6 @@ reports/mutation
 *.tsbuildinfo
 *.tgz
 artifacts/
+.psj/
 test/docs/.generated/
 examples/typed-agent-loop/readme-check.mts

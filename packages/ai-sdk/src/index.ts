@@ -1,8 +1,10 @@
 import { asSchema, jsonSchema, streamText, type ToolSet } from "ai";
 import { createOpenAICompatible, type OpenAICompatibleProviderSettings } from "@ai-sdk/openai-compatible";
-import { canonical, GuardRefusal, inspectWire, readBounded } from "./wire.js";
+import { canonical, GuardRefusal, guardResponse, inspectWire } from "./wire.js";
+import type { GuardCapture } from "./recording-types.js";
 
 export { GuardRefusal } from "./wire.js";
+export type { GuardCapture } from "./recording-types.js";
 
 export interface GuardEvent {
   readonly status: "allowed" | "refused";
@@ -13,8 +15,12 @@ export interface GuardEvent {
 export type GuardedChatSettings = Pick<OpenAICompatibleProviderSettings, "name" | "baseURL" | "apiKey" | "headers" | "fetch"> & {
   /** Whole-response buffering ceiling; defaults to 8 MiB. */
   maxResponseBytes?: number;
+  /** Display-only text/reasoning prefix streams by default. Tool bytes wait for EOF. */
+  textStreaming?: "prefix" | "buffered";
   /** Local, payload-free callback. The package sends no telemetry. */
   onDecision?: (event: GuardEvent) => void;
+  /** Explicit opt-in: contains original response bytes and wire tool schemas. */
+  onCapture?: (capture: GuardCapture) => void | Promise<void>;
 };
 
 type NativeOptions<T extends ToolSet> = Parameters<typeof streamText<T>>[0];
@@ -29,12 +35,13 @@ export type GuardedChatResult<T extends ToolSet> = Extract<ReturnType<typeof str
 
 /**
  * Experimental OpenAI-compatible Chat Completions integration. Checks each
- * original response before releasing its bytes to native SDK tool execution.
+ * original response before releasing tool-bearing bytes to native execution.
  * Normal tool results, stopWhen, stream results and UI responses remain SDK-owned.
  */
 export function createGuardedChat(settings: GuardedChatSettings) {
   const limit = settings.maxResponseBytes ?? 8 * 1024 * 1024;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 64 * 1024 * 1024) throw new Error("maxResponseBytes must be 1..67108864.");
+  if (settings.textStreaming !== undefined && !["prefix", "buffered"].includes(settings.textStreaming)) throw new Error("textStreaming must be prefix or buffered.");
   const upstream = settings.fetch ?? globalThis.fetch;
   return function guardedChat<const T extends ToolSet>(options: GuardedChatOptions<T>): GuardedChatResult<T> {
     for (const key of Object.keys(options)) if (!(allowed as readonly string[]).includes(key)) {
@@ -85,44 +92,52 @@ export function createGuardedChat(settings: GuardedChatSettings) {
       }
       const response = await upstream(url, init);
       if (!response.ok) return response;
-      try {
-        if (!/^text\/event-stream(?:;|$)/iu.test(response.headers.get("content-type") ?? "")) throw new GuardRefusal("unsupported_response_type");
-        const bytes = await readBounded(response, limit, init.signal);
-        const { gate, decisions } = inspectWire(bytes, wireSchemas);
-        // Validate the ENTIRE batch with original application schemas before
-        // the SDK sees any call. Retain only unchanged JSON; validation runs once.
-        const pending: [string, Authority][] = [];
-        for (const decision of decisions) {
-          if (decision.action !== "execute" || !decision.toolCallId || !decision.name || !Object.hasOwn(wireSchemas, decision.name)) throw new GuardRefusal("unregistered_call");
-          const schema = schemas.get(decision.name);
-          const input = canonical(decision.value);
-          if (schema?.validate) {
-            const result = await schema.validate(structuredClone(decision.value));
-            if (!result.success) throw new GuardRefusal("application_schema_invalid");
-            if (canonical(result.value) !== input) throw new GuardRefusal("transformed_input");
-          }
-          init.signal?.throwIfAborted();
-          const authority = gate.takeDecision(decision.internalId);
-          if (!authority || pending.some(([id]) => id === decision.toolCallId)) throw new GuardRefusal("ambiguous_authority");
-          pending.push([decision.toolCallId, { name: decision.name, input }]);
-        }
-        for (const [id, authority] of pending) {
-          authorities.set(id, authority);
-          approved.get(authority.name)?.add(authority.input);
-        }
-        settings.onDecision?.({ status: "allowed", toolCalls: pending.length });
-        // Bytes are unchanged; only transfer-specific headers become invalid
-        // after fetch decompression and rebuilding this buffered response.
-        const headers = new Headers(response.headers);
-        for (const key of ["content-encoding", "content-length", "transfer-encoding"]) headers.delete(key);
-        return new Response(new Uint8Array(bytes).buffer, { status: response.status, statusText: response.statusText, headers });
-      } catch (error) {
+      const revoke = () => {
         authorities.clear();
         for (const values of approved.values()) values.clear();
+      };
+      if (!/^text\/event-stream(?:;|$)/iu.test(response.headers.get("content-type") ?? "")) {
         await response.body?.cancel().catch(() => {});
-        settings.onDecision?.({ status: "refused", toolCalls: 0, reason: error instanceof GuardRefusal ? error.reason : init.signal?.aborted ? "aborted" : "validation_error" });
-        throw error instanceof GuardRefusal || init.signal?.aborted ? error : new GuardRefusal("validation_error");
+        settings.onDecision?.({ status: "refused", toolCalls: 0, reason: "unsupported_response_type" });
+        throw new GuardRefusal("unsupported_response_type");
       }
+      return guardResponse(response, {
+        limit, signal: init.signal, buffered: settings.textStreaming === "buffered", revoke,
+        decide: event => settings.onDecision?.(event),
+        async observe(body, bodyComplete, decision) {
+          if (!settings.onCapture) return;
+          try {
+            await settings.onCapture({ formatVersion: 1, protocol: "openai-chat-completions-sse", body: new Uint8Array(body),
+              bodyComplete, toolSchemas: structuredClone(wireSchemas), decision: { ...decision } });
+          } catch { throw new GuardRefusal("recording_error"); }
+        },
+        async validate(bytes) {
+          const { gate, decisions } = inspectWire(bytes, wireSchemas);
+          // Validate the ENTIRE batch with original application schemas before
+          // the SDK sees any call. Retain only unchanged JSON; validation runs once.
+          const pending: [string, Authority][] = [];
+          for (const decision of decisions) {
+            if (decision.action !== "execute" || !decision.toolCallId || !decision.name || !Object.hasOwn(wireSchemas, decision.name)) throw new GuardRefusal("unregistered_call");
+            const schema = schemas.get(decision.name);
+            const input = canonical(decision.value);
+            if (schema?.validate) {
+              const result = await schema.validate(structuredClone(decision.value));
+              if (!result.success) throw new GuardRefusal("application_schema_invalid");
+              if (canonical(result.value) !== input) throw new GuardRefusal("transformed_input");
+            }
+            init.signal?.throwIfAborted();
+            const authority = gate.takeDecision(decision.internalId);
+            if (!authority || pending.some(([id]) => id === decision.toolCallId)) throw new GuardRefusal("ambiguous_authority");
+            pending.push([decision.toolCallId, { name: decision.name, input }]);
+          }
+          return { toolCalls: pending.length, commit() {
+            for (const [id, authority] of pending) {
+              authorities.set(id, authority);
+              approved.get(authority.name)?.add(authority.input);
+            }
+          } };
+        },
+      });
     };
     const provider = createOpenAICompatible({ name: settings.name, baseURL: settings.baseURL, apiKey: settings.apiKey, headers: settings.headers, fetch: guardedFetch });
     return streamText<T>({ ...options, model: provider.chatModel(options.model), tools: wrapped as T, maxRetries: 0, experimental_lowMemory: false }) as GuardedChatResult<T>;
