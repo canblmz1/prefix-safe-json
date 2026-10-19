@@ -1,6 +1,6 @@
 {
   "name": "prefix-safe-json",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Fail-closed execution integrity for streamed LLM tool calls — reject truncated or unconfirmed arguments before side effects",
   "keywords": [
     "json",
@@ -104,6 +104,7 @@
     "ai-v5": "npm:ai@5.0.244",
     "ai-v6": "npm:ai@6.0.264",
     "ai-v7": "npm:ai@7.0.77",
+    "arktype": "2.2.8",
     "clarinet": "^0.12.6",
     "eslint": "^9.8.0",
     "fast-check": "^4.9.0",

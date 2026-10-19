@@ -8,6 +8,17 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-19
+
+### Fixed
+
+- `fromStandardSchema` accepts callable Standard Schema v1 values, including real ArkType 2.2.8 schemas. Version/vendor/validate checks, the synchronous adapter contract and typed guards' unchanged-JSON requirement remain intact. ArkType is a test-only development dependency.
+
+### Companion package `psj-ai-sdk` 0.3.2
+
+- Whole-response validation also checks error/fatal coordinator diagnostics for calls that could not be created or were dropped by the provider adapter. A 129-call response and negative/fractional tool indexes cannot release otherwise valid siblings. Missing original call IDs refuse before application validation or one-shot authority consumption. The core gate's per-call decisions are unchanged; warning/info diagnostics and supported provider extra fields remain accepted.
+- A reproducible three-way comparison checks native SDK behavior, a small normalized-stream native check and the companion with identical response bytes. Current native JSON/schema/finish checks are controls, while duplicate original JSON members and provider-normalized IDs demonstrate specific raw-evidence differences. These are authored fixtures, not adoption or incident-frequency evidence.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed

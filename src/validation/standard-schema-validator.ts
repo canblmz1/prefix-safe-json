@@ -72,9 +72,12 @@ function formatIssue(issue: StandardSchemaV1Issue): string {
  * than refusing it here, synchronously, with a clear, specific reason.
  */
 function assertStandardSchemaV1(schema: unknown): asserts schema is StandardSchemaV1Like {
-  if (!isRecord(schema) || !("~standard" in schema)) {
+  // ArkType and other callable schemas expose the same interface on a
+  // function. Only the schema container may be callable; metadata and
+  // validation results still have to be ordinary object-shaped values.
+  if ((!isRecord(schema) && typeof schema !== "function") || !("~standard" in schema)) {
     throw new Error(
-      'prefix-safe-json: fromStandardSchema() requires an object with a "~standard" property ' +
+      'prefix-safe-json: fromStandardSchema() requires an object or function with a "~standard" property ' +
         "(the Standard Schema v1 interface - see https://standardschema.dev). Received: " +
         describeForError(schema),
     );

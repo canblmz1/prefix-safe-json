@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
-  "scripts": { "start": "node demo.mjs" },
+  "scripts": { "start": "node demo.mjs", "compare": "node comparison.mjs" },
   "dependencies": {
-    "psj-ai-sdk": "https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz",
-    "prefix-safe-json": "0.6.1",
+    "psj-ai-sdk": "0.3.2",
+    "prefix-safe-json": "0.6.2",
     "ai": "7.0.143",
     "@ai-sdk/openai-compatible": "3.0.71",
     "zod": "4.4.3"

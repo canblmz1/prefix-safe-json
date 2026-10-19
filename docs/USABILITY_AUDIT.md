@@ -1,5 +1,12 @@
 # Integration usability audit — October 19, 2026
 
+Follow-up: PR #88 merged at `5ed764c`; companion 0.3.1 was submitted through
+the protected npm publisher and its registry artifact now matches the tested
+workflow artifact, with provenance. The table below records the earlier
+0.2/0.3.0 audit state. Core 0.6.2 and companion 0.3.2 candidates separately fix
+callable schemas and the whole-batch diagnostic gap; see the
+[new regression evidence](BATCH_CONTRACT.md) and [evaluation kit](COMPANION_EVALUATION.md).
+
 The core npm package is installable. The largest observed costs are in the
 path from installation to an existing SDK application: a separate preview
 artifact, an unnecessarily narrow option list, and ownership of the original

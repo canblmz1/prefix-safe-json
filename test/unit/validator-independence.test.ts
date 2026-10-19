@@ -573,13 +573,13 @@ describe("prefix-safe-json/standard-schema", () => {
       );
     });
 
-    it("a non-object schema (e.g. a bare validate function with no ~standard) is a construction error", () => {
-      expect(() => fromStandardSchema((() => {}) as never)).toThrow(/requires an object with a "~standard" property/);
+    it("a bare validate function with no ~standard is a construction error", () => {
+      expect(() => fromStandardSchema((() => {}) as never)).toThrow(/requires an object or function with a "~standard" property/);
     });
 
     it("a schema with no ~standard property at all is a construction error, naming the exact value received", () => {
       expect(() => fromStandardSchema({} as never)).toThrow(
-        'prefix-safe-json: fromStandardSchema() requires an object with a "~standard" property ' +
+        'prefix-safe-json: fromStandardSchema() requires an object or function with a "~standard" property ' +
           "(the Standard Schema v1 interface - see https://standardschema.dev). Received: {}",
       );
     });

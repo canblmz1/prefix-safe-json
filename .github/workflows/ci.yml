@@ -524,6 +524,7 @@ jobs:
             done
             cp packages/ai-sdk/test/consumer.mts "$PSJ_CHAT_DIR/"
             cp examples/guarded-chat/demo.mjs "$PSJ_CHAT_DIR/"
+            cp examples/guarded-chat/comparison.mjs "$PSJ_CHAT_DIR/"
             (
               cd "$PSJ_CHAT_DIR"
               npm init -y
@@ -535,6 +536,7 @@ jobs:
               node --test test/*.test.mjs
               node node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext consumer.mts
               node demo.mjs
+              if [ "$PSJ_AI_VERSION" = '7.0.143' ]; then node comparison.mjs; fi
             )
           done
 
