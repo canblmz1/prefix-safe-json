@@ -51,6 +51,23 @@ class ByteCursor {
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 
+/** Stop awaiting user callbacks on cancellation; late settlement has no authority. */
+function cancellable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return false;
+      settled = true;
+      signal.removeEventListener("abort", abort);
+      return true;
+    };
+    const abort = () => { if (finish()) reject(signal.reason); };
+    signal.addEventListener("abort", abort, { once: true });
+    pending.then(value => { if (finish()) resolve(value); }, error => { if (finish()) reject(error); });
+    if (signal.aborted) abort();
+  });
+}
+
 /** Conservative display-only classification. It never grants tool authority. */
 function textFrame(bytes: Uint8Array): boolean {
   let frame: string;
@@ -97,15 +114,20 @@ export async function guardResponse(response: Response, options: {
   let failed!: (error: unknown) => void;
   const firstDisplayOrVerified = new Promise<void>((resolve, reject) => { ready = resolve; failed = reject; });
   let reporting: Promise<void> | undefined;
+  const callbackAbort = new AbortController();
   const bytes = () => new ByteCursor(chunks).read(size);
-  const abort = () => { void reader?.cancel(signal?.reason).catch(() => {}); };
+  const abort = () => {
+    callbackAbort.abort(signal?.reason);
+    void reader?.cancel(signal?.reason).catch(() => {});
+  };
   signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
   const cleanup = () => { signal?.removeEventListener("abort", abort); reader?.releaseLock(); };
   const active = () => { signal?.throwIfAborted(); if (cancelled) throw new GuardRefusal("cancelled"); };
   const report = (body: Uint8Array, event: ResponseObservation) => {
     // A recording callback is invoked once, including on cancellation/failure.
-    reporting ??= options.observe(body, complete, event);
-    return reporting;
+    reporting ??= Promise.resolve().then(() => options.observe(body, complete, event));
+    return cancellable(reporting, callbackAbort.signal);
   };
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -119,7 +141,7 @@ export async function guardResponse(response: Response, options: {
           if (next.done) {
             complete = true;
             const body = bytes();
-            const checked = await options.validate(body);
+            const checked = await cancellable(options.validate(body), callbackAbort.signal);
             active();
             await report(body, { status: "allowed", toolCalls: checked.toolCalls });
             active();
@@ -189,6 +211,7 @@ export async function guardResponse(response: Response, options: {
     async cancel(reason) {
       if (settled) return;
       cancelled = true;
+      callbackAbort.abort(new GuardRefusal("cancelled"));
       options.revoke();
       await reader?.cancel(reason).catch(() => {});
       const event = { status: "refused", toolCalls: 0, reason: "cancelled" } as const;

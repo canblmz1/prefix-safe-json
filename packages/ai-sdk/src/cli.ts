@@ -12,7 +12,10 @@ async function main(): Promise<void> {
   }
   if (positionals[0] !== "replay" || positionals.length !== 2 || (values.expect !== undefined && !["allowed", "refused"].includes(values.expect))) throw new Error("Invalid command.");
   const report = await replayRecording(positionals[1]!);
-  process.stdout.write(values.json ? JSON.stringify(report) + "\n" : `${report.replayed.status}: ${report.replayed.reason ?? `${report.replayed.toolCalls} eligible calls`} (wire policy only)\n`);
+  const text = `Wire policy only: ${report.replayed.status} (${report.replayed.reason ?? `${report.replayed.toolCalls} eligible calls`}).\n` +
+    `Recorded: ${report.recorded.status}${report.recorded.reason ? ` (${report.recorded.reason})` : ""}.\n` +
+    "Application validators, SDK continuation and tools were not executed.\n";
+  process.stdout.write(values.json ? JSON.stringify(report) + "\n" : text);
   if (values.expect && report.replayed.status !== values.expect) process.exitCode = 1;
 }
 main().catch(() => {

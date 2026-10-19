@@ -14,20 +14,16 @@ side effect. The separate integration below keeps tool execution in the SDK.
 Provider signals must accurately describe completion;
 see the [provider-honesty limit](examples/openai-consumer/README.md).
 
-```bash
-pnpm add prefix-safe-json ai zod
-# or: npm install prefix-safe-json ai zod
-```
-
 For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
 [guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
 `execute` callbacks and the SDK's automatic tool-result continuation:
 
-Install its separate preview into your application alongside the supported
-SDK/provider peers:
+For a new application, install its separate preview and a tested SDK/provider
+pair together. In an existing application, keep your supported locked peer
+versions; see the integration's installation instructions.
 
 ```sh
-npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.2.0/psj-ai-sdk-0.2.0.tgz
+npm install --save-exact prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
 ```
 
 ```typescript
@@ -44,7 +40,8 @@ offline wire-policy replay and explicit CI expectations. See the integration's
 supported policies and provisional-text limits. Run the [offline example](examples/guarded-chat/)
 without a key. The core runtime gains no AI SDK dependency.
 
-For caller-owned dispatch, use the [complete TypeScript agent-loop example](examples/typed-agent-loop/):
+For caller-owned dispatch, install `prefix-safe-json` from npm and use the
+[complete TypeScript agent-loop example](examples/typed-agent-loop/):
 [download its ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
 extract it, then run `npm install --engine-strict --no-audit --no-fund` and
 `npm start` with Node 22+. It uses published PSJ `0.6.1`, runs tools, sends
@@ -133,6 +130,8 @@ across providers. Check your integration before adding it:
 The [integration guide](docs/TRY_IN_YOUR_PROJECT.md) explains the migration
 steps and [external fit audit](docs/EXTERNAL_FIT_AUDIT.md) records useful
 integrations and cases where no additional benefit was shown.
+The [usability audit](docs/USABILITY_AUDIT.md) separates reproduced integration
+blockers, fixes and the limits that still need evaluation.
 
 For a concrete difference beyond unsafe termination, the
 [identity comparison](docs/IDENTITY_TRIAL.md) feeds complete, schema-valid

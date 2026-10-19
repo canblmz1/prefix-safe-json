@@ -103,8 +103,8 @@ See the [AI SDK generateText reference](https://ai-sdk.dev/docs/reference/ai-sdk
 ## Separate AI SDK guarded-chat preview
 
 The [guarded chat package](../packages/ai-sdk/README.md) preserves ordinary
-function-tool callbacks and native SDK result continuation. It checks original
-OpenAI-compatible Chat Completions SSE before releasing each response to the
+function-tool and runtime-defined (`dynamicTool`) callbacks and native SDK result
+continuation. It checks original OpenAI-compatible Chat Completions SSE before releasing each response to the
 SDK. Its installed-consumer matrix includes AI SDK/provider pairs
 `7.0.29`/`3.0.11`, `7.0.128`/`3.0.71`, and `7.0.143`/`3.0.71`.
 Each case runs actual SDK transport parsing and tool callbacks, not a mock
@@ -113,8 +113,11 @@ LanguageModel projection. Strict external TypeScript consumers are compiled.
 It is a separate experimental GitHub preview, requires Node 22+, and adds no
 core-runtime dependency. Version 0.2 streams a display-only text/reasoning
 prefix while tool/control frames and all later bytes wait for EOF. Text is
-provisional; unknown provider fields can cause buffering. Only its
-documented function-tool policy is supported; this does not extend the core
+provisional; unknown provider fields can cause buffering. Version 0.3 supports
+a checked `prepareStep` subset: registered-tool selection,
+messages/instructions and generation settings. Model/tool/execution-context
+replacement remains refused. The integration's function-tool policy is narrower
+than the full SDK lifecycle; this does not extend the core
 AiSdkStreamAdapter's contract to LanguageModelV4 or certify live providers,
 full applications, browser extensions or independent adoption.
 
