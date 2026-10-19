@@ -30,23 +30,30 @@ the native SDK result, including `fullStream`, `steps` and response helpers.
 
 ## Install the preview
 
-This integration is a **GitHub preview, not an npm registry package**.
-`npm install psj-ai-sdk` does not work. For an existing application with supported
-AI SDK/provider peers, install the exact public artifact and core dependency:
+For a registry release, install the integration and core dependency. Keep an
+existing application's supported locked AI SDK/provider peers:
 
 ```sh
-npm install --save-exact prefix-safe-json@0.6.1 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
+npm install --save-exact psj-ai-sdk@0.3.1 prefix-safe-json@0.6.1
 ```
 
 Keep your application's supported locked `ai` and `@ai-sdk/openai-compatible`
 versions. For a **new project**, this single command installs a tested pair:
 
 ```sh
-npm install --save-exact prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
+npm install --save-exact psj-ai-sdk@0.3.1 prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
 ```
 
-The release includes checksums. `private: true` prevents accidental registry
-publication. The core npm package does not export `createGuardedChat`.
+The published GitHub-only 0.3.0 preview remains available independently of
+registry publication, with its original artifact and checksum:
+
+```sh
+npm install --save-exact prefix-safe-json@0.6.1 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
+```
+
+The core npm package does not export `createGuardedChat`. Package publication
+uses the [separate release workflow](RELEASING.md); a GitHub preview release
+does not itself establish that a registry version exists.
 
 The installed-package matrix covers `ai@7.0.29` / provider `3.0.11`,
 `ai@7.0.128` / provider `3.0.71`, and `ai@7.0.143` / provider `3.0.71`.
