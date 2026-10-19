@@ -34,14 +34,14 @@ For a registry release, install the integration and core dependency. Keep an
 existing application's supported locked AI SDK/provider peers:
 
 ```sh
-npm install --save-exact psj-ai-sdk@0.3.1 prefix-safe-json@0.6.1
+npm install --save-exact psj-ai-sdk@0.3.2 prefix-safe-json@0.6.2
 ```
 
 Keep your application's supported locked `ai` and `@ai-sdk/openai-compatible`
 versions. For a **new project**, this single command installs a tested pair:
 
 ```sh
-npm install --save-exact psj-ai-sdk@0.3.1 prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
+npm install --save-exact psj-ai-sdk@0.3.2 prefix-safe-json@0.6.2 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
 ```
 
 The published GitHub-only 0.3.0 preview remains available independently of
@@ -54,6 +54,25 @@ npm install --save-exact prefix-safe-json@0.6.1 https://github.com/canblmz1/pref
 The core npm package does not export `createGuardedChat`. Package publication
 uses the [separate release workflow](RELEASING.md); a GitHub preview release
 does not itself establish that a registry version exists.
+
+Before the candidate versions are published, use the two tested tarballs as
+described in the [evaluation kit](../../docs/COMPANION_EVALUATION.md). Older
+0.3.0/0.3.1 builds do not include the whole-batch diagnostic fix in 0.3.2.
+
+## Whole-response batch policy
+
+All tracked calls must be executable, and the core coordinator must report no
+`error` or `fatal` diagnostic for the original response. This includes calls
+that exceeded the default 128-call limit or were dropped for an invalid index:
+they have no entry in the core's per-call decisions, but still refuse the
+companion's entire group. Original nonempty IDs are required before application
+validation or one-shot authority consumption. Warning/info diagnostics and
+supported provider extension fields do not refuse a healthy group.
+
+127 and 128 valid calls remain supported. At 129 calls, neither a valid nor an
+invalid final call permits any callback or continuation. This policy validates
+the group before execution; it does not roll back callbacks after they begin.
+See the [contract and regression evidence](../../docs/BATCH_CONTRACT.md).
 
 The installed-package matrix covers `ai@7.0.29` / provider `3.0.11`,
 `ai@7.0.128` / provider `3.0.71`, and `ai@7.0.143` / provider `3.0.71`.

@@ -1,4 +1,4 @@
-import { OpenAICompatibleStreamAdapter, createToolCallExecutionGate } from "prefix-safe-json";
+import { OpenAICompatibleStreamAdapter, createToolCallExecutionGate, type CoordinatorLimits } from "prefix-safe-json";
 
 export class GuardRefusal extends Error {
   readonly code = "PSJ_REFUSED";
@@ -230,14 +230,14 @@ export async function guardResponse(response: Response, options: {
   return new Response(stream, { status: response.status, statusText: response.statusText, headers });
 }
 
-export function inspectWire(bytes: Uint8Array, schemas: Record<string, object>) {
+export function inspectWire(bytes: Uint8Array, schemas: Record<string, object>, limits?: Partial<CoordinatorLimits>) {
   let text: string;
   try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
   catch { throw new GuardRefusal("invalid_utf8"); }
   const frames = text.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n").split("\n\n");
   if (frames.pop()?.trim()) throw new GuardRefusal("unfinished_sse_event");
   const adapter = new OpenAICompatibleStreamAdapter();
-  const gate = createToolCallExecutionGate(undefined, undefined, schemas);
+  const gate = createToolCallExecutionGate(limits, undefined, schemas);
   let ended = false;
   for (const frame of frames) {
     const data = frame.split("\n").filter(line => line === "data" || line.startsWith("data:"))
@@ -255,5 +255,20 @@ export function inspectWire(bytes: Uint8Array, schemas: Record<string, object>) 
   const final = gate.finish();
   const refusal = final.decisions.find(decision => decision.action !== "execute");
   if (refusal) throw new GuardRefusal(refusal.reason);
+  // Core decisions cover only calls the coordinator could create. This
+  // adapter promises a whole-response batch, so errors about dropped or
+  // unresolved calls must refuse BEFORE consuming any one-shot authority.
+  // Keep call-scoped core policy intact; warning/info diagnostics and provider
+  // extension fields do not invalidate an otherwise accounted-for batch.
+  const batchError = final.diagnostics.find(diagnostic => diagnostic.severity === "error" || diagnostic.severity === "fatal");
+  if (batchError) {
+    const reason = ["E_COORDINATOR_LIMIT_CALLS", "E_COORDINATOR_LIMIT_EVENTS", "E_TOOL_NAME_LIMIT"].includes(batchError.code) ? "resource_limit" :
+      batchError.code === "E_PROVIDER_EVENT_MALFORMED" ? "unaccounted_call" :
+        batchError.code === "E_TOOL_CALL_NOT_FOUND" ? "unresolved_call" : "protocol_violation";
+    throw new GuardRefusal(reason);
+  }
+  if (final.decisions.some(decision => typeof decision.toolCallId !== "string" || decision.toolCallId.length === 0)) {
+    throw new GuardRefusal("unresolved_call");
+  }
   return { gate, decisions: final.decisions };
 }

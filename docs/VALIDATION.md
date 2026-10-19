@@ -193,6 +193,12 @@ coordinator then converts into the same fail-closed `valid: false`
 outcome described above ("A validator that throws") - never a silently
 awaited or ignored Promise, and never a hang.
 
+Schema values may be objects or callable functions exposing a valid
+`~standard` interface. Callable ArkType `2.2.8` schemas are exercised with real
+valid/invalid inputs and typed guard authority in the test suite. Their
+callability does not relax the v1 metadata checks or add asynchronous,
+coercion or transformation support to the typed execution boundary.
+
 ### Construction-time v1 shape validation
 
 `fromStandardSchema(schema)` checks `schema["~standard"]` at construction

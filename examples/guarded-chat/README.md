@@ -24,3 +24,11 @@ The 0.3 preview accepts ordinary generation settings and a limited `prepareStep`
 for selecting registered tools and messages; see the package's supported subset.
 The SDK remains responsible for tool errors and continuation. This is not
 rollback, durable idempotency or evidence of independent adoption.
+
+Run `npm run compare` for the same response through current native SDK,
+a small application-native batch check, and the companion. The pinned
+AI SDK/provider pair is `7.0.143`/`3.0.71`; native JSON/schema/finish checks are
+included as controls. See the [evaluation kit](../../docs/COMPANION_EVALUATION.md)
+for candidate-artifact installation, observed callback counts, integration
+costs and independent keep/remove questions. The whole-batch diagnostic fix
+requires companion 0.3.2; the older published demo pin does not include it.
