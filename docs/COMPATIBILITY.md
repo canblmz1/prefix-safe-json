@@ -113,8 +113,11 @@ LanguageModel projection. Strict external TypeScript consumers are compiled.
 It is a separate experimental GitHub preview, requires Node 22+, and adds no
 core-runtime dependency. Version 0.2 streams a display-only text/reasoning
 prefix while tool/control frames and all later bytes wait for EOF. Text is
-provisional; unknown provider fields can cause buffering. Only its
-documented function-tool policy is supported; this does not extend the core
+provisional; unknown provider fields can cause buffering. Version 0.3 supports
+a checked `prepareStep` subset: registered-tool selection,
+messages/instructions and generation settings. Model/tool/execution-context
+replacement remains refused. The integration's function-tool policy is narrower
+than the full SDK lifecycle; this does not extend the core
 AiSdkStreamAdapter's contract to LanguageModelV4 or certify live providers,
 full applications, browser extensions or independent adoption.
 

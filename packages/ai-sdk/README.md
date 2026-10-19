@@ -30,16 +30,23 @@ the native SDK result, including `fullStream`, `steps` and response helpers.
 
 ## Install the preview
 
-Distributed separately from the core runtime as a GitHub preview tarball:
+This integration is a **GitHub preview, not an npm registry package**.
+`npm install psj-ai-sdk` does not work. For an existing application with supported
+AI SDK/provider peers, install the exact public artifact and core dependency:
 
 ```sh
-npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.2.0/psj-ai-sdk-0.2.0.tgz
+npm install --save-exact prefix-safe-json@0.6.1 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
 ```
 
-Install the supported application-owned peers too: `ai`,
-`@ai-sdk/openai-compatible` and `prefix-safe-json@0.6.1`. Keep the lockfile.
-The release includes checksums. This package is not on the npm registry;
-`private: true` prevents accidental registry publication.
+Keep your application's supported locked `ai` and `@ai-sdk/openai-compatible`
+versions. For a **new project**, this single command installs a tested pair:
+
+```sh
+npm install --save-exact prefix-safe-json@0.6.1 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.3.0/psj-ai-sdk-0.3.0.tgz
+```
+
+The release includes checksums. `private: true` prevents accidental registry
+publication. The core npm package does not export `createGuardedChat`.
 
 The installed-package matrix covers `ai@7.0.29` / provider `3.0.11`,
 `ai@7.0.128` / provider `3.0.71`, and `ai@7.0.143` / provider `3.0.71`.
@@ -73,11 +80,48 @@ unlisted patches are not individually certified.
   Nothing is transmitted to the package maintainer.
 
 Ordinary local function tools with `execute` are supported. Input lifecycle
-hooks, provider-executed tools, approval continuation, `prepareStep`, input
+hooks, provider-executed tools, approval continuation, input
 refinement, model replacement and call repair are refused rather than quietly
 bypassing the original-response boundary. For those workflows, retain the
 [caller-owned integration](../../examples/typed-agent-loop/README.md).
 This first adapter does not implement Anthropic Messages or OpenAI Responses.
+
+## Keep step selection and ordinary SDK settings
+
+`instructions`, `system`, `reasoning`, sampling controls, `providerOptions`,
+`onStepFinish`, and `prepareStep` can remain in a supported SDK call:
+
+```typescript
+const result = chat({
+  model: "your-model", tools, prompt, instructions: "Be concise.",
+  reasoning: "none", stopWhen: stepCountIs(5),
+  prepareStep: ({ messages, stepNumber }) => ({
+    messages,
+    activeTools: stepNumber === 0 ? ["search"] : ["summarize"],
+  }),
+});
+```
+
+The selected names must be tools registered in `tools`. The hook can return
+`activeTools`, `toolChoice`, `messages`, `instructions`/`system`, `providerOptions`
+and sampling controls, or `undefined`. Every physical request is checked against
+its actual outgoing tools, so an inactive tool cannot gain authority. Returning
+a replacement model, tool set, execution context, sandbox or unknown field fails
+before the next provider request. Provider metadata cannot change the configured
+wire model. Input schemas and callbacks stay registered for the invocation.
+
+Provider settings accept `name`, `baseURL`, `apiKey`, `headers`, `queryParams`,
+`includeUsage` and `fetch`, alongside the guard settings above. Unsupported
+settings produce an explicit configuration error instead of being silently
+discarded. This is still a subset of the native provider/SDK API; compare your
+configuration before replacing a broader integration.
+
+On abort/cancellation the guard releases the response reader and revokes
+authority without waiting for a pending application validator or recorder.
+JavaScript callbacks already in progress may still finish, including a local
+file write; their late settlement cannot restore tool authority. Keep validators
+free of application effects. `allowed` capture metadata describes validation,
+not execution or a guarantee that the invocation was not later cancelled.
 
 ## Use it in existing CI
 

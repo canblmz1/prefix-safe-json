@@ -528,7 +528,7 @@ jobs:
               npm init -y
               npm pkg set type=module
               npm install --ignore-scripts --engine-strict --no-audit --no-fund \
-                "$RUNNER_TEMP/psj-ai-sdk-0.2.0.tgz" 'prefix-safe-json@0.6.1' \
+                "$RUNNER_TEMP/psj-ai-sdk-0.3.0.tgz" 'prefix-safe-json@0.6.1' \
                 "ai@$PSJ_AI_VERSION" "@ai-sdk/openai-compatible@$PSJ_PROVIDER_VERSION" \
                 'zod@4.4.3' 'typescript@5.9.3' '@types/node@22.19.15' '@types/json-schema@7.0.15'
               node --test test/*.test.mjs

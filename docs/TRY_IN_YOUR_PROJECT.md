@@ -19,6 +19,9 @@ Text/reasoning can stream before EOF; tool calls and every subsequent byte
 wait for the complete response and batch validation. Displayed text is
 provisional. The adapter accepts ordinary function tools without input hooks
 or approval continuation; it refuses model replacement and call repair.
+The 0.3 preview supports `instructions`, `reasoning` and a limited `prepareStep`
+for selecting registered tools, messages and generation settings. It still
+does not accept a replacement model/tool set or execution context.
 Check its supported policies before choosing it. Applications needing the
 broader SDK lifecycle can retain the caller-owned path below.
 

@@ -20,5 +20,7 @@ The 0.2 integration streams a display-only text/reasoning prefix. Tool calls
 and all bytes following them wait for EOF and whole-batch validation. Text is
 provisional; handle body errors when consuming it. Its function-tool policy is narrower than the SDK's full
 API; input hooks, approval continuation and model/tool replacement are refused.
+The 0.3 preview accepts ordinary generation settings and a limited `prepareStep`
+for selecting registered tools and messages; see the package's supported subset.
 The SDK remains responsible for tool errors and continuation. This is not
 rollback, durable idempotency or evidence of independent adoption.

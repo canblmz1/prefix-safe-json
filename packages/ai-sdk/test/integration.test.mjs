@@ -156,7 +156,7 @@ test("concurrent invocations cannot consume another invocation's authority", asy
 
 test("unsupported SDK replacement and tool hook paths fail before a request", () => {
   const f = fixture([]);
-  assert.throws(() => createGuardedChat(f.settings)({ ...f.options, prepareStep: () => { throw new Error("must not run"); } }), /Unsupported guarded option/u);
+  assert.throws(() => createGuardedChat(f.settings)({ ...f.options, experimental_repairToolCall: () => { throw new Error("must not run"); } }), /Unsupported guarded option/u);
   assert.throws(() => createGuardedChat(f.settings)({ ...f.options, tools: { record: { ...f.tools.record, onInputAvailable() {} } } }), /no input hooks/u);
   assert.equal(f.requests.length, 0);
   assert.equal(f.effects.length, 0);
