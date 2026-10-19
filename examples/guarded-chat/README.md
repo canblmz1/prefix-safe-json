@@ -16,8 +16,9 @@ The fixture transport is test setup, not integration code to copy into a live
 application. Use [the package quick start](../../packages/ai-sdk/README.md) with
 your own configured endpoint and tools.
 
-This first integration buffers each response and therefore delays its first
-text chunk. Its supported function-tool policy is narrower than the SDK's full
+The 0.2 integration streams a display-only text/reasoning prefix. Tool calls
+and all bytes following them wait for EOF and whole-batch validation. Text is
+provisional; handle body errors when consuming it. Its function-tool policy is narrower than the SDK's full
 API; input hooks, approval continuation and model/tool replacement are refused.
 The SDK remains responsible for tool errors and continuation. This is not
 rollback, durable idempotency or evidence of independent adoption.

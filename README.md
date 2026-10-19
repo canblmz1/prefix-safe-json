@@ -27,7 +27,7 @@ Install its separate preview into your application alongside the supported
 SDK/provider peers:
 
 ```sh
-npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.1.0/psj-ai-sdk-0.1.0.tgz
+npm install --save-exact https://github.com/canblmz1/prefix-safe-json/releases/download/psj-ai-sdk-v0.2.0/psj-ai-sdk-0.2.0.tgz
 ```
 
 ```typescript
@@ -38,9 +38,10 @@ const chat = createGuardedChat({ name: "provider", baseURL, apiKey });
 const result = chat({ model: modelId, tools, prompt, stopWhen: stepCountIs(5) });
 ```
 
-It buffers each complete response before releasing tool calls, which delays
-the first text chunk. See its separate preview install and supported tool
-policies before choosing it. Run the [offline example](examples/guarded-chat/)
+Text/reasoning can stream while tool calls wait for the entire response and
+batch validation. Optional local recording saves refused responses for
+offline wire-policy replay and explicit CI expectations. See the integration's
+supported policies and provisional-text limits. Run the [offline example](examples/guarded-chat/)
 without a key. The core runtime gains no AI SDK dependency.
 
 For caller-owned dispatch, use the [complete TypeScript agent-loop example](examples/typed-agent-loop/):

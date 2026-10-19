@@ -111,7 +111,9 @@ Each case runs actual SDK transport parsing and tool callbacks, not a mock
 LanguageModel projection. Strict external TypeScript consumers are compiled.
 
 It is a separate experimental GitHub preview, requires Node 22+, and adds no
-core-runtime dependency. Full-response buffering delays first output. Only its
+core-runtime dependency. Version 0.2 streams a display-only text/reasoning
+prefix while tool/control frames and all later bytes wait for EOF. Text is
+provisional; unknown provider fields can cause buffering. Only its
 documented function-tool policy is supported; this does not extend the core
 AiSdkStreamAdapter's contract to LanguageModelV4 or certify live providers,
 full applications, browser extensions or independent adoption.

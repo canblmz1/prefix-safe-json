@@ -209,3 +209,124 @@ test("invalid UTF-8 is refused, while BOM/CRLF and split Unicode remain intact",
   await consume(createGuardedChat(f.settings)(f.options));
   assert.deepEqual(f.effects.map(effect => effect.input.message), ["\u03b1", "beta"]);
 });
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  return { promise, resolve };
+}
+
+for (const newline of ["\n", "\r\n", "\r"]) test(`text and reasoning arrive before EOF (${JSON.stringify(newline)}), tools do not`, { timeout: 5000 }, async t => {
+  const seen = deferred(), abort = new AbortController();
+  t.after(() => abort.abort());
+  let source;
+  const display = "\uFEFF" + [chunk({ role: "assistant", reasoning_content: "Thinking \u03b1" }), chunk({ content: "Working \ud83d\ude80" })]
+    .map(event => `data: ${JSON.stringify({ ...event, usage: null, choices: event.choices.map(choice => ({ ...choice, logprobs: null })) })}\n\n`).join("");
+  const f = fixture([() => new Response(new ReadableStream({ start(controller) {
+    source = controller;
+    // Split every Unicode sequence, newline and SSE boundary into single bytes.
+    for (const byte of new TextEncoder().encode((display + ": keepalive\n\n").replaceAll("\n", newline))) controller.enqueue(new Uint8Array([byte]));
+  } }), { headers: { "content-type": "text/event-stream" } }), answer]);
+  const parts = [];
+  const result = createGuardedChat(f.settings)({ ...f.options, abortSignal: abort.signal, onChunk: ({ chunk: part }) => {
+    parts.push(part);
+    if (part.type === "text-delta") seen.resolve();
+  } });
+  const consuming = consume(result);
+  await seen.promise;
+  assert.ok(parts.some(p => p.type === "reasoning-delta" && p.text === "Thinking \u03b1"));
+  assert.ok(parts.some(p => p.type === "text-delta" && p.text === "Working \ud83d\ude80"));
+  assert.deepEqual(f.effects, []);
+  assert.deepEqual(f.events, []);
+  source.enqueue(new TextEncoder().encode(complete.replaceAll("\n", newline)));
+  // Even complete tool JSON + finish + DONE does not constitute EOF.
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(f.effects, []);
+  assert.deepEqual(f.events, []);
+  source.close();
+  await consuming;
+  assert.deepEqual(f.effects.map(effect => effect.id), ["a", "b"]);
+  assert.deepEqual(f.requests[1].messages.filter(m => m.role === "tool").map(m => m.tool_call_id), ["a", "b"]);
+  assert.equal(await result.text, "Recorded.");
+});
+
+test("a displayed prefix followed by a late error cannot release a tool", { timeout: 5000 }, async t => {
+  const seen = deferred(), abort = new AbortController();
+  t.after(() => abort.abort());
+  let source;
+  const f = fixture([() => new Response(new ReadableStream({ start(controller) {
+    source = controller;
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk({ content: "Provisional text" }))}\n\n`));
+  } }), { headers: { "content-type": "text/event-stream" } })]);
+  const result = createGuardedChat(f.settings)({ ...f.options, abortSignal: abort.signal, onChunk: ({ chunk }) => { if (chunk.type === "text-delta") seen.resolve(); } });
+  const consuming = consume(result);
+  // Attach rejection handling before the body can fail.
+  const rejected = assert.rejects(consuming, error => {
+    // Provider-utils patches differ in whether body errors are wrapped.
+    while (error.cause) error = error.cause;
+    assert.ok(error instanceof GuardRefusal);
+    assert.equal(error.reason, "provider_error");
+    return true;
+  });
+  await seen.promise;
+  source.enqueue(new TextEncoder().encode(refusals["late provider error"]));
+  source.close();
+  await rejected;
+  assert.deepEqual(f.effects, []);
+  assert.equal(f.requests.length, 1);
+  assert.deepEqual(f.events, [{ status: "refused", toolCalls: 0, reason: "provider_error" }]);
+});
+
+test("mixed text/tool frames and all later text remain held", { timeout: 5000 }, async () => {
+  const held = deferred();
+  let source;
+  const f = fixture([() => new Response(new ReadableStream({ start(controller) {
+    source = controller;
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk({ content: "Not yet", tool_calls: [call(0, "a", '{"message":"alpha"}')] }))}\n\n`));
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk({ content: "Still held" }))}\n\n`));
+    held.resolve();
+  } }), { headers: { "content-type": "text/event-stream" } }), answer]);
+  const chunks = [];
+  const consuming = consume(createGuardedChat(f.settings)({ ...f.options, onChunk: ({ chunk }) => chunks.push(chunk) }));
+  await held.promise;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chunks.some(chunk => ["text-delta", "tool-call", "tool-input-delta"].includes(chunk.type)), false);
+  assert.deepEqual(f.effects, []);
+  source.enqueue(new TextEncoder().encode(sse([chunk({}, "tool_calls")])));
+  source.close();
+  await consuming;
+  assert.equal(f.effects.length, 1);
+});
+
+test("buffered mode retains the previous display boundary", { timeout: 5000 }, async () => {
+  const started = deferred();
+  let source;
+  const f = fixture([() => new Response(new ReadableStream({ start(controller) {
+    source = controller;
+    controller.enqueue(new TextEncoder().encode(answer));
+    started.resolve();
+  } }), { headers: { "content-type": "text/event-stream" } })], { textStreaming: "buffered" });
+  const chunks = [];
+  const consuming = consume(createGuardedChat(f.settings)({ ...f.options, onChunk: ({ chunk }) => chunks.push(chunk) }));
+  await started.promise;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(chunks.some(chunk => chunk.type === "text-delta"), false);
+  source.close();
+  await consuming;
+  assert.ok(chunks.some(chunk => chunk.type === "text-delta"));
+});
+
+test("abort after a displayed prefix cancels upstream without executing tools", { timeout: 5000 }, async () => {
+  const seen = deferred(), abort = new AbortController();
+  let cancelled = false;
+  const f = fixture([() => new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk({ content: "Working" }))}\n\n`));
+    controller.enqueue(new TextEncoder().encode(complete));
+  }, cancel() { cancelled = true; } }), { headers: { "content-type": "text/event-stream" } })]);
+  const consuming = consume(createGuardedChat(f.settings)({ ...f.options, abortSignal: abort.signal, onChunk: ({ chunk }) => { if (chunk.type === "text-delta") seen.resolve(); } })).catch(() => {});
+  await seen.promise;
+  abort.abort();
+  await consuming;
+  assert.equal(cancelled, true);
+  assert.deepEqual(f.effects, []);
+});

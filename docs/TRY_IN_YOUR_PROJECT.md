@@ -15,11 +15,16 @@ const chat = createGuardedChat({ name: "provider", baseURL, apiKey });
 const result = chat({ model: modelId, tools, prompt, stopWhen: stepCountIs(5) });
 ```
 
-Each response is fully buffered before release, so its first text chunk is
-delayed. The first adapter accepts ordinary function tools without input hooks
+Text/reasoning can stream before EOF; tool calls and every subsequent byte
+wait for the complete response and batch validation. Displayed text is
+provisional. The adapter accepts ordinary function tools without input hooks
 or approval continuation; it refuses model replacement and call repair.
 Check its supported policies before choosing it. Applications needing the
 broader SDK lifecycle can retain the caller-owned path below.
+
+Add `onCapture: createFileRecorder({ directory: ".psj/captures" })` to keep
+refused responses locally, then run `psj-chat replay recording.json --json`
+without a model key. See the preview's recording import, privacy and replay scope.
 
 ## Check whether the caller-owned boundary fits
 

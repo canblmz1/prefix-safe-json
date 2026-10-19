@@ -516,7 +516,11 @@ jobs:
             read -r PSJ_AI_VERSION PSJ_PROVIDER_VERSION <<< "$PSJ_PAIR"
             PSJ_CHAT_DIR=$(mktemp -d)
             mkdir "$PSJ_CHAT_DIR/test"
-            sed 's#"../dist/index.js"#"psj-ai-sdk"#' packages/ai-sdk/test/integration.test.mjs > "$PSJ_CHAT_DIR/test/integration.test.mjs"
+            for PSJ_TEST in packages/ai-sdk/test/*.test.mjs; do
+              sed -e 's#"../dist/index.js"#"psj-ai-sdk"#' \
+                  -e 's#"../dist/recording.js"#"psj-ai-sdk/recording"#' \
+                  "$PSJ_TEST" > "$PSJ_CHAT_DIR/test/$(basename "$PSJ_TEST")"
+            done
             cp packages/ai-sdk/test/consumer.mts "$PSJ_CHAT_DIR/"
             cp examples/guarded-chat/demo.mjs "$PSJ_CHAT_DIR/"
             (
@@ -524,10 +528,10 @@ jobs:
               npm init -y
               npm pkg set type=module
               npm install --ignore-scripts --engine-strict --no-audit --no-fund \
-                "$RUNNER_TEMP/psj-ai-sdk-0.1.0.tgz" 'prefix-safe-json@0.6.1' \
+                "$RUNNER_TEMP/psj-ai-sdk-0.2.0.tgz" 'prefix-safe-json@0.6.1' \
                 "ai@$PSJ_AI_VERSION" "@ai-sdk/openai-compatible@$PSJ_PROVIDER_VERSION" \
                 'zod@4.4.3' 'typescript@5.9.3' '@types/node@22.19.15' '@types/json-schema@7.0.15'
-              node --test test/integration.test.mjs
+              node --test test/*.test.mjs
               node node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext consumer.mts
               node demo.mjs
             )
