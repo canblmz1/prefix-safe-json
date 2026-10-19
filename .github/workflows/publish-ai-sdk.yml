@@ -1,0 +1,125 @@
+name: Publish psj-ai-sdk to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact version from packages/ai-sdk/package.json
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-psj-ai-sdk
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Verify version and publication metadata
+        id: package
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./packages/ai-sdk/package.json').version")
+          test "$VERSION" = "$REQUESTED_VERSION"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('packages/ai-sdk/package.json', 'utf8'));
+          if (pkg.name !== 'psj-ai-sdk' || pkg.private || pkg.publishConfig?.access !== 'public' ||
+              pkg.repository?.url !== 'git+https://github.com/canblmz1/prefix-safe-json.git') {
+            throw new Error('Unexpected publication identity or visibility');
+          }
+          NODE
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Build and pack once
+        working-directory: packages/ai-sdk
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Validate the installed artifact across supported peers
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          for PAIR in '7.0.29 3.0.11' '7.0.128 3.0.71' '7.0.143 3.0.71'; do
+            read -r AI_VERSION PROVIDER_VERSION <<< "$PAIR"
+            CONSUMER=$(mktemp -d)
+            mkdir "$CONSUMER/test"
+            for TEST in packages/ai-sdk/test/*.test.mjs; do
+              sed -e 's#"../dist/index.js"#"psj-ai-sdk"#' \
+                  -e 's#"../dist/recording.js"#"psj-ai-sdk/recording"#' \
+                  "$TEST" > "$CONSUMER/test/$(basename "$TEST")"
+            done
+            cp packages/ai-sdk/test/consumer.mts examples/guarded-chat/demo.mjs "$CONSUMER/"
+            (
+              cd "$CONSUMER"
+              npm init -y >/dev/null
+              npm pkg set type=module
+              npm install --ignore-scripts --engine-strict --no-audit --no-fund \
+                "$RUNNER_TEMP/psj-ai-sdk-$VERSION.tgz" prefix-safe-json@0.6.1 \
+                "ai@$AI_VERSION" "@ai-sdk/openai-compatible@$PROVIDER_VERSION" \
+                zod@4.4.3 typescript@5.9.3 @types/node@22.19.15 @types/json-schema@7.0.15
+              node --test test/*.test.mjs
+              node node_modules/typescript/bin/tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext consumer.mts
+              node demo.mjs
+            )
+          done
+      - name: Preserve the exact tested artifact
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          mkdir release
+          cp "$RUNNER_TEMP/psj-ai-sdk-$VERSION.tgz" release/
+          cd release
+          sha256sum "psj-ai-sdk-$VERSION.tgz" > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: psj-ai-sdk-release
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with native OIDC support
+        run: npm install -g npm@11.5.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: psj-ai-sdk-release
+          path: release
+      - name: Publish the verified artifact
+        working-directory: release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS
+          TAG=latest
+          if [[ "$VERSION" == *-* ]]; then TAG=next; fi
+          npm publish "psj-ai-sdk-$VERSION.tgz" --access public --provenance --tag "$TAG"

@@ -512,6 +512,7 @@ jobs:
       - name: Run actual installed SDK parsers and strict consumer types
         run: |
           PSJ_SOURCE_DIR="$PWD"
+          PSJ_CHAT_VERSION=$(node -p "require('./packages/ai-sdk/package.json').version")
           for PSJ_PAIR in '7.0.29 3.0.11' '7.0.128 3.0.71' '7.0.143 3.0.71'; do
             read -r PSJ_AI_VERSION PSJ_PROVIDER_VERSION <<< "$PSJ_PAIR"
             PSJ_CHAT_DIR=$(mktemp -d)
@@ -528,7 +529,7 @@ jobs:
               npm init -y
               npm pkg set type=module
               npm install --ignore-scripts --engine-strict --no-audit --no-fund \
-                "$RUNNER_TEMP/psj-ai-sdk-0.3.0.tgz" 'prefix-safe-json@0.6.1' \
+                "$RUNNER_TEMP/psj-ai-sdk-$PSJ_CHAT_VERSION.tgz" 'prefix-safe-json@0.6.1' \
                 "ai@$PSJ_AI_VERSION" "@ai-sdk/openai-compatible@$PSJ_PROVIDER_VERSION" \
                 'zod@4.4.3' 'typescript@5.9.3' '@types/node@22.19.15' '@types/json-schema@7.0.15'
               node --test test/*.test.mjs
