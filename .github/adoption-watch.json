@@ -284,7 +284,13 @@
       "invitationUrl": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6255777258",
       "since": "2026-10-18T22:11:08Z",
       "purpose": "psj-project-trial",
-      "reviewedResponses": []
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6264504755",
+          "bodySha256": "739ae713b71f30130fb93cf9b40d1b63354b140bd79842abefc15d84e865c641",
+          "classification": "native finishReason/truncation fix published in 0.11.0-next.1; no PSJ run confirmed"
+        }
+      ]
     },
     {
       "repository": "dedalus-labs/dedalus-agents-typescript",
@@ -292,6 +298,15 @@
       "kind": "issue",
       "invitationUrl": "https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15#issuecomment-6256214676",
       "since": "2026-10-18T22:57:21Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "codexu/note-gen",
+      "number": 1298,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/codexu/note-gen/pull/1298",
+      "since": "2026-10-18T23:26:45Z",
       "purpose": "psj-project-trial",
       "reviewedResponses": []
     }
