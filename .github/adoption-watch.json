@@ -17,7 +17,13 @@
       "invitationUrl": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6166247064",
       "since": "2026-10-14T10:26:16Z",
       "purpose": "psj-project-trial",
-      "reviewedResponses": []
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102",
+          "bodySha256": "28bc13f8cd2f9802575d29cb3207b13d04b143db6e335f7fa3ae09b6bb5bdb22",
+          "classification": "independent current LangChain cutoff benchmark; no PSJ evaluation or adoption reported"
+        }
+      ]
     },
     {
       "repository": "zgsm-ai/costrict",
@@ -308,6 +314,15 @@
       "invitationUrl": "https://github.com/codexu/note-gen/pull/1298",
       "since": "2026-10-18T23:26:45Z",
       "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "simin-yuan/agent-cutoff-bench",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/simin-yuan/agent-cutoff-bench/pull/1",
+      "since": "2026-10-20T12:51:33Z",
+      "purpose": "sdk-comparison-evaluation",
       "reviewedResponses": []
     }
   ]
