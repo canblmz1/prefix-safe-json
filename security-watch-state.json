@@ -1,14 +1,14 @@
 {
-  "date": "2026-10-19",
-  "run": "twenty-first",
+  "date": "2026-10-20",
+  "run": "twenty-second",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 21 in a row). Advisory requires gh api specifically per task instructions (non-public triage state), so no curl fallback attempted."
+      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 22 in a row). Advisory requires gh api specifically per task instructions (non-public triage state), so no curl fallback attempted."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message. No fallback available (private GHSA collaboration fork, no public page)."
+      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message; WebFetch against the public PR URL returns 404 (private GHSA collaboration fork has no public page). No fallback available."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
@@ -21,7 +21,7 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-18 snapshot -- no change."
+      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-19 snapshot -- no change."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
@@ -30,7 +30,7 @@
       "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. Last-activity date unchanged from the 2026-10-18 snapshot (2026-09-09), so carried forward as unchanged."
+      "reason": "same method/blockers as item 4. Last-activity date unchanged from the 2026-10-19 snapshot (2026-09-09), so carried forward as unchanged."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
@@ -39,7 +39,7 @@
       "comments": 2,
       "review_comments": 6,
       "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (2 Copilot reviews + salmanmkc, canblmz1 replies) already captured in the 2026-10-18 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open'. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
+      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (2 Copilot reviews + salmanmkc, canblmz1 replies) already captured in the 2026-10-19 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'Open, at least 1 approving review required'. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
     }
   }
 }
