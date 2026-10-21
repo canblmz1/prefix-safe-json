@@ -8,6 +8,10 @@ coverage) a version bump requires.
 
 ## [Unreleased]
 
+### Fixed
+
+- Empty chunks no longer prevent the parser from recognizing a leading UTF-8 BOM. Incomplete leading `EF` or `EF BB` byte sequences now report `E_INCOMPLETE_UTF8` at stream end, including when split across chunks. Complete BOM handling and execution eligibility rules are unchanged.
+
 ## [0.6.2] - 2026-10-19
 
 ### Fixed
