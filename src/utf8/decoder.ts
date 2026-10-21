@@ -23,6 +23,8 @@ export interface DecodeResult {
   errors: Utf8Error[];
   /** True if BOM was detected and stripped during this chunk. */
   strippedBom: boolean;
+  /** Decoded code points before the first error; absent on error-free chunks. */
+  validPrefixCodePoints?: number;
 }
 
 export interface Utf8Error {
@@ -56,6 +58,11 @@ export class Utf8Decoder {
   decode(bytes: Uint8Array): DecodeResult {
     const errors: Utf8Error[] = [];
     const codePoints: number[] = [];
+    let validPrefixCodePoints: number | undefined;
+    const recordError = (error: Utf8Error): void => {
+      validPrefixCodePoints ??= codePoints.length;
+      errors.push(error);
+    };
     let strippedBom = false;
     let i = 0;
 
@@ -110,14 +117,15 @@ export class Utf8Decoder {
 
     // If we have pending bytes from a previous chunk, try to complete the sequence
     if (this.pending.length > 0) {
+      const pendingOffset = startOffset - this.pending.length;
       let brokenByInvalidContinuation = false;
       while (i < bytes.length && this.pending.length < this.pendingExpected) {
         const b = bytes[i] as number;
         if ((b & 0xc0) !== 0x80) {
           // Not a valid continuation byte — the pending sequence is broken
-          errors.push({
+          recordError({
             kind: "invalid_continuation",
-            byteOffset: startOffset - this.pending.length,
+            byteOffset: pendingOffset,
           });
           this.pending = [];
           this.pendingExpected = 0;
@@ -139,10 +147,10 @@ export class Utf8Decoder {
         // We have a complete sequence — decode it
         const result = this.decodeSequence(
           this.pending,
-          startOffset - (this.pending.length - (i - 0)),
+          pendingOffset,
         );
         if (result.error) {
-          errors.push(result.error);
+          recordError(result.error);
         } else {
           codePoints.push(result.codePoint);
         }
@@ -172,7 +180,7 @@ export class Utf8Decoder {
           const seq = [b, bytes[i + 1] as number];
           const result = this.decodeSequence(seq, seqOffset);
           if (result.error) {
-            errors.push(result.error);
+            recordError(result.error);
             i++;
             this.totalOffset++;
           } else {
@@ -197,7 +205,7 @@ export class Utf8Decoder {
           const seq = [b, bytes[i + 1] as number, bytes[i + 2] as number];
           const result = this.decodeSequence(seq, seqOffset);
           if (result.error) {
-            errors.push(result.error);
+            recordError(result.error);
             i++;
             this.totalOffset++;
           } else {
@@ -221,7 +229,7 @@ export class Utf8Decoder {
           const seq = [b, bytes[i + 1] as number, bytes[i + 2] as number, bytes[i + 3] as number];
           const result = this.decodeSequence(seq, seqOffset);
           if (result.error) {
-            errors.push(result.error);
+            recordError(result.error);
             i++;
             this.totalOffset++;
           } else {
@@ -240,7 +248,7 @@ export class Utf8Decoder {
         }
       } else {
         // Invalid start byte (0x80-0xBF or 0xF8+)
-        errors.push({
+        recordError({
           kind: "invalid_start_byte",
           byteOffset: seqOffset,
         });
@@ -251,7 +259,7 @@ export class Utf8Decoder {
 
     const text = codePointsToString(codePoints);
     const consumed = this.totalOffset - startOffset;
-    return { text, consumed, errors, strippedBom };
+    return { text, consumed, errors, strippedBom, validPrefixCodePoints };
   }
 
   /**
