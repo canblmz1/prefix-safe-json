@@ -4,8 +4,7 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    # Also validate the UTF-8 follow-up stacked on the unmerged prefix fix.
-    branches: [ "main", "fix/invalid-utf8-prefix-invariance-20261021" ]
+    branches: [ "main" ]
 
 # Default to read-only; individual jobs opt into anything more.
 permissions:
