@@ -1,0 +1,2 @@
+# Preserve replay bytes; a unified diff encodes blank context lines as one space.
+docs/evidence/2026-10-21/sandbase-approval/experiment.patch text eol=lf whitespace=-blank-at-eol

@@ -1,0 +1,14 @@
+{
+  "platform": "Windows 11 build 26200",
+  "node": "22.23.2",
+  "npm": "10.9.8",
+  "source": "427b52a96a5309ca23268407f85c237468ab6a4e",
+  "freshSeparateWorktree": true,
+  "priorNodeModules": false,
+  "overlaysOrJunctions": false,
+  "command": "npm ci --ignore-scripts --strict-peer-deps --no-audit --no-fund",
+  "exit": 0,
+  "installedPackages": 383,
+  "packageManifestOrLockModified": false,
+  "prepareSkipped": "Tests load source directly; no third-party install or prepare script executed"
+}

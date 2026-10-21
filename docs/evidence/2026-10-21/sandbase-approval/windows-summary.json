@@ -1,0 +1,50 @@
+{
+  "environment": {
+    "measuredAt": "2026-10-21T15:45:03.167Z",
+    "node": "22.23.2",
+    "npm": "10.9.8",
+    "os": "win32 10.0.26200",
+    "source": "427b52a96a5309ca23268407f85c237468ab6a4e",
+    "packageLockSha256": "3bfdbfe41522b0e8c312478caee6dbc290e159b2242b070fba1f9a3a3694b345",
+    "patchSha256": "7c366da02de5a4088c064322a1b702e2652345221e80bf166755fa555b2af376",
+    "packages": {
+      "ai": "7.0.128",
+      "prefix-safe-json": "0.5.0",
+      "zod": "4.6.5",
+      "vitest": "5.0.3",
+      "typescript": "7.0.2"
+    },
+    "cleanSourceBeforePatch": true,
+    "model": "scripted v4 protocol fixture through installed AI SDK 7; no live provider"
+  },
+  "baselineCases": 13,
+  "measuredCases": 15,
+  "modes": {
+    "psj": {
+      "cases": 5,
+      "policySatisfied": 5,
+      "unnecessaryRefusals": 0
+    },
+    "native": {
+      "cases": 5,
+      "policySatisfied": 2,
+      "unnecessaryRefusals": 0
+    },
+    "native-check": {
+      "cases": 5,
+      "policySatisfied": 5,
+      "unnecessaryRefusals": 0
+    }
+  },
+  "identicalInitialLifecycles": true,
+  "sameMeasuredPsjAndNativeCheckBehavior": true,
+  "productionSourceAndLockUnchanged": true,
+  "conclusion": "Same measured behavior; maintenance preference unmeasured",
+  "limits": [
+    "five authored scripted-model cases, not provider incidents",
+    "selected lifecycle fields, not complete wire capture",
+    "temporary DB/files inspected then removed by existing teardown",
+    "no process-restart/crash replay experiment",
+    "not new adoption"
+  ]
+}

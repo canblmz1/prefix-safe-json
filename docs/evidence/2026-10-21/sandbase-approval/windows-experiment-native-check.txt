@@ -1,0 +1,18 @@
+
+ RUN  v5.0.3 <checkout>
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed | 10 skipped (15)
+   Start at  18:45:28
+   Duration  9.34s (import 36%, transform 30%, tests 28%, setup 6%)
+
+  Transform  transforming modules took 2.56s · 30% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:7:20). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+(node:24868) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
