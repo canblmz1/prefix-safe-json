@@ -168,6 +168,29 @@ export class Utf8Decoder {
       const b = bytes[i] as number;
       const seqOffset = this.totalOffset;
 
+      // A short trailing sequence is incomplete only if its available
+      // continuation bytes are valid. Match the pending-sequence check
+      // above without waiting for bytes that cannot repair this sequence.
+      if ((b & 0xf0) === 0xe0 || (b & 0xf8) === 0xf0) {
+        const needed = (b & 0xf0) === 0xe0 ? 3 : 4;
+        if (i + needed > bytes.length) {
+          let invalidContinuation = false;
+          for (let j = i + 1; j < bytes.length; j++) {
+            if (((bytes[j] as number) & 0xc0) !== 0x80) {
+              invalidContinuation = true;
+              break;
+            }
+          }
+          if (invalidContinuation) {
+            recordError({ kind: "invalid_continuation", byteOffset: seqOffset });
+            // Preserve direct decoder recovery: retry bytes after the lead.
+            i++;
+            this.totalOffset++;
+            continue;
+          }
+        }
+      }
+
       if (b <= 0x7f) {
         // Single-byte ASCII
         codePoints.push(b);

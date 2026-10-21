@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "fix/invalid-utf8-prefix-invariance-20261021" ]
   schedule:
     # Weekly, independent of any push/PR activity - catches new CodeQL query
     # packs/advisories against unchanged code, not just new commits.
