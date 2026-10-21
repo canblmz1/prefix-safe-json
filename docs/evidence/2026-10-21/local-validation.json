@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-21T09:13:19.128Z",
+  "localMarkdownLinks": 18,
+  "lockMatchesManifest": true,
+  "freshConsumer": {
+    "os": "Windows 11 build 26200",
+    "node": "22.23.2",
+    "npm": "10.9.8",
+    "priorNodeModules": false,
+    "cacheInitiallyEmpty": true,
+    "linksOrOverlay": false,
+    "command": "npm ci --ignore-scripts --strict-peer-deps --engine-strict --no-audit --no-fund --cache <empty trial cache>",
+    "installedPackages": 19,
+    "installExit": 0,
+    "comparisonExit": 0,
+    "comparisonCases": 6,
+    "unchangedBroadComparisonCases": 21
+  },
+  "localChecks": {
+    "watcherContractCases": 8,
+    "watcherFailed": 0,
+    "nodeSyntaxExit": 0,
+    "diffWhitespaceExit": 0
+  }
+}

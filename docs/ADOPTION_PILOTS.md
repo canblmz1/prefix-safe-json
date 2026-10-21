@@ -1,5 +1,10 @@
 # Own-project evaluation
 
+The [October 21 product snapshot](PRODUCT_BASELINE_20261021.md) records current
+downloads, dated historical retention evidence, development-trial candidates
+and a comparison with a raw-capable native alternative. A prepared pilot is
+separate from accepted use.
+
 The new integration reduces the first supported AI SDK path to a provider
 factory and a normal call with ordinary tool callbacks. SDK-owned result
 serialization and continuation are exercised by the

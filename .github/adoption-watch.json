@@ -22,6 +22,11 @@
           "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102",
           "bodySha256": "28bc13f8cd2f9802575d29cb3207b13d04b143db6e335f7fa3ae09b6bb5bdb22",
           "classification": "independent current LangChain cutoff benchmark; no PSJ evaluation or adoption reported"
+        },
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6294109525",
+          "bodySha256": "d2543fc7b8a69fbc415a53181ce6a274f936d98eafd1ba3a4921292c8fd889a6",
+          "classification": "independent native LangChain fix PR 11994; previous PR status corrected; no PSJ evaluation or adoption reported"
         }
       ]
     },

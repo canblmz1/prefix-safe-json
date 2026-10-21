@@ -1,0 +1,108 @@
+{
+  "measuredAt": "2026-10-21T09:08:26.001Z",
+  "window": {
+    "start": "2026-09-21",
+    "end": "2026-10-20",
+    "completeUtcDays": 30
+  },
+  "downloads": {
+    "core": {
+      "count": 3162,
+      "target": 200000,
+      "remaining": 196838,
+      "source": "https://api.npmjs.org/downloads/point/2026-09-21:2026-10-20/prefix-safe-json"
+    },
+    "companion": {
+      "count": null,
+      "httpStatus": 404,
+      "error": "package psj-ai-sdk not found",
+      "note": "Downloads API unavailable; registry metadata is HTTP 200, version 0.3.2. Not zero."
+    }
+  },
+  "registry": [
+    {
+      "retrievedAt": "2026-10-21T09:01:35.514Z",
+      "url": "https://registry.npmjs.org/prefix-safe-json/latest",
+      "status": 200,
+      "version": "0.6.2",
+      "engines": {
+        "node": ">=18.0.0"
+      }
+    },
+    {
+      "retrievedAt": "2026-10-21T09:01:36.396Z",
+      "url": "https://registry.npmjs.org/psj-ai-sdk/latest",
+      "status": 200,
+      "version": "0.3.2",
+      "engines": {
+        "node": ">=22"
+      },
+      "peerDependencies": {
+        "ai": ">=7.0.29 <8",
+        "prefix-safe-json": ">=0.6.1 <0.7",
+        "@ai-sdk/openai-compatible": ">=3.0.11 <4"
+      }
+    },
+    {
+      "retrievedAt": "2026-10-21T09:01:37.021Z",
+      "url": "https://registry.npmjs.org/ai/latest",
+      "status": 200,
+      "version": "7.0.148",
+      "engines": {
+        "node": ">=22"
+      },
+      "peerDependencies": {
+        "zod": "^3.25.76 || ^4.1.8"
+      }
+    },
+    {
+      "retrievedAt": "2026-10-21T09:01:37.500Z",
+      "url": "https://registry.npmjs.org/@ai-sdk/openai-compatible/latest",
+      "status": 200,
+      "version": "3.0.75",
+      "engines": {
+        "node": ">=22"
+      },
+      "peerDependencies": {
+        "zod": "^3.25.76 || ^4.1.8"
+      }
+    },
+    {
+      "retrievedAt": "2026-10-21T09:01:38.326Z",
+      "url": "https://registry.npmjs.org/zod/latest",
+      "status": 200,
+      "version": "4.6.7"
+    }
+  ],
+  "adoption": {
+    "goal": "Five independent projects accept integration and continue use; 30-day retention tracked separately",
+    "newlyConfirmedProjects": 0,
+    "companionAcceptedProjectsObserved": 0,
+    "companionThirtyDayProjectsObserved": 0,
+    "historicalCoreProjects": [
+      {
+        "repository": "sandbaseai/sandbase-harness",
+        "acceptedAt": "2026-08-30T03:17:08Z",
+        "acceptedVersion": "0.4.2",
+        "acceptedBy": "liyangbing",
+        "acceptedPr": "https://github.com/sandbaseai/sandbase-harness/pull/80",
+        "retainedVersion": "0.5.0",
+        "retainedHead": "427b52a96a5309ca23268407f85c237468ab6a4e",
+        "laterCiAt": "2026-10-12T04:02:34Z",
+        "laterCiActor": "AllureCurtain",
+        "laterCi": "https://github.com/sandbaseai/sandbase-harness/actions/runs/38202171387",
+        "thirtyDayEvidence": "Accepted runtime integration retained in source and independently triggered passing CI 43 days later; no deployment or per-day activity claim",
+        "currentSourceVerifiedAt": "2026-10-21T09:08:26.003Z"
+      }
+    ],
+    "observationLimit": "Public configured threads and source evidence, not all private or unreported installations",
+    "watcher": {
+      "checkedAt": "2026-10-21T09:00:44.431Z",
+      "checkedThreads": 31,
+      "apiFailures": 0,
+      "integrationReports": 0,
+      "newResponse": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6294109525",
+      "classification": "Native LangChain fix PR 11994; no PSJ evaluation"
+    }
+  }
+}

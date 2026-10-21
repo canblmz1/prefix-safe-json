@@ -1,0 +1,103 @@
+{
+  "retrievedAt": "2026-10-21T09:03:27.717Z",
+  "api": "https://api.github.com/repos/canblmz1/prefix-safe-json/commits/374ecf7c2f1804929e7950ec767e561db7d081c6/check-runs?per_page=100",
+  "commit": "374ecf7c2f1804929e7950ec767e561db7d081c6",
+  "checks": [
+    {
+      "name": "Packed runtime smoke (Node 18)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126574122"
+    },
+    {
+      "name": "Packed runtime smoke (Node 20)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126574111"
+    },
+    {
+      "name": "Packed runtime smoke (Node 22)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126573978"
+    },
+    {
+      "name": "Packed runtime smoke (Node 24)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126573968"
+    },
+    {
+      "name": "CodeQL",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/runs/119126486014"
+    },
+    {
+      "name": "Node 22 on macos-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088123"
+    },
+    {
+      "name": "Node 22 on ubuntu-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088110"
+    },
+    {
+      "name": "Node 24 on windows-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088088"
+    },
+    {
+      "name": "Node 22 on windows-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088065"
+    },
+    {
+      "name": "Dependency Review",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088042"
+    },
+    {
+      "name": "Node 24 on ubuntu-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126088024"
+    },
+    {
+      "name": "Guarded chat (installed SDK matrix)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126087969"
+    },
+    {
+      "name": "Package smoke (clean-room tarball install)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126087968"
+    },
+    {
+      "name": "Node 24 on macos-latest",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126087935"
+    },
+    {
+      "name": "Analyze (javascript-typescript)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366610/job/119126087686"
+    },
+    {
+      "name": "Coverage",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/canblmz1/prefix-safe-json/actions/runs/39571366483/job/119126087479"
+    }
+  ]
+}

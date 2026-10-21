@@ -1,0 +1,376 @@
+{
+  "checkedAt": "2026-10-21T09:12:34.578Z",
+  "status": "complete",
+  "needsManualReview": false,
+  "apiFailures": [],
+  "integrationReports": [],
+  "manuallyConfirmedDevelopers": 0,
+  "observationScope": "Configured public threads only; not private or unreported use",
+  "targets": [
+    {
+      "repository": "langchain-ai/langchainjs",
+      "number": 11469,
+      "kind": "issue",
+      "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6166247064",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102",
+          "author": "simin-yuan",
+          "createdAt": "2026-10-19T17:26:17Z",
+          "updatedAt": "2026-10-19T17:26:17Z",
+          "bodySha256": "28bc13f8cd2f9802575d29cb3207b13d04b143db6e335f7fa3ae09b6bb5bdb22",
+          "bot": false,
+          "reviewedClassification": "independent current LangChain cutoff benchmark; no PSJ evaluation or adoption reported",
+          "needsManualReview": false
+        },
+        {
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6294109525",
+          "author": "simin-yuan",
+          "createdAt": "2026-10-20T15:08:42Z",
+          "updatedAt": "2026-10-20T15:08:42Z",
+          "bodySha256": "d2543fc7b8a69fbc415a53181ce6a274f936d98eafd1ba3a4921292c8fd889a6",
+          "bot": false,
+          "reviewedClassification": "independent native LangChain fix PR 11994; previous PR status corrected; no PSJ evaluation or adoption reported",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "zgsm-ai/costrict",
+      "number": 1360,
+      "kind": "issue",
+      "url": "https://github.com/zgsm-ai/costrict/issues/1360#issuecomment-6166248036",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 117,
+      "kind": "issue",
+      "url": "https://github.com/sandbaseai/sandbase-harness/pull/117#issuecomment-6166248694",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "Blackcat-Informatics/purrassist",
+      "number": 17,
+      "kind": "issue",
+      "url": "https://github.com/Blackcat-Informatics/purrassist/issues/17#issuecomment-6166249274",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "TYNYBAY/dobby-sdk",
+      "number": 7,
+      "kind": "issue",
+      "url": "https://github.com/TYNYBAY/dobby-sdk/issues/7#issuecomment-6166249750",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "anomalyco/opencode",
+      "number": 38747,
+      "kind": "issue",
+      "url": "https://github.com/anomalyco/opencode/issues/38747#issuecomment-6167701769",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "code-yeongyu/oh-my-openagent",
+      "number": 9864,
+      "kind": "issue",
+      "url": "https://github.com/code-yeongyu/oh-my-openagent/issues/9864#issuecomment-6167702370",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "nedonatelli/sidecar",
+      "number": 164,
+      "kind": "issue",
+      "url": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6172465563",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817",
+          "author": "nedonatelli",
+          "createdAt": "2026-10-14T22:10:04Z",
+          "updatedAt": "2026-10-14T22:10:04Z",
+          "bodySha256": "f9e534a045cbe301de06f761c3ddf5e22ffb2a8a480304328c566196e78c6289",
+          "bot": false,
+          "reviewedClassification": "problem and regression-test-shape validation, not PSJ adoption",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "vercel/ai",
+      "number": 22914,
+      "kind": "issue",
+      "url": "https://github.com/vercel/ai/issues/22914#issuecomment-6172958009",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "DayuanJiang/next-ai-draw-io",
+      "number": 993,
+      "kind": "discussion",
+      "url": "https://github.com/DayuanJiang/next-ai-draw-io/discussions/993",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "pyrotank41/marco-harness",
+      "number": 10,
+      "kind": "issue",
+      "url": "https://github.com/pyrotank41/marco-harness/issues/10",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "OpenRouterTeam/typescript-agent",
+      "number": 128,
+      "kind": "issue",
+      "url": "https://github.com/OpenRouterTeam/typescript-agent/issues/128",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/OpenRouterTeam/typescript-agent/issues/128#issuecomment-6239700732",
+          "author": "chiarorosa",
+          "createdAt": "2026-10-17T19:36:11Z",
+          "updatedAt": "2026-10-17T19:36:11Z",
+          "bodySha256": "27371def3ea1d2725738f462b53ce5a21d864c7cc760f8a7964b390957450f35",
+          "bot": false,
+          "reviewedClassification": "external-contributor-reports-native-guard-proposal-not-psj-adoption",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "TanStack/ai",
+      "number": 1689,
+      "kind": "issue",
+      "url": "https://github.com/TanStack/ai/issues/1689#issuecomment-6217941748",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "anthropics/anthropic-sdk-typescript",
+      "number": 1269,
+      "kind": "discussion",
+      "url": "https://github.com/anthropics/anthropic-sdk-typescript/discussions/1269",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "TanStack/ai",
+      "number": 1808,
+      "kind": "discussion",
+      "url": "https://github.com/TanStack/ai/discussions/1808",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "Hannibal046/Awesome-LLM",
+      "number": 853,
+      "kind": "issue",
+      "url": "https://github.com/Hannibal046/Awesome-LLM/pull/853",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "jagreehal/ai-sdk-ollama",
+      "number": 1092,
+      "kind": "issue",
+      "url": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092#issuecomment-6235264006",
+          "author": "jagreehal",
+          "createdAt": "2026-10-17T14:45:33Z",
+          "updatedAt": "2026-10-17T14:45:33Z",
+          "bodySha256": "13a63785fd0af88297396148a46f209f166d61a1dcf573416dcac5557072a932",
+          "bot": false,
+          "reviewedClassification": "upstream-native-fix-merged-release-pending-not-psj-adoption",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 965,
+      "kind": "issue",
+      "url": "https://github.com/sandbaseai/sandbase-harness/pull/965",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "slimclaw/slimclaw",
+      "number": 1,
+      "kind": "issue",
+      "url": "https://github.com/slimclaw/slimclaw/issues/1",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "nbonamy/multi-llm-ts",
+      "number": 29,
+      "kind": "issue",
+      "url": "https://github.com/nbonamy/multi-llm-ts/issues/29",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/nbonamy/multi-llm-ts/issues/29#issuecomment-6226621249",
+          "author": "nbonamy",
+          "createdAt": "2026-10-16T23:30:04Z",
+          "updatedAt": "2026-10-16T23:30:04Z",
+          "bodySha256": "7f9386f4414698b3fc87abb47faf4cec6b8ebc7da5cf39ed7031de575b2070a6",
+          "bot": false,
+          "reviewedClassification": "upstream-native-fix-published-not-psj-adoption",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "havingautism/Codemini-CLI",
+      "number": 53,
+      "kind": "issue",
+      "url": "https://github.com/havingautism/Codemini-CLI/issues/53",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "vierisid/jarvis",
+      "number": 1097,
+      "kind": "issue",
+      "url": "https://github.com/vierisid/jarvis/issues/1097",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "mangfufu/director-desk",
+      "number": 8,
+      "kind": "issue",
+      "url": "https://github.com/mangfufu/director-desk/issues/8",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "mcp-use/webmcp-inspector",
+      "number": 5,
+      "kind": "issue",
+      "url": "https://github.com/mcp-use/webmcp-inspector/issues/5",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "whitefoxx/localmd",
+      "number": 1,
+      "kind": "issue",
+      "url": "https://github.com/whitefoxx/localmd/pull/1",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/whitefoxx/localmd/pull/1#issuecomment-6254471307",
+          "author": "vercel[bot]",
+          "createdAt": "2026-10-18T19:59:52Z",
+          "updatedAt": "2026-10-18T19:59:52Z",
+          "bodySha256": "0dc9d6816d30b3a0b14b7f6ea0b545c9421d5c08c2d121763b45c3336ebd8036",
+          "bot": true,
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "agentuse/agentuse",
+      "number": 25,
+      "kind": "issue",
+      "url": "https://github.com/agentuse/agentuse/pull/25",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "skrylnikov/Phoronis-tg-bot",
+      "number": 12,
+      "kind": "issue",
+      "url": "https://github.com/skrylnikov/Phoronis-tg-bot/pull/12",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "rarebit-one/harness-kernel",
+      "number": 76,
+      "kind": "issue",
+      "url": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6255777258",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": [
+        {
+          "url": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6264504755",
+          "author": "jaryl",
+          "createdAt": "2026-10-19T09:54:12Z",
+          "updatedAt": "2026-10-19T09:54:12Z",
+          "bodySha256": "739ae713b71f30130fb93cf9b40d1b63354b140bd79842abefc15d84e865c641",
+          "bot": false,
+          "reviewedClassification": "native finishReason/truncation fix published in 0.11.0-next.1; no PSJ run confirmed",
+          "needsManualReview": false
+        }
+      ]
+    },
+    {
+      "repository": "dedalus-labs/dedalus-agents-typescript",
+      "number": 15,
+      "kind": "issue",
+      "url": "https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15#issuecomment-6256214676",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "codexu/note-gen",
+      "number": 1298,
+      "kind": "issue",
+      "url": "https://github.com/codexu/note-gen/pull/1298",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    },
+    {
+      "repository": "simin-yuan/agent-cutoff-bench",
+      "number": 1,
+      "kind": "issue",
+      "url": "https://github.com/simin-yuan/agent-cutoff-bench/pull/1",
+      "status": "checked",
+      "needsManualReview": false,
+      "responses": []
+    }
+  ]
+}
