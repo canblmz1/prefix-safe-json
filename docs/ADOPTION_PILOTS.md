@@ -293,10 +293,10 @@ use of the new 0.2 preview features or another new developer for the campaign.
 
 ## October 21, 2026 outreach checkpoint (work order 009)
 
-Status: **three messages prepared, none sent; sending approval pending**.
+Status: **three approved messages sent on October 21; independent replies pending**.
 Two are first-contact development-test proposals to newly screened projects;
 one supplies new evidence to the existing Sandbase contact. No application
-integration, external PR, release, deployment or unsolicited reminder was made.
+integration, external PR, release or deployment was made.
 These are qualified evaluation offers, not confirmed unmet production needs.
 
 ### Publication closure and measured baseline
@@ -345,7 +345,7 @@ ai-sdk-ollama and harness-kernel remain native fixes, not PSJ adoption.
 
 | Existing contact | Current reviewed state | Action in this checkpoint |
 | --- | --- | --- |
-| [Sandbase 965](https://github.com/sandbaseai/sandbase-harness/pull/965) | Open, head `f2866b9f7bf331c0479ac93364234f4afc81653c`; no maintainer comment/review on upgrade PR | Prepare the new equal-result update below; no request to rerun |
+| [Sandbase 965](https://github.com/sandbaseai/sandbase-harness/pull/965) | Open, head `f2866b9f7bf331c0479ac93364234f4afc81653c`; no maintainer comment/review on upgrade PR | Sent the new equal-result update below; no request to rerun |
 | [localmd 1](https://github.com/whitefoxx/localmd/pull/1) | Draft, head `fefb45e6256f0bf057bb21e8bbb94a31663aca55`; companion 0.3.2 candidate; no independent response | Existing invitation stands; no repeat |
 | [AgentUse 25](https://github.com/agentuse/agentuse/pull/25) | Draft, head `7d8a66cb4aee6b9faa0dd65ec2c0f315ddd76a12`; no comments/reviews | Existing invitation stands; no repeat |
 | [Phoronis 12](https://github.com/skrylnikov/Phoronis-tg-bot/pull/12) | Open, head `b84198e03a86d779f56d2308655c203103f021b2`; no comments/reviews | Existing invitation stands; no repeat |
@@ -462,10 +462,27 @@ scripted experiments, not frequency/production evidence. No lower maintenance
 cost or unique protection over the equally informed native alternative is
 proven. Neither comparison was rerun in this outreach task.
 
-Only the following three exact comments are proposed for approval. They are
-not sent. No repeated invitations to localmd, AgentUse or Phoronis are included.
-If approved, recheck each destination for a newer reply, post only the approved
-text, and record its resulting URL here. No automatic follow-up is authorized.
+The user approved all three exact comments below with "gonder" after reviewing
+the prepared package. Each destination was checked for new replies and duplicate
+messages before sending. API readback verified the posted author (`canblmz1`)
+and exact approved body for all three. No repeated invitations to localmd,
+AgentUse or Phoronis are included. No automatic follow-up is authorized.
+
+| Message | Sent at (UTC), October 21, 2026 | Verified comment |
+| --- | --- | --- |
+| K | 20:28:58 | [Kept](https://github.com/keptinventory/kept/discussions/183#discussioncomment-19108457) |
+| U | 20:29:07 | [Upstash AgentKit](https://github.com/upstash/agentkit/pull/73#issuecomment-6325845102) |
+| S | 20:29:11 | [Sandbase](https://github.com/sandbaseai/sandbase-harness/pull/965#issuecomment-6325846401) |
+
+Receipts and exact bodies are retained under the ignored audit directory's
+`sent/` subdirectory. The existing watch configuration now includes the two
+new public reply threads; this local branch has not been merged, so those
+additions are not yet active in main's scheduled watcher. Sending does not
+change the confirmed-project count.
+The focused live watcher query checked both new threads successfully; its
+existing Sandbase target timed out after 30 seconds (2/3 checked, one failure).
+That query is recorded as partial failure, not a clean watcher run. The separate
+GitHub comment readback above verified all three sends, including Sandbase.
 
 #### K — Kept first contact
 
@@ -501,9 +518,8 @@ This is an evidence update to an existing adopter, not a new-user invitation.
 >
 > Would you prefer to retain PSJ or own the small native check, and what drives that choice?
 
-Next action: obtain one approval specifying K/U/S, then send only those exact
-comments and record their URLs. A positive reply leads to one selected flow's
-smallest reviewable test patch; external PR permission is handled only when
-that diff is concrete. A decline is recorded without another solicitation.
-Silence remains pending. Technical preparation is complete; independent
-evaluation and the five-project goal remain open.
+Next action: review any independent response on these existing threads. A
+positive reply leads to one selected flow's smallest reviewable test patch;
+external PR permission is handled only when that diff is concrete. A decline
+is recorded without another solicitation. Silence remains pending. The approved
+send is complete; independent evaluation and the five-project goal remain open.
