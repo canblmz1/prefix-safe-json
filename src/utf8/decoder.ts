@@ -59,8 +59,8 @@ export class Utf8Decoder {
     let strippedBom = false;
     let i = 0;
 
-    // Handle BOM check at the very beginning of the stream
-    if (!this.checkedForBom) {
+    // Empty chunks must not decide whether the stream starts with a BOM.
+    if (!this.checkedForBom && bytes.length > 0) {
       while (this.bomBuffer.length < 3 && i < bytes.length) {
         this.bomBuffer.push(bytes[i] as number);
         i++;
@@ -258,7 +258,8 @@ export class Utf8Decoder {
    * Check if there are buffered incomplete bytes.
    */
   hasIncomplete(): boolean {
-    return this.pending.length > 0;
+    return this.pending.length > 0 ||
+      (!this.checkedForBom && this.bomBuffer.length > 0);
   }
 
   /**
