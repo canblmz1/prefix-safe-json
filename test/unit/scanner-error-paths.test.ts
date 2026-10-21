@@ -187,7 +187,12 @@ describe("Scanner error paths (coverage gaps)", () => {
       const r = p.finish({ reason: "complete" });
       expect(r.outcome).toBe("invalid");
       expect(r.diagnostics.some((d) => d.code === "E_INVALID_UTF8")).toBe(true);
-      expect(r.stableValue).toBeUndefined();
+      // The verified prefix opened the root object, but never completed a's
+      // string. Preserve that empty root exactly as a split push already did.
+      expect(r.stableValue).toEqual({});
+      expect(r.stableValue).not.toHaveProperty("a");
+      expect(r.executable).toBe(false);
+      expect(r.diagnostics).toContainEqual(expect.objectContaining({ code: "E_INVALID_UTF8", byteOffset: prefix.length }));
     });
   });
 
