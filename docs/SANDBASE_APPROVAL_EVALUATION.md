@@ -169,6 +169,10 @@ Evidence:
 - [Install receipt](evidence/2026-10-21/sandbase-approval/installation.json),
   [installed environment and hashes](evidence/2026-10-21/sandbase-approval/windows-environment.json),
   [actual commands/exits](evidence/2026-10-21/sandbase-approval/windows-commands.json).
+- [Runner checks](evidence/2026-10-21/sandbase-approval/runner-validation.json):
+  frozen offline PSJ install, full zero-warning lint, syntax and source/output
+  mutation guards. Its plain-JS lint override preserves the rules and avoids
+  consuming an inferred TypeScript project slot; existing files stay unchanged.
 - Raw [A](evidence/2026-10-21/sandbase-approval/windows-results-psj.jsonl),
   [B](evidence/2026-10-21/sandbase-approval/windows-results-native.jsonl),
   [C](evidence/2026-10-21/sandbase-approval/windows-results-native-check.jsonl),

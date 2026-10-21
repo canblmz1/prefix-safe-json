@@ -23,6 +23,13 @@ export default tseslint.config(
     },
   },
   {
+    files: ["scripts/evaluate-sandbase-approval.mjs"],
+    languageOptions: {
+      // Plain JS needs the same syntax/rules, not an inferred TS project slot.
+      parserOptions: { projectService: false },
+    },
+  },
+  {
     ignores: [
       "dist/",
       "coverage/",

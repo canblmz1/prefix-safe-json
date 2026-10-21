@@ -6,6 +6,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { platform, release } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import process from "node:process";
+import console from "node:console";
 
 // Applies only a test patch to an explicitly supplied, pinned clean checkout.
 // Clone and frozen npm installation remain visible commands in the runbook.
