@@ -31,7 +31,9 @@ aşağıdaki gelecek görevler yapılmış veya kontrolleri geçmiş sayılmaz.
 - Mevcut araçlar ve takip dosyaları kullanılır. Yeni CRM, demo altyapısı,
   benchmark veya talep kanıtı olmayan adapter ailesi açılmaz.
 - İnceleme, yerel değişiklik ve gerekli testler teknik yürütücüde kalır.
-  Merge Kübra'nın kararındadır. Yayın, dış mesaj, dış repoya PR ve gerçek
+  Kullanıcı 22 Ekim'de bu roadmap için merge ve yayın yetkisini de verdi.
+  Normal PR, zorunlu kontrol ve yayın kapıları korunur; genel yetki kendi
+  başına yeni sürüm çıkarma gerekçesi değildir. Dış mesaj, dış repoya PR ve gerçek
   archive/deprecation işlemi için ilgili açık yetki somut çıktı hazırken kontrol edilir.
   Onaylanan üç mesaj zaten gönderildi; bu onay yeni hatırlatmaları kapsamaz.
 
@@ -51,7 +53,7 @@ aşağıdaki gelecek görevler yapılmış veya kontrolleri geçmiş sayılmaz.
   konular üzerinde read-only watcher ve `git diff --check`. API hatası
   başarısız kontrol olarak kaydedilir. Birleşirse ilk gerçek schedule koşusu
   üzerinden main kapsamı doğrulanır; birleşene kadar iki yeni konu elle kontrol edilir.
-- Bağımlılık: yok. Merge izni bu görevde varsayılmaz.
+- Bağımlılık: yok. Merge yetkisi 22 Ekim'de açıkça verildi; kontroller atlanmaz.
 
 ### T2 — Teknik bakım kuyruğunu daralt
 
@@ -203,14 +205,21 @@ koruma ayarı değişikliği ve archive bu planın kendiliğinden uyguladığı 
 
 Bu plan hazırlanırken kod değişikliği, dış gönderim veya yeni test koşusu yapılmadı.
 
-## Uygulama durumu — 22 Ekim
+## Uygulama durumu — 22 Ekim, birleştirme sonrası
 
-- T1: mevcut #90 dalı main 0.6.3 ile eşitlendi; eski 31 takip konusu ve
-  inceleme kayıtları korunarak iki yeni konu eklendi. Canlı ilk kontrolde
-  33/33 konu, sıfır API hatası ve sıfır yeni entegrasyon raporu görüldü.
-  Son commit kontrolleri ve Kübra'nın merge kararı ayrı adımlardır;
-  main'in zamanlanmış takibine geçmiş sayılmaz.
-- T2: [somut bakım kuyruğu](ADOPTION_DIAGNOSIS.md#concrete-maintenance-queue)
-  kaydedildi. Yeni doğrulanmış PSJ runtime/kurulum/uyumluluk engeli bulunmadı.
-- T3/T5: bağımsız bakımcı henüz akış seçmedi; entegrasyon kodlaması başlamadı.
-  Bu, T1/T2 teknik teslimini engellemez. Takvim ve 21 Kasım karar eşiği korunuyor.
+| İş | Gerçek durum ve sonraki koşul |
+| --- | --- |
+| T1, takip diff'i | [#90](https://github.com/canblmz1/prefix-safe-json/pull/90), son head `a1906caa488738fc96e719497ff823535dbea2ba` üzerinde 16/16 başarılı kontrolden sonra normal PR akışıyla birleşti: `62cf74ad991fb7b25431c43cab2d5ff0818a879a`. Önceki 31 konu ve incelemeler korunarak iki konu eklendi |
+| T1, main'de çalışma | [Elle başlatılan mevcut takip koşusu](https://github.com/canblmz1/prefix-safe-json/actions/runs/39843257781), aynı merge SHA'sında başarılı: 33/33 konu, sıfır API hatası, sıfır yeni entegrasyon raporu. Bu `workflow_dispatch` koşusudur; ilk gerçek `schedule` koşusunun doğrulaması henüz bekliyor |
+| T2, karşılaştırma kanıtı | [#93](https://github.com/canblmz1/prefix-safe-json/pull/93), güncel main'e taşınmış `04e36b1d9e6e881d96cb73a13f83bb77b8f47c13` head'inde 17/17 başarılı kontrolden sonra birleşti: `474ebacdf60eef6577229387895f0ec54a57d3b8`. PSJ / mevcut native / küçük native sonucu 5/2/5; bakım üstünlüğü ölçülmedi |
+| T2, bakım | GitHub'ın geliştirme bağımlılığı Vite 6.4.3 için bildirdiği 43–47 numaralı beş uyarının düzeltilmiş sürümü 6.4.4. Ayrı küçük bakım diff'i yalnız Vite çözümünü ve mevcut override'ı günceller; diğer kilitli sürümler, runtime ve yayımlanmış sürümler korunur. Son PR/main kontrolleri ayrıca doğrulanır |
+| T3, akış seçimi | Bağımsız bakımcı henüz bir pilot akışı seçmedi; sessizlik kabul sayılmıyor |
+| T4, ek teklif | 1 Kasım koşulu henüz gelmedi. Gerekirse mevcut dar kurallarla en fazla iki ek hedef değerlendirilir |
+| T5, teknik hazırlık | localmd'nin mevcut `fefb45e6256f0bf057bb21e8bbb94a31663aca55` adayı hazır: eski/yeni temiz Windows kurulumu, dokuz odaklı test ve typecheck başarılı. Genel tarayıcı kapılarının hepsi başarılı değil. Bakımcının seçtiği yeni bir akış olmadığı için yeni entegrasyon yazılmadı |
+| T6–T7, bağımsız kullanım | Yeni doğrulanmış proje sıfır; bağımsız çalıştırma, gerekçeli tutma kararı ve sonraki kullanım bekleniyor. Tarihî Sandbase entegrasyonu ayrı kalır |
+| T8, karar | 21 Kasım karar eşiği korunuyor; henüz gerçekleşmemiş süre ve bakımcı kararları tamamlanmış sayılmaz |
+
+T1/T2'nin uygulanabilir teknik işleri, bağımsız değerlendirmeden ayrı teslim edilir.
+Core 0.6.3 / companion 0.3.2 mevcut ve doğrulanmış yayımlardır. Kanıt ve geliştirme
+bağımlılığı bakımı runtime sürümünü artırmayı veya npm'de tekrar yayınlamayı gerektirmez.
+Bu kayıtta yeni dış mesaj gönderilmedi ve yeni kullanıcı kazanıldığı iddia edilmedi.
