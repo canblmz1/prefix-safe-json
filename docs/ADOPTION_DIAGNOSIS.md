@@ -250,3 +250,7 @@ Any actual archive/deprecation action is a separate explicit decision.
 Current approved contacts and response classifications remain in
 [the existing pilot log](ADOPTION_PILOTS.md#october-22-status-check-1838-utc).
 This review sent no messages, created no new pilot and changed no runtime.
+
+The [dated execution roadmap](psj-adoption-maintenance-plan.md) specifies
+owners, dependencies, validation and the November 21 decision gate. Its
+future tasks are planned work, not completed results.
