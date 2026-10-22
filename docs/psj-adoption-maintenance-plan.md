@@ -210,16 +210,18 @@ Bu plan hazırlanırken kod değişikliği, dış gönderim veya yeni test koşu
 | İş | Gerçek durum ve sonraki koşul |
 | --- | --- |
 | T1, takip diff'i | [#90](https://github.com/canblmz1/prefix-safe-json/pull/90), son head `a1906caa488738fc96e719497ff823535dbea2ba` üzerinde 16/16 başarılı kontrolden sonra normal PR akışıyla birleşti: `62cf74ad991fb7b25431c43cab2d5ff0818a879a`. Önceki 31 konu ve incelemeler korunarak iki konu eklendi |
-| T1, main'de çalışma | [Elle başlatılan mevcut takip koşusu](https://github.com/canblmz1/prefix-safe-json/actions/runs/39843257781), aynı merge SHA'sında başarılı: 33/33 konu, sıfır API hatası, sıfır yeni entegrasyon raporu. Bu `workflow_dispatch` koşusudur; ilk gerçek `schedule` koşusunun doğrulaması henüz bekliyor |
+| T1, main'de çalışma | [İlk gerçek `schedule` koşusu](https://github.com/canblmz1/prefix-safe-json/actions/runs/39846666473), `ec088d2ec5ac072057d65f200015d266fb1e3f05` üzerinde başarılı: 33/33 konu, sıfır API hatası, sıfır yeni entegrasyon raporu. 20:11:34 UTC tarihli artifact incelendi; bu artık yalnız elle başlatılan koşunun kanıtı değil |
 | T2, karşılaştırma kanıtı | [#93](https://github.com/canblmz1/prefix-safe-json/pull/93), güncel main'e taşınmış `04e36b1d9e6e881d96cb73a13f83bb77b8f47c13` head'inde 17/17 başarılı kontrolden sonra birleşti: `474ebacdf60eef6577229387895f0ec54a57d3b8`. PSJ / mevcut native / küçük native sonucu 5/2/5; bakım üstünlüğü ölçülmedi |
-| T2, bakım | GitHub'ın geliştirme bağımlılığı Vite 6.4.3 için bildirdiği 43–47 numaralı beş uyarının düzeltilmiş sürümü 6.4.4. Ayrı küçük bakım diff'i yalnız Vite çözümünü ve mevcut override'ı günceller; diğer kilitli sürümler, runtime ve yayımlanmış sürümler korunur. Son PR/main kontrolleri ayrıca doğrulanır |
+| T2, bakım | [#96](https://github.com/canblmz1/prefix-safe-json/pull/96) normal korumalı akışla `ec088d2ec5ac072057d65f200015d266fb1e3f05` olarak birleşti; Vite 6.4.4 dışında mevcut kilitli sürümler ve runtime korunuyor. Main [CI](https://github.com/canblmz1/prefix-safe-json/actions/runs/39845224677) ve [CodeQL](https://github.com/canblmz1/prefix-safe-json/actions/runs/39845224780) başarılı; 43–47 uyarıları GitHub tarafından fixed olarak kapatıldı. Yeni paket yayını yapılmadı |
 | T3, akış seçimi | Bağımsız bakımcı henüz bir pilot akışı seçmedi; sessizlik kabul sayılmıyor |
-| T4, ek teklif | 1 Kasım koşulu henüz gelmedi. Gerekirse mevcut dar kurallarla en fazla iki ek hedef değerlendirilir |
-| T5, teknik hazırlık | localmd'nin mevcut `fefb45e6256f0bf057bb21e8bbb94a31663aca55` adayı hazır: eski/yeni temiz Windows kurulumu, dokuz odaklı test ve typecheck başarılı. Genel tarayıcı kapılarının hepsi başarılı değil. Bakımcının seçtiği yeni bir akış olmadığı için yeni entegrasyon yazılmadı |
+| T4, ek teklif | Kullanıcı 22 Ekim'de aday değerlendirmesini bekletmeden sürdürmeyi istedi. Mevcut agent-cutoff-bench teklifinin yanlış SDK yoluna odaklandığı görüldü; aynı PR somut LangGraph ihtiyacına uyarlandı. Beş ek projenin incelemesinde yeni nitelikli hedef doğrulanmadı; sayı doldurulmadı. Dış güncelleme, hazır diff üzerinden ayrıca açıkça onaylandı |
+| T5, teknik hazırlık | localmd adayı ve önceki sınırlamaları korunuyor. [Mevcut benchmark PR #1](https://github.com/simin-yuan/agent-cutoff-bench/pull/1) `edc32a0b533df075724d3aebd9dba11d53263890` olarak güncellendi: iki ayrı temiz Windows kurulumunda toplam 24/24 kontrol, gerçek dosya yazımı ve continuation kayıtlı. Küçük native kontrol ile PSJ eşit; [pilot kaydı](ADOPTION_PILOTS.md#october-22-replace-the-mismatched-proposal-with-the-actual-langgraph-path) kapsamı ve başarısız ilk ölçümü açıklar |
 | T6–T7, bağımsız kullanım | Yeni doğrulanmış proje sıfır; bağımsız çalıştırma, gerekçeli tutma kararı ve sonraki kullanım bekleniyor. Tarihî Sandbase entegrasyonu ayrı kalır |
 | T8, karar | 21 Kasım karar eşiği korunuyor; henüz gerçekleşmemiş süre ve bakımcı kararları tamamlanmış sayılmaz |
 
 T1/T2'nin uygulanabilir teknik işleri, bağımsız değerlendirmeden ayrı teslim edilir.
 Core 0.6.3 / companion 0.3.2 mevcut ve doğrulanmış yayımlardır. Kanıt ve geliştirme
 bağımlılığı bakımı runtime sürümünü artırmayı veya npm'de tekrar yayınlamayı gerektirmez.
-Bu kayıtta yeni dış mesaj gönderilmedi ve yeni kullanıcı kazanıldığı iddia edilmedi.
+Son pilot güncellemesinde onaylanan tek dış yorum gönderildi; yeni kullanıcı
+kazanıldığı iddia edilmedi. Sonraki kanıt bakımcının kendi koşusu ve tutma/kaldırma
+gerekçesidir; yanıt gelmemesi teknik adayın teslimini engellemez.
