@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: finds a human response after a full page without counting it as adoption
+ok 1 - finds a human response after a full page without counting it as adoption
+  ---
+  duration_ms: 37.3552
+  type: 'test'
+  ...
+# Subtest: edited reviewed text needs review again; unchanged text, bots and our replies do not
+ok 2 - edited reviewed text needs review again; unchanged text, bots and our replies do not
+  ---
+  duration_ms: 4.0654
+  type: 'test'
+  ...
+# Subtest: follows discussion reply and comment cursors, including replies to our invitation
+ok 3 - follows discussion reply and comment cursors, including replies to our invitation
+  ---
+  duration_ms: 4.527
+  type: 'test'
+  ...
+# Subtest: API failures remain unknown instead of appearing as no-response success
+ok 4 - API failures remain unknown instead of appearing as no-response success
+  ---
+  duration_ms: 1.0055
+  type: 'test'
+  ...
+# Subtest: a new comment on a reviewed integration report is still surfaced
+ok 5 - a new comment on a reviewed integration report is still surfaced
+  ---
+  duration_ms: 2.0815
+  type: 'test'
+  ...
+# Subtest: maintainer self-runs cannot be inserted into the independent-user count
+ok 6 - maintainer self-runs cannot be inserted into the independent-user count
+  ---
+  duration_ms: 0.567
+  type: 'test'
+  ...
+# Subtest: GitHub login capitalization cannot inflate the manually recorded count
+ok 7 - GitHub login capitalization cannot inflate the manually recorded count
+  ---
+  duration_ms: 0.4594
+  type: 'test'
+  ...
+# Subtest: reads submitted PR reviews and inline feedback while excluding private pending drafts
+ok 8 - reads submitted PR reviews and inline feedback while excluding private pending drafts
+  ---
+  duration_ms: 1.6511
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 200.6865

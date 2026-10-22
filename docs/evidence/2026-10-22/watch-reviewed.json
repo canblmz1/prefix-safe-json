@@ -1,0 +1,455 @@
+{
+  "checkedAt": "2026-10-22T19:02:21.375Z",
+  "status": "complete",
+  "goal": {
+    "target": 5,
+    "manuallyConfirmedDevelopers": [],
+    "manuallyConfirmedCount": 0,
+    "countingRule": "Manual confirmation of independent developers running PSJ inside their own projects. Operator fixtures, downloads and native-only fixes do not qualify."
+  },
+  "targets": [
+    {
+      "repository": "langchain-ai/langchainjs",
+      "number": 11469,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6166247064",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "simin-yuan",
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102",
+          "createdAt": "2026-10-19T17:26:17Z",
+          "updatedAt": "2026-10-19T17:26:17Z",
+          "body": "Two data points in case they help with #11494.\n\n1. On the latest release (`@langchain/core` 1.2.18, `@langchain/openai` 1.6.2, `@langchain/langgraph` 1.5.1), `createReactAgent` with `new ChatOpenAI({ streaming: true })` still runs the cut-off call end to end. A `write_file` call cut in the middle of line 17 of a 40-line file writes the first 16 lines plus part of line 17, the tool returns success, and the agent answers \"Done.\". Same with `useResponsesApi: true`. With `streaming: false` the call is not run.\n\n2. The same happens when the stream ends with no finish reason at all (the body closes cleanly, no `[DONE]`), which is what a proxy or server dropping the stream looks like. The approach in #11494 keys on `finishReason === \"length\"` in `ChatModelStream`, so it can't catch that case. Also, in the agent runs above the call is built by `collapseToolCallChunks` (`src/messages/utils.ts`, the `parsePartialJson` call at line 634 on current main), which #11494 doesn't change.\n\nHarness and per-run server logs: https://github.com/simin-yuan/agent-cutoff-bench\n\nPython has the same behaviour; it is tracked in langchain-ai/langchain#41285.\n",
+          "bodySha256": "28bc13f8cd2f9802575d29cb3207b13d04b143db6e335f7fa3ae09b6bb5bdb22",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "independent current LangChain cutoff benchmark; no PSJ evaluation or adoption reported"
+        },
+        {
+          "author": "simin-yuan",
+          "url": "https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6294109525",
+          "createdAt": "2026-10-20T15:08:42Z",
+          "updatedAt": "2026-10-20T15:08:42Z",
+          "body": "Opened #11994 for this. It doesn't key on the finish reason, so it also covers a stream that just ends. A correction to my previous comment: #11494 was closed in September without being merged, and #11471 (open since August) keys on `finish_reason === \"length\"`, so a dropped stream is still uncovered on both.\n",
+          "bodySha256": "d2543fc7b8a69fbc415a53181ce6a274f936d98eafd1ba3a4921292c8fd889a6",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "independent native LangChain fix PR 11994; previous PR status corrected; no PSJ evaluation or adoption reported"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "zgsm-ai/costrict",
+      "number": 1360,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/zgsm-ai/costrict/issues/1360#issuecomment-6166248036",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 117,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/sandbaseai/sandbase-harness/pull/117#issuecomment-6166248694",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "Blackcat-Informatics/purrassist",
+      "number": 17,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/Blackcat-Informatics/purrassist/issues/17#issuecomment-6166249274",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "TYNYBAY/dobby-sdk",
+      "number": 7,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/TYNYBAY/dobby-sdk/issues/7#issuecomment-6166249750",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "anomalyco/opencode",
+      "number": 38747,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/anomalyco/opencode/issues/38747#issuecomment-6167701769",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "code-yeongyu/oh-my-openagent",
+      "number": 9864,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/code-yeongyu/oh-my-openagent/issues/9864#issuecomment-6167702370",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "nedonatelli/sidecar",
+      "number": 164,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6172465563",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "nedonatelli",
+          "url": "https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817",
+          "createdAt": "2026-10-14T22:10:04Z",
+          "updatedAt": "2026-10-14T22:10:04Z",
+          "body": "Thanks — this was useful. We traced it through our Anthropic path and you're right on two counts: the max_tokens stop reason arrives after `content_block_stop` and is never checked before dispatch, and a stream that ends without a terminal event currently defaults to `end_turn`. The ML-15 fix will cover both in-tree: carry the truncation reason on the pending call, refuse dispatch when its arguments needed repair, and treat a missing terminal event as incomplete rather than finished. We'll use your test shape as the regression test (a counter tool: one complete call runs once, truncated or interrupted calls run zero times). We won't take an external dependency or run the demo for this; our primary path is native Ollama, which has no message-terminal event comparable to `message_stop`, so a call whose JSON closed on its own is treated as complete there.\n",
+          "bodySha256": "f9e534a045cbe301de06f761c3ddf5e22ffb2a8a480304328c566196e78c6289",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "problem and regression-test-shape validation, not PSJ adoption"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "vercel/ai",
+      "number": 22914,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/vercel/ai/issues/22914#issuecomment-6172958009",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "DayuanJiang/next-ai-draw-io",
+      "number": 993,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/DayuanJiang/next-ai-draw-io/discussions/993",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "pyrotank41/marco-harness",
+      "number": 10,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/pyrotank41/marco-harness/issues/10",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "OpenRouterTeam/typescript-agent",
+      "number": 128,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/OpenRouterTeam/typescript-agent/issues/128",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "chiarorosa",
+          "url": "https://github.com/OpenRouterTeam/typescript-agent/issues/128#issuecomment-6239700732",
+          "createdAt": "2026-10-17T19:36:11Z",
+          "updatedAt": "2026-10-17T19:36:11Z",
+          "body": "I reproduced the duplicate-ID batch in local SDK-response tests and have a proposed fix ready: https://github.com/chiarorosa/typescript-agent/commit/dd315f7\n\nThe guard rejects an executable batch before dispatch when two function calls share a `call_id`. Neither callback runs and no follow-up request is sent. It covers the initial response, subsequent turns, and the pending batch after `stopWhen`. Manual-only batches remain unchanged; this does not solve caller-managed result correlation.\n\nThe five focused tests pass. Disabling the guard makes the three duplicate-ID regressions fail, while both controls still pass. The full unit suite (1,253 tests), lint, typecheck and build passed. These are simulated responses, not live-provider evidence.\n\nThis also changes two existing tests that assumed duplicate IDs would execute. Would rejecting the whole ambiguous batch match the intended behavior, rather than deduplicating it? If so, I can open a PR with the fix, tests and changeset.",
+          "bodySha256": "27371def3ea1d2725738f462b53ce5a21d864c7cc760f8a7964b390957450f35",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "external-contributor-reports-native-guard-proposal-not-psj-adoption"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "TanStack/ai",
+      "number": 1689,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/TanStack/ai/issues/1689#issuecomment-6217941748",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "anthropics/anthropic-sdk-typescript",
+      "number": 1269,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/anthropics/anthropic-sdk-typescript/discussions/1269",
+      "purpose": "community-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "TanStack/ai",
+      "number": 1808,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/TanStack/ai/discussions/1808",
+      "purpose": "community-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "Hannibal046/Awesome-LLM",
+      "number": 853,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/Hannibal046/Awesome-LLM/pull/853",
+      "purpose": "curated-listing-submission",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "jagreehal/ai-sdk-ollama",
+      "number": 1092,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092",
+      "purpose": "native-validation",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "jagreehal",
+          "url": "https://github.com/jagreehal/ai-sdk-ollama/issues/1092#issuecomment-6235264006",
+          "createdAt": "2026-10-17T14:45:33Z",
+          "updatedAt": "2026-10-17T14:45:33Z",
+          "body": "Thanks for the clear fixture. I reproduced it on main with `streamText` and with `generateText`, since the non-streaming path calls the same mapper.\n\n`length` should win. A truncated turn should never dispatch a tool, and the OpenAI and Anthropic providers report `length` for the same case. Your one-line change is the fix, and #1093 ships it with a regression test. With the patch, your fixture reports `length` and runs the tool zero times. The `stop` control still runs it once.\n\nThe fix goes out in the next patch release.",
+          "bodySha256": "13a63785fd0af88297396148a46f209f166d61a1dcf573416dcac5557072a932",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "upstream-native-fix-merged-release-pending-not-psj-adoption"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "sandbaseai/sandbase-harness",
+      "number": 965,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/sandbaseai/sandbase-harness/pull/965",
+      "purpose": "existing-adopter-upgrade",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "slimclaw/slimclaw",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/slimclaw/slimclaw/issues/1",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "nbonamy/multi-llm-ts",
+      "number": 29,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/nbonamy/multi-llm-ts/issues/29",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "nbonamy",
+          "url": "https://github.com/nbonamy/multi-llm-ts/issues/29#issuecomment-6226621249",
+          "createdAt": "2026-10-16T23:30:04Z",
+          "updatedAt": "2026-10-16T23:30:04Z",
+          "body": "Thanks for the detailed report and reproducer. This is fixed in [ead0cca](https://github.com/nbonamy/multi-llm-ts/commit/ead0cca0a45c9f562a5ccdff4b7c8c6f86c34f44) and published in [v5.1.2](https://github.com/nbonamy/multi-llm-ts/releases/tag/v5.1.2), now available on npm.\n\nThe Chat Completions adapter now keeps an index-to-call-ID map for each streaming round, so interleaved argument deltas that omit `id` are routed to the correct tool call. It also clones the tool-call data before stripping `index`, preserving the original SDK chunks for other observers.\n\nA regression test covers the reported interleaved sequence, verifies that the two tools receive `{ message: 'alpha' }` and `{ message: 'beta' }`, and checks that the original chunks retain their indexes. The release checks passed.\n\nTo upgrade:\n\n```sh\nnpm install multi-llm-ts@5.1.2\n```\n",
+          "bodySha256": "7f9386f4414698b3fc87abb47faf4cec6b8ebc7da5cf39ed7031de575b2070a6",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "upstream-native-fix-published-not-psj-adoption"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "havingautism/Codemini-CLI",
+      "number": 53,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/havingautism/Codemini-CLI/issues/53",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "vierisid/jarvis",
+      "number": 1097,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/vierisid/jarvis/issues/1097",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "mangfufu/director-desk",
+      "number": 8,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/mangfufu/director-desk/issues/8",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "mcp-use/webmcp-inspector",
+      "number": 5,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/mcp-use/webmcp-inspector/issues/5",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "whitefoxx/localmd",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/whitefoxx/localmd/pull/1",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "vercel[bot]",
+          "url": "https://github.com/whitefoxx/localmd/pull/1#issuecomment-6254471307",
+          "createdAt": "2026-10-18T19:59:52Z",
+          "updatedAt": "2026-10-18T19:59:52Z",
+          "body": "@canblmz1 is attempting to deploy a commit to the **yunbiao's projects** Team on [Vercel](https://vercel.com).\n\nA member of the Team first needs to [authorize it](https://vercel.com/git/authorize?team=yunbiao's%20projects&slug=yunbiaos-projects&teamId=team_nnqmaOjpypOhD3F8U6huy3z5&type=github&job=%7B%22headInfo%22%3A%7B%22sha%22%3A%2210e9cc9d799db3058e4005e1e32b294752507d72%22%7D%2C%22id%22%3A%22QmewstftJZwqyVJytXp9qCPTgMPNH8rJxurdLLpzm5rg5w%22%2C%22org%22%3A%22whitefoxx%22%2C%22prId%22%3A1%2C%22repo%22%3A%22localmd%22%7D).\n\n",
+          "bodySha256": "0dc9d6816d30b3a0b14b7f6ea0b545c9421d5c08c2d121763b45c3336ebd8036",
+          "bot": true,
+          "needsManualReview": false
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "agentuse/agentuse",
+      "number": 25,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/agentuse/agentuse/pull/25",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "skrylnikov/Phoronis-tg-bot",
+      "number": 12,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/skrylnikov/Phoronis-tg-bot/pull/12",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "rarebit-one/harness-kernel",
+      "number": 76,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6255777258",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "jaryl",
+          "url": "https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6264504755",
+          "createdAt": "2026-10-19T09:54:12Z",
+          "updatedAt": "2026-10-19T09:54:12Z",
+          "body": "Shipped in 0.11.0-next.1 (PR #84, on npm under `@next`): `finishReason` on `ConverseResult`, `model.turn`, `ConversationResult` and `EngineResult`, mapped from Anthropic `stop_reason` and the OpenAI dialect `finish_reason`; a terminal call on a `length` turn is refused and a cut-off prose answer ends with `stopReason: \"length\"` (`runAgent()` throws `TruncatedAnswerError`).",
+          "bodySha256": "739ae713b71f30130fb93cf9b40d1b63354b140bd79842abefc15d84e865c641",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "native finishReason/truncation fix published in 0.11.0-next.1; no PSJ run confirmed"
+        }
+      ],
+      "needsManualReview": false
+    },
+    {
+      "repository": "dedalus-labs/dedalus-agents-typescript",
+      "number": 15,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/dedalus-labs/dedalus-agents-typescript/pull/15#issuecomment-6256214676",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "codexu/note-gen",
+      "number": 1298,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/codexu/note-gen/pull/1298",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "simin-yuan/agent-cutoff-bench",
+      "number": 1,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/simin-yuan/agent-cutoff-bench/pull/1",
+      "purpose": "sdk-comparison-evaluation",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "keptinventory/kept",
+      "number": 183,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/keptinventory/kept/discussions/183#discussioncomment-19108457",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [],
+      "needsManualReview": false
+    },
+    {
+      "repository": "upstash/agentkit",
+      "number": 73,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/upstash/agentkit/pull/73#issuecomment-6325845102",
+      "purpose": "psj-project-trial",
+      "status": "checked",
+      "responses": [
+        {
+          "author": "CahidArda",
+          "url": "https://github.com/upstash/agentkit/pull/73#issuecomment-6339971296",
+          "createdAt": "2026-10-22T11:47:20Z",
+          "updatedAt": "2026-10-22T11:47:20Z",
+          "body": "Closing as a duplicate: these daily upstream-bump PRs all bump the same pins to newer versions. #74 (eve 0.82.0, ai 7.0.148, @tanstack/ai 0.71.0) supersedes it. The branch is left in place.",
+          "bodySha256": "18aa9b72643aaa25ac061a34cbc3dd9705606d62e53e8a1c36f3a8bf0b315401",
+          "bot": false,
+          "needsManualReview": false,
+          "reviewedClassification": "upgrade PR superseded by PR 74; housekeeping, neither acceptance nor rejection of the PSJ trial"
+        }
+      ],
+      "needsManualReview": false
+    }
+  ],
+  "integrationReports": [],
+  "failures": [],
+  "needsManualReview": false,
+  "limits": [
+    "Replies require manual review; no comment, fixture run or download automatically counts as adoption.",
+    "This job reads public GitHub records and writes reports; it sends no invitations, changes no threads and runs no third-party code."
+  ]
+}

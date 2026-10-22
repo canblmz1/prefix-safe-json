@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-10-22T19:04:16.820Z",
+  "stage": "pre-update-maintenance-audit",
+  "reviewedMain": "deab898cf4eb96fa7600ef37926e3ceaddcadb77",
+  "openNonPrIssues": [],
+  "openPrs": [
+    {
+      "headRefOid": "17007789e46c307c2dba8ed9a005c707f3333464",
+      "isDraft": false,
+      "number": 93,
+      "title": "test: compare deferred approval admission in Sandbase",
+      "url": "https://github.com/canblmz1/prefix-safe-json/pull/93"
+    },
+    {
+      "headRefOid": "9dc7dbc30b2e21f8a37842dfea2ba35c0682d351",
+      "isDraft": true,
+      "number": 90,
+      "title": "test: compare raw-ID alternatives and record adoption evidence",
+      "url": "https://github.com/canblmz1/prefix-safe-json/pull/90"
+    }
+  ]
+}

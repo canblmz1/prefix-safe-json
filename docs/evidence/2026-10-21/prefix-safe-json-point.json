@@ -1,0 +1,11 @@
+{
+  "retrievedAt": "2026-10-21T09:01:33.870Z",
+  "url": "https://api.npmjs.org/downloads/point/2026-09-21:2026-10-20/prefix-safe-json",
+  "status": 200,
+  "body": {
+    "downloads": 3162,
+    "start": "2026-09-21",
+    "end": "2026-10-20",
+    "package": "prefix-safe-json"
+  }
+}

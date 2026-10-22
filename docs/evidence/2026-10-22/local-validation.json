@@ -1,0 +1,28 @@
+{
+  "checkedAt": "2026-10-22T19:04:16.908Z",
+  "node": "v22.23.2",
+  "originalTargets": 31,
+  "mergedTargets": 33,
+  "priorTargetsAndReviewsPreserved": true,
+  "reviewedResponseCount": 8,
+  "newlyConfirmed": 0,
+  "watcherContracts": {
+    "command": "node --test test/scripts/adoption-watch.test.mjs",
+    "pass": 8,
+    "fail": 0,
+    "log": "watcher-contracts.tap"
+  },
+  "localMarkdownLinks": {
+    "checked": 27,
+    "missing": 0
+  },
+  "runtimeTestPackageLockChangelogDiffAgainstMain": 0,
+  "liveWatcher": {
+    "threads": 33,
+    "failures": 0,
+    "needsManualReview": false,
+    "report": "watch-reviewed.json"
+  },
+  "openNonPrIssues": 0,
+  "openPrs": 2
+}
