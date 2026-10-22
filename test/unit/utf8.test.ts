@@ -21,6 +21,7 @@ describe("Utf8Decoder", () => {
       const result = decoder.decode(new Uint8Array(0));
       expect(result.text).toBe("");
       expect(result.consumed).toBe(0);
+      expect(decoder.hasIncomplete()).toBe(false);
     });
   });
 
@@ -221,6 +222,8 @@ describe("Utf8Decoder", () => {
       const result = decoder.decode(new Uint8Array([0xef]));
       expect(result.text).toBe("");
       expect(result.strippedBom).toBe(false);
+      expect(decoder.hasIncomplete()).toBe(true);
+      expect(decoder.incompleteByteOffset()).toBe(0);
     });
 
     it("waits for more data when only the first two BOM bytes have arrived", () => {
@@ -228,6 +231,8 @@ describe("Utf8Decoder", () => {
       const result = decoder.decode(new Uint8Array([0xef, 0xbb]));
       expect(result.text).toBe("");
       expect(result.strippedBom).toBe(false);
+      expect(decoder.hasIncomplete()).toBe(true);
+      expect(decoder.incompleteByteOffset()).toBe(0);
     });
 
     it("strips a BOM delivered one byte at a time", () => {
@@ -237,6 +242,26 @@ describe("Utf8Decoder", () => {
       const result = decoder.decode(new Uint8Array([0xbf, 0x61])); // 'a' after BOM
       expect(result.strippedBom).toBe(true);
       expect(result.text).toBe("a");
+      expect(decoder.hasIncomplete()).toBe(false);
+    });
+
+    it("does not leave a completed BOM pending at EOF", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xef, 0xbb]));
+      const result = decoder.decode(new Uint8Array([0xbf]));
+      expect(result.text).toBe("");
+      expect(result.strippedBom).toBe(true);
+      expect(decoder.hasIncomplete()).toBe(false);
+    });
+
+    it("decodes a completed non-BOM sequence sharing the BOM prefix", () => {
+      const decoder = new Utf8Decoder();
+      decoder.decode(new Uint8Array([0xef, 0xbb]));
+      const result = decoder.decode(new Uint8Array([0xbe])); // U+FEFE, not U+FEFF
+      expect(result.text).toBe("\ufefe");
+      expect(result.errors).toEqual([]);
+      expect(result.strippedBom).toBe(false);
+      expect(decoder.hasIncomplete()).toBe(false);
     });
   });
 

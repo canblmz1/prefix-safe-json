@@ -175,40 +175,15 @@ class Parser implements IncrementalJsonParser {
        this.addRepair(repair);
     }
 
-    // Handle UTF-8 errors
-    for (const err of decoded.errors) {
-      // Every UTF-8 decode failure kind (overlong, out_of_range,
-      // invalid_start_byte, invalid_continuation) maps to the same
-      // machine-readable code - there is no per-kind DiagnosticCode - so
-      // `err.kind` only distinguishes the free-text message below, not the
-      // code itself. A branch here would be equivalent under every mutation
-      // (the resulting `code` value can never differ), so there is no
-      // branch to test.
-      const diag = createDiagnostic(
-        DiagnosticCode.E_INVALID_UTF8,
-        "error",
-        err.byteOffset,
-        `Invalid UTF-8: ${err.kind} at byte ${err.byteOffset}`,
-        false,
-      );
-      this.addDiagnostic(diag);
-      this.syntax_ = "invalid";
-      this.terminal = true;
-      return {
-        acceptedBytes: decoded.consumed,
-        emittedEvents: this.events.emittedDuringPush,
-        syntax: this.syntax_,
-        terminal: true,
-      };
-    }
-
-    // Feed decoded text to scanner character by character
+    // Commit only the verified prefix, never recovery text after a UTF-8 error.
     const text = decoded.text;
     // Track byte positions via UTF-8 encoding
     let bytePos = this.consumedBytes;
+    let codePointIndex = 0;
 
     for (const ch of text) {
-      if (this.terminal) break;
+      if (this.terminal || codePointIndex === decoded.validPrefixCodePoints) break;
+      codePointIndex++;
 
       const charBytes = getUtf8ByteLength(ch);
 
@@ -326,6 +301,22 @@ class Parser implements IncrementalJsonParser {
     }
 
     this.consumedBytes = bytePos;
+
+    // Report UTF-8 failure after the prefix's events, unless an earlier
+    // scanner/grammar/resource failure already stopped the parser.
+    const err = decoded.errors[0];
+    if (err && !this.terminal) {
+      const diag = createDiagnostic(
+        DiagnosticCode.E_INVALID_UTF8,
+        "error",
+        err.byteOffset,
+        `Invalid UTF-8: ${err.kind} at byte ${err.byteOffset}`,
+        false,
+      );
+      this.addDiagnostic(diag);
+      this.syntax_ = "invalid";
+      this.terminal = true;
+    }
 
     return {
       acceptedBytes: decoded.consumed,

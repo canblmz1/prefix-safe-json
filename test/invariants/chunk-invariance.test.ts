@@ -130,6 +130,70 @@ function assertEquivalentResults(
 }
 
 describe("Chunk Invariance", () => {
+  it("preserves BOM-prefixed JSON across byte splits and empty chunks", () => {
+    const input = '{"text":"é😀","escaped":"\\u0041\\n"}';
+    const bytes = new TextEncoder().encode(`\ufeff${input}`);
+    const reference = runParse([bytes]);
+    expect(reference.result.outcome).toBe("valid");
+    expect(reference.result.stableValue).toEqual(JSON.parse(input));
+    expect(reference.result.executable).toBe(true);
+    expect(reference.result.diagnostics).toEqual([]);
+    expect(reference.result.repairs.map((repair) => repair.code)).toEqual([
+      "R_STRIP_UTF8_BOM",
+    ]);
+
+    for (let split = 0; split <= bytes.length; split++) {
+      const actual = runParse([
+        "", bytes.slice(0, split), new Uint8Array(), bytes.slice(split), "",
+      ]);
+      expect(actual, `split at byte ${split}`).toEqual(reference);
+    }
+
+    const byteChunks = Array.from(bytes, (byte) => new Uint8Array([byte]));
+    expect(runParse(byteChunks.flatMap((chunk) => ["", chunk]))).toEqual(reference);
+    expect(runParse(["", `\ufeff${input}`, ""])).toEqual(reference);
+  });
+
+  const endReasons: StreamEndReason[] = [
+    "complete", "length", "network_error", "provider_error", "cancelled", "unknown",
+  ];
+
+  for (const reason of endReasons) {
+    it(`reports incomplete BOM prefixes at EOF (${reason})`, () => {
+      const partitions = [
+        [new Uint8Array([0xef])],
+        [new Uint8Array([0xef, 0xbb])],
+        [new Uint8Array([0xef]), new Uint8Array([0xbb])],
+      ];
+
+      for (const chunks of partitions) {
+        const parsed = runParse(chunks, reason);
+        expect(parsed.result.outcome).toBe("truncated");
+        expect(parsed.result.executable).toBe(false);
+        expect(parsed.result.stableValue).toBeUndefined();
+        expect(parsed.result.repairs).toEqual([]);
+        expect(parsed.result.diagnostics.filter((d) => d.code === "E_INCOMPLETE_UTF8"))
+          .toEqual([expect.objectContaining({
+            code: "E_INCOMPLETE_UTF8",
+            severity: "error",
+            byteOffset: 0,
+            recoverable: false,
+          })]);
+        expect(runParse(chunks.flatMap((chunk) => ["", chunk, new Uint8Array()]), reason))
+          .toEqual(parsed);
+      }
+    });
+  }
+
+  it("does not diagnose empty input or a complete BOM as incomplete UTF-8", () => {
+    for (const chunks of [[], ["", new Uint8Array()], [new Uint8Array([0xef, 0xbb, 0xbf])]]) {
+      const { result } = runParse(chunks);
+      expect(result.outcome).toBe("truncated");
+      expect(result.executable).toBe(false);
+      expect(result.diagnostics).toEqual([]);
+    }
+  });
+
   const testCases: Array<{
     name: string;
     input: string;

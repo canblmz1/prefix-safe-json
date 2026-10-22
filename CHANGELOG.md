@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
 coverage) a version bump requires.
 
-## [Unreleased]
+## [0.6.3] - Unreleased
+
+### Fixed
+
+- Empty chunks no longer prevent recognition of a leading UTF-8 BOM. Incomplete leading `EF` or `EF BB` sequences report `E_INCOMPLETE_UTF8` at EOF, including when split across chunks.
+- Preserve completed JSON values and committed events before the first malformed UTF-8 sequence, including when the verified prefix and error arrive in one chunk. The parser does not interpret data after the error.
+- Reject available invalid continuation bytes in short three- or four-byte UTF-8 tails as `E_INVALID_UTF8` consistently across the covered chunk boundaries. Valid unfinished sequences retain `E_INCOMPLETE_UTF8`.
+
+Malformed inputs remain non-executable. Public APIs, dependencies and companion package versions are unchanged.
 
 ## [0.6.2] - 2026-10-19
 
