@@ -1,0 +1,261 @@
+diff --git a/tests/integration/approval-evaluation-controls.ts b/tests/integration/approval-evaluation-controls.ts
+new file mode 100644
+index 0000000..8c9db64
+--- /dev/null
++++ b/tests/integration/approval-evaluation-controls.ts
+@@ -0,0 +1,73 @@
++import { z } from 'zod';
++
++// Test-only replacements at the existing admission seam, not runtime adapters.
++// No PSJ parser, validator or decision implementation is used by either path.
++export function nativeDeferredTools(tools: Record<string, any>) {
++  return Object.fromEntries(Object.entries(tools).map(([name, definition]) => {
++    const { execute, onInputStart, onInputDelta, onInputAvailable, needsApproval, ...rest } = definition;
++    void [execute, onInputStart, onInputDelta, onInputAvailable, needsApproval];
++    return [name, { ...rest, needsApproval: true }];
++  }));
++}
++
++export function nativeAdmission(mode: 'native' | 'native-check', schemas: Record<string, object> = {}) {
++  const raw = new Map<string, { name: string; text: string; ended: boolean }>();
++  const projected: any[] = [];
++  const consumed = new Set<string>();
++  const validators = mode === 'native-check' ? new Map(Object.entries(schemas).map(([name, schema]) =>
++    [name, z.fromJSONSchema(schema as Parameters<typeof z.fromJSONSchema>[0])])) : new Map();
++  let fault: string | undefined, finished = false;
++  let decisions: any[] = [];
++  return {
++    push(part: any) {
++      if (part.type === 'tool-call' && !part.invalid) projected.push(part);
++      if (mode === 'native') return; // SDK JSON/invalid-call handling stays active.
++      if (part.type === 'tool-input-start') {
++        if (!part.id || raw.has(part.id) || !part.toolName) fault ??= 'native_identity';
++        else raw.set(part.id, { name: part.toolName, text: '', ended: false });
++      } else if (part.type === 'tool-input-delta') {
++        const call = raw.get(part.id);
++        if (!call || call.ended || typeof part.delta !== 'string') fault ??= 'native_lifecycle';
++        else call.text += part.delta;
++      } else if (part.type === 'tool-input-end') {
++        const call = raw.get(part.id);
++        if (!call || call.ended) fault ??= 'native_lifecycle';
++        else call.ended = true;
++      } else if (part.type === 'finish-step' || part.type === 'finish') {
++        if (!['stop', 'tool-calls'].includes(part.finishReason)) fault ??= 'native_finish';
++        if (part.type === 'finish') finished = true;
++      } else if (part.type === 'error' || part.type === 'tool-error') fault ??= 'native_sdk_error';
++    },
++    finish() {
++      const ids = new Set<string>();
++      decisions = projected.map((call, index) => {
++        let reason = fault;
++        let value = call.input;
++        if (mode === 'native-check') {
++          const original = raw.get(call.toolCallId);
++          if (!finished) reason ??= 'native_finish';
++          if (!call.toolCallId || ids.has(call.toolCallId) || !original || original.name !== call.toolName) reason ??= 'native_identity';
++          if (!original?.ended) reason ??= 'native_lifecycle';
++          try { value = JSON.parse(original?.text ?? ''); } catch { reason ??= 'native_json'; }
++          const validator = validators.get(call.toolName);
++          if (!validator || !validator.safeParse(value).success) reason ??= 'native_schema';
++          // Validation output is deliberately ignored; persist the original value.
++        }
++        ids.add(call.toolCallId);
++        return { internalId: `local-${index}`, toolCallId: call.toolCallId, name: call.toolName,
++          action: reason ? 'reject' : 'execute', reason: reason ?? (mode === 'native' ? 'sdk_projection' : 'native_raw_valid'), value };
++      });
++      if (mode === 'native-check' && raw.size !== projected.length) {
++        decisions = decisions.map(item => ({ ...item, action: 'reject', reason: 'native_identity' }));
++      }
++      return { decisions };
++    },
++    takeDecision(id: string) {
++      const decision = decisions.find(item => item.internalId === id);
++      if (!decision || decision.action !== 'execute' || consumed.has(id)) return;
++      consumed.add(id);
++      return decision;
++    },
++    snapshot() { return decisions; },
++  };
++}
+diff --git a/tests/integration/tool-confirmation-reliability.test.ts b/tests/integration/tool-confirmation-reliability.test.ts
+index 4f91c17..2bddfb6 100644
+--- a/tests/integration/tool-confirmation-reliability.test.ts
++++ b/tests/integration/tool-confirmation-reliability.test.ts
+@@ -1,9 +1,12 @@
+-import { afterEach, describe, expect, it } from 'vitest';
+-import { mkdtempSync, rmSync } from 'node:fs';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
++import { createHash } from 'node:crypto';
++import { isDeepStrictEqual } from 'node:util';
+ import { join } from 'node:path';
+ import { tmpdir } from 'node:os';
+ import type { LanguageModel } from 'ai';
+ import { Database } from '@/core/db/database.js';
++import { EventLogger } from '@/core/session/event-logger.js';
+ import { ModelRegistry } from '@/model/registry.js';
+ import { LocalSandboxProvider } from '@/sandbox/local-provider.js';
+ import { DefaultSessionExecutor } from '@/core/session/executor.js';
+@@ -12,7 +15,40 @@ import { DefaultStrategy } from '@/strategy/default-strategy.js';
+ import { createAiSdkV4ExecutionGuard } from '@/strategy/ai-sdk-v4-execution-guard.js';
+ import type { EnvironmentConfig, SandboxInstance } from '@/types/sandbox.js';
+ 
++const evaluation = vi.hoisted(() => ({ mode: process.env.PSJ_APPROVAL_MODE,
++  traces: [] as any[][], decisions: [] as any[][] }));
++vi.mock('prefix-safe-json', async (importOriginal) => {
++  const actual = await importOriginal<typeof import('prefix-safe-json')>();
++  const { nativeDeferredTools } = await import('./approval-evaluation-controls.js');
++  return { ...actual, createAiSdkExecutionLock: evaluation.mode && evaluation.mode !== 'psj'
++    ? nativeDeferredTools : actual.createAiSdkExecutionLock };
++});
++vi.mock('@/strategy/ai-sdk-v4-execution-guard.js', async (importOriginal) => {
++  const actual = await importOriginal<typeof import('@/strategy/ai-sdk-v4-execution-guard.js')>();
++  const { nativeAdmission } = await import('./approval-evaluation-controls.js');
++  return { ...actual, createAiSdkV4ExecutionGuard(options?: { schemas?: Record<string, object> }) {
++    const guard = evaluation.mode === 'native' || evaluation.mode === 'native-check'
++      ? nativeAdmission(evaluation.mode, options?.schemas) : actual.createAiSdkV4ExecutionGuard(options);
++    if (!evaluation.mode) return guard;
++    const trace: any[] = [], decisions: any[] = [];
++    evaluation.traces.push(trace);
++    evaluation.decisions.push(decisions);
++    return { ...guard, push(part: any) {
++      if (['tool-input-start', 'tool-input-delta', 'tool-input-end', 'tool-call', 'finish-step', 'finish'].includes(part.type)) {
++        trace.push(Object.fromEntries(['type', 'id', 'toolCallId', 'toolName', 'delta', 'input', 'invalid', 'finishReason']
++          .filter(key => part[key] !== undefined).map(key => [key, part[key]])));
++      }
++      guard.push(part);
++    }, finish() {
++      const result = guard.finish();
++      decisions.push(...result.decisions.map(({ toolCallId, name, action, reason }: any) => ({ toolCallId, name, action, reason })));
++      return result;
++    } };
++  } };
++});
++
+ type ToolStream = {
++  observeRequest?: (prompt: any) => void;
+   finishReason: 'stop' | 'length' | 'tool-calls';
+   toolName?: string;
+   args: string;
+@@ -40,7 +76,8 @@ function scriptedToolModel(script: ToolStream): LanguageModel {
+     async doGenerate() {
+       throw new Error('not used');
+     },
+-    async doStream() {
++    async doStream(options: any) {
++      script.observeRequest?.(options.prompt);
+       turn += 1;
+       return {
+         stream: new ReadableStream({
+@@ -98,6 +135,7 @@ function scriptedToolModel(script: ToolStream): LanguageModel {
+ class CountingLocalSandboxProvider extends LocalSandboxProvider {
+   writeCount = 0;
+   writes: Array<{ path: string; content: string }> = [];
++  successfulWrites: Array<{ path: string; content: string }> = [];
+ 
+   override async provision(sessionId: string, config: EnvironmentConfig): Promise<SandboxInstance> {
+     const sandbox = await super.provision(sessionId, config);
+@@ -108,7 +146,8 @@ class CountingLocalSandboxProvider extends LocalSandboxProvider {
+           return async (path: string, content: string) => {
+             provider.writeCount += 1;
+             provider.writes.push({ path, content });
+-            return target.writeFile(path, content);
++            await target.writeFile(path, content);
++            provider.successfulWrites.push({ path, content });
+           };
+         }
+         const value = Reflect.get(target, property, receiver);
+@@ -192,7 +231,7 @@ afterEach(() => {
+   }
+ });
+ 
+-describe('tool confirmation stream reliability', () => {
++describe.skipIf(Boolean(evaluation.mode))('tool confirmation stream reliability', () => {
+   it('executes a safely completed, schema-valid call exactly once after confirmation', async () => {
+     const harness = createHarness({
+       finishReason: 'tool-calls',
+@@ -412,3 +451,84 @@ describe('tool confirmation stream reliability', () => {
+     expect(duplicateResult.decisions.every((item) => item.action !== 'execute')).toBe(true);
+   });
+ });
++
++describe.skipIf(!evaluation.mode)('deferred approval evaluation', () => {
++  const healthyArgs = { path: 'safe.txt', content: 'safe' };
++  const cases: Array<{ name: string; script: ToolStream; expected: object | null; queuedRepeat?: boolean }> = [
++    { name: 'healthy', script: { finishReason: 'tool-calls', args: JSON.stringify(healthyArgs) }, expected: healthyArgs },
++    { name: 'length', script: { finishReason: 'length', args: JSON.stringify({ path: 'length.txt', content: 'incomplete turn' }) }, expected: null },
++    { name: 'schema-invalid', script: { finishReason: 'tool-calls', args: JSON.stringify({ path: 'missing-content.txt' }) }, expected: null },
++    { name: 'raw-projection-conflict', script: { finishReason: 'tool-calls',
++      rawArgs: JSON.stringify({ path: 'raw.txt', content: 'raw' }), args: JSON.stringify({ path: 'projection.txt', content: 'projection' }) },
++    expected: { path: 'raw.txt', content: 'raw' } },
++    { name: 'healthy-reapproval', script: { finishReason: 'tool-calls', args: JSON.stringify(healthyArgs) },
++      expected: healthyArgs, queuedRepeat: true },
++  ];
++  for (const fixture of cases) it(fixture.name, async () => {
++    evaluation.traces.length = 0;
++    evaluation.decisions.length = 0;
++    const scriptSha256 = createHash('sha256').update(JSON.stringify(fixture.script)).digest('hex');
++    const prompts: any[] = [];
++    const harness = createHarness({ ...fixture.script, observeRequest: prompt => prompts.push(prompt) });
++    const sessionId = await requestToolCall(harness);
++    const readEvents = () => {
++      const reader = new Database(join(harness.workspace, 'test.db'));
++      try { return new EventLogger(reader).getEvents(sessionId); } finally { reader.close(); }
++    };
++    await waitFor(() => readEvents().some(event => event.type === 'span.model_request_end')
++      && ['requires_action', 'paused'].includes(harness.manager.get(sessionId)!.status), 15_000);
++    const files = () => Object.fromEntries(['safe.txt', 'length.txt', 'missing-content.txt', 'raw.txt', 'projection.txt']
++      .map(path => { const full = join(harness.workspace, 'sandbox', sessionId, path);
++        return [path, existsSync(full) ? readFileSync(full, 'utf8') : null]; }));
++    const pending = readEvents().filter(event => event.type === 'agent.tool_use')
++      .flatMap(event => event.content ?? []).filter((block: any) => block.requires_confirmation)
++      .map((block: any) => ({ id: block.id, name: block.name, input: block.input, requiresConfirmation: block.requires_confirmation }));
++    const before = { status: harness.manager.get(sessionId)?.status, pending,
++      successfulWrites: harness.sandboxProvider.successfulWrites.length, attemptedWrites: harness.sandboxProvider.writeCount,
++      files: files(), modelRequests: prompts.length };
++    expect(before.successfulWrites).toBe(0);
++    expect(before.attemptedWrites).toBe(0); // Native permission barrier must stay intact.
++    expect(Object.values(before.files).every(value => value === null)).toBe(true);
++    const confirm = { type: 'user.tool_confirmation', tool_use_id: 'call_write_1', result: 'allow' } as const;
++    const attempt = async () => {
++      try { await harness.manager.sendEvent(sessionId, confirm as any); return { accepted: true, error: null }; }
++      catch (error) { return { accepted: false, error: (error as Error).message }; }
++    };
++    let first, repeat;
++    if (fixture.queuedRepeat) {
++      const queued = attempt();
++      repeat = await attempt();
++      first = await queued;
++    } else first = await attempt();
++    if (first.accepted) await waitFor(() => harness.manager.get(sessionId)?.status === 'paused', 15_000);
++    const after = { successfulWrites: harness.sandboxProvider.successfulWrites.length,
++      attemptedWrites: harness.sandboxProvider.writeCount, files: files(), modelRequests: prompts.length,
++      continuation: readEvents().filter(event => event.type === 'agent.message')
++        .some(event => (event.content?.[0] as any)?.text === 'continued'),
++      toolResults: readEvents().filter(event => event.type === 'agent.tool_result').map(event => event.content) };
++    repeat ??= await attempt();
++    expect(repeat.accepted).toBe(false);
++    expect(repeat.error).toContain('not awaiting approval');
++    const afterRepeat = { successfulWrites: harness.sandboxProvider.successfulWrites.length,
++      attemptedWrites: harness.sandboxProvider.writeCount, files: files(), modelRequests: prompts.length,
++      durableConfirmations: readEvents().filter(event => event.type === 'user.tool_confirmation').length };
++    expect(afterRepeat.successfulWrites).toBe(after.successfulWrites);
++    expect(afterRepeat.attemptedWrites).toBe(after.attemptedWrites);
++    expect(afterRepeat.files).toEqual(after.files);
++    expect(afterRepeat.modelRequests).toBe(after.modelRequests);
++    expect(afterRepeat.durableConfirmations).toBe(first.accepted ? 1 : 0);
++    const expected = fixture.expected as { path: string; content: string } | null;
++    const correctInput = expected ? pending.length === 1 && isDeepStrictEqual(pending[0].input, expected) : pending.length === 0;
++    const policySatisfied = correctInput && (expected ? first.accepted && after.successfulWrites === 1
++      && after.files[expected.path] === expected.content && after.continuation : !first.accepted && after.successfulWrites === 0);
++    const row = { mode: evaluation.mode, case: fixture.name, scriptSha256,
++      lifecycleSha256: createHash('sha256').update(JSON.stringify(evaluation.traces[0])).digest('hex'),
++      before, firstApproval: first, after, repeatedApproval: { timing: fixture.queuedRepeat ? 'queued' : 'after-turn', ...repeat },
++      afterRepeat, decisions: evaluation.decisions, lifecycle: evaluation.traces,
++      policySatisfied, unnecessaryRefusal: Boolean(expected && pending.length === 0),
++      continuationMessages: prompts.slice(1).map(prompt => prompt.filter((message: any) => message.role === 'tool')) };
++    if (process.env.PSJ_APPROVAL_OUTPUT) appendFileSync(process.env.PSJ_APPROVAL_OUTPUT, JSON.stringify(row) + '\n');
++    console.log('APPROVAL_EVALUATION ' + JSON.stringify(row));
++    if (evaluation.mode !== 'native') expect(policySatisfied).toBe(true);
++  });
++});
