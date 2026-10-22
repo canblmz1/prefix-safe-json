@@ -145,6 +145,60 @@ for SDK upgrades or prefer the native row alone. No independent run, keep/remove
 decision or retained PSJ use has been reported. This adds zero developers to
 the five-developer count.
 
+### October 22: replace the mismatched proposal with the actual LangGraph path
+
+The user's instruction to continue acquisition advanced the offer review;
+it did not establish maintainer demand for a PSJ dependency. The earlier
+AI SDK row already prevented the reported writes and did not exercise the
+author's affected LangGraph path. The same draft PR now contains
+[`edc32a0b533df075724d3aebd9dba11d53263890`](https://github.com/canblmz1/agent-cutoff-bench/commit/edc32a0b533df075724d3aebd9dba11d53263890),
+normally fast-forwarded from the original proposal, with no rewritten history
+or duplicate PR. Its old files remain accessible at the historical commit.
+
+The replacement uses the existing `ChatOpenAI -> createReactAgent -> write_file`
+and real temporary-file path, unchanged server fixtures and original tool
+schema. Published core **0.6.3** is an optional development dependency;
+no production adapter or framework API was added. The original default
+runner remains available without the optional fifth argument.
+
+| Existing fixture | Native | Small raw-native check | PSJ |
+| --- | --- | --- | --- |
+| Complete | One 2,120-byte, 40-line write | Same | Same |
+| Length cutoff | One truncated 866-byte write | No write | No write |
+| Clean EOF/drop | One truncated 866-byte write | No write | No write |
+| TCP reset | No write; transport error | Same | Same |
+
+Two separate source-only Windows 11 build 26200 installations used Node
+22.23.2, npm 10.9.8 and Python 3.12.10 with strict peers, no prior modules,
+links or overlays. The retained core/OpenAI/LangGraph **1.2.18/1.6.2/1.5.1**
+pins pass **12/12**. A separate validation on current registry
+**1.3.0/1.7.0/1.5.2** also passes **12/12** in one invocation; those pins do
+not replace the benchmark manifest. Both use Zod 4.6.7 and PSJ 0.6.3.
+
+In guarded length/drop runs, one callback attempt becomes an error
+ToolMessage before any disk write; original result ID `call_bench_1`, two
+model requests and the fake server's `Done.` remain. Complete/length/drop
+argument and lifecycle fingerprints match across clients except volatile
+timestamps. Real TCP reset delivery can differ and is reported as transport
+controls, not identical delivered inputs. The first retained run failed on
+pre-header fetch capture bookkeeping; its eleven records are preserved,
+the observer was corrected and zero-write expectations were not relaxed.
+
+[Trial instructions, limitations, exact locks and raw records](https://github.com/canblmz1/agent-cutoff-bench/blob/edc32a0b533df075724d3aebd9dba11d53263890/harness/js/RESULTS.md)
+make the next action `npm ci --ignore-scripts --strict-peer-deps --no-audit
+--no-fund`, then `npm run test:raw-policy` in `harness/js` with Node 22+ and
+Python 3. Two operator reviews found no concrete correctness/fairness blocker.
+This is an operator experiment: native-check and PSJ give equal outcomes;
+lower maintenance cost and independent use remain unverified. It does not
+replace the author's still-open [native fix 11994](https://github.com/langchain-ai/langchainjs/pull/11994).
+
+After explicit approval of the exact candidate, PR title/body and one comment,
+[the material update](https://github.com/simin-yuan/agent-cutoff-bench/pull/1#issuecomment-6350775744)
+was sent at **20:37:33 UTC**. API readback verified the head, preserved draft
+state, exact approved body and one posted comment. No other invitation or
+automatic reminder was sent. The maintainer's own run and keep/remove decision
+are pending; newly confirmed independent projects remain **zero**.
+
 ## AgentUse: raw batches through the existing Code Mode runner
 
 The existing [transport recovery tests](https://github.com/agentuse/agentuse/blob/4092f5bd4ef2c756116fd9d4b3e4e345187e688f/tests/model-stream-transport-drop.test.ts)
