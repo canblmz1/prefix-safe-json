@@ -1,14 +1,14 @@
 {
-  "date": "2026-10-21",
-  "run": "twenty-third",
+  "date": "2026-10-22",
+  "run": "twenty-fourth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 23 in a row). add_repo (read) for BerriAI/litellm returned 'read_available' (public repo, anonymous git clone/fetch only) and explicitly does not grant GitHub API tool access; that requires access:\"push\", which was not requested since it would mint write credentials against a third-party repo the user doesn't own for a read-only status check -- treated as a privilege escalation out of scope for this task, not attempted. Advisory requires gh api specifically per task instructions (non-public triage state), so no curl/WebFetch fallback attempted beyond a quick confirmatory check on item 3's sibling advisory (both 404 publicly, as expected for a private triage advisory)."
+      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 24 in a row). Unauthenticated curl to api.github.com is intercepted by the session proxy with the identical 403 message. Advisory requires gh api specifically per task instructions (non-public triage state), so no further fallback attempted; a quick WebFetch against the public advisory URL returns 404, consistent with private triage state."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message; WebFetch against the public PR URL returns 404 (private GHSA collaboration fork has no public page). No fallback available."
+      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message. No fallback available (private GHSA collaboration fork has no public page)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
@@ -21,7 +21,7 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-20 snapshot -- no change."
+      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Same state/comment counts/last-activity date as the 2026-10-21 snapshot -- no change."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
@@ -30,7 +30,7 @@
       "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. Last-activity date unchanged from the 2026-10-20 snapshot (2026-09-09), so carried forward as unchanged."
+      "reason": "same method/blockers as item 4. Last-activity date unchanged from the 2026-10-21 snapshot (2026-09-09), so carried forward as unchanged."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
@@ -39,7 +39,7 @@
       "comments": 2,
       "review_comments": 6,
       "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot reviews + salmanmkc, canblmz1 replies) already captured in the 2026-10-20 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'at least 1 approving review required'. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
+      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot reviews + salmanmkc, canblmz1 replies) already captured in the 2026-10-21 snapshot; most recent activity date still 2026-09-11 -- no new activity since then. Header still reads 'at least 1 approving review required'. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
     }
   }
 }
