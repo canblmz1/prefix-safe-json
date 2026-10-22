@@ -1,5 +1,12 @@
 # Product evidence and next trials — October 21, 2026
 
+Historical snapshot: the source/status statements below describe October 21
+before the UTF-8 PRs merged. Current main is core 0.6.3 at
+`deab898cf4eb96fa7600ef37926e3ceaddcadb77`; PRs 91, 92 and 94 are merged.
+The original measurements and exact published-package pins remain unchanged.
+See the [October 22 decision](ADOPTION_DIAGNOSIS.md#october-22-2026-continue-or-archive)
+and [current pilot log](ADOPTION_PILOTS.md) for later evidence.
+
 This snapshot does not claim five users or forecast growth. The goals are five
 independent projects accepting and retaining an integration, and 200,000 core
 downloads in a rolling 30-day window. Companion downloads are separate.

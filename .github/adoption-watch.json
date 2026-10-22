@@ -329,6 +329,30 @@
       "since": "2026-10-20T12:51:33Z",
       "purpose": "sdk-comparison-evaluation",
       "reviewedResponses": []
+    },
+    {
+      "repository": "keptinventory/kept",
+      "number": 183,
+      "kind": "discussion",
+      "invitationUrl": "https://github.com/keptinventory/kept/discussions/183#discussioncomment-19108457",
+      "since": "2026-10-21T20:28:58Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": []
+    },
+    {
+      "repository": "upstash/agentkit",
+      "number": 73,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/upstash/agentkit/pull/73#issuecomment-6325845102",
+      "since": "2026-10-21T20:29:07Z",
+      "purpose": "psj-project-trial",
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/upstash/agentkit/pull/73#issuecomment-6339971296",
+          "bodySha256": "18aa9b72643aaa25ac061a34cbc3dd9705606d62e53e8a1c36f3a8bf0b315401",
+          "classification": "upgrade PR superseded by PR 74; housekeeping, neither acceptance nor rejection of the PSJ trial"
+        }
+      ]
     }
   ]
 }
