@@ -9,13 +9,12 @@ group. The SDK still owns execution, results and continuation.
 ## Install and reproduce
 
 Node 22+ is required. Follow the [package installation instructions](../packages/ai-sdk/README.md)
-for the available release and preserve your application's supported locked
-SDK/provider pair. For a review before registry publication, install the two
-prepared artifacts in a new directory:
+and preserve your application's supported locked SDK/provider pair. Both
+packages below are published on npm. In a new directory:
 
 ```sh
 npm init -y
-npm install --save-exact ./prefix-safe-json-0.6.2.tgz ./psj-ai-sdk-0.3.2.tgz ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 zod@4.4.3
+npm install --save-exact --strict-peer-deps --engine-strict prefix-safe-json@0.6.2 psj-ai-sdk@0.3.2 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71 zod@4.4.3
 ```
 
 Copy [comparison.mjs](../examples/guarded-chat/comparison.mjs) into that
@@ -85,6 +84,12 @@ policy. A custom native check with its own original-byte parser could enforce
 more of the same rules. Compare its maintenance cost with this dependency.
 
 ## Add it to a development branch
+
+The [October 21 raw-ID comparison](../examples/raw-id-policy/README.md) gives
+the small native control access to the original bytes too. On current AI
+7.0.148/provider 3.0.75 it blocks the repeated-ID fixture just as PSJ does;
+this scenario demonstrates no extra protection over that local alternative.
+Use that comparison when evaluating whether a new dependency is justified.
 
 Keep the existing supported schemas, callbacks and continuation condition:
 

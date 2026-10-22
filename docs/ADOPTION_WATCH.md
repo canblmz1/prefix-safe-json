@@ -31,6 +31,12 @@ The maintainer's own runs are rejected. Fixture runs, downloads, native-only
 fixes and promising replies never increase the count automatically. Historical
 verification remains separate from newly acquired users.
 
+`goal.confirmedDevelopers` is the legacy new-campaign developer counter, not
+a total installed-project count. The five-project objective in the
+[roadmap](psj-adoption-maintenance-plan.md) requires separate manual project
+deduplication across core and companion. Historical Sandbase retention remains
+separate; an empty campaign counter does not mean zero historical core users.
+
 After reviewing a reply, add its URL, exact `bodySha256` from the report and
 classification to that thread's `reviewedResponses`. Record a decline as a
 decline; do not re-invite a developer who declined. Integration-report bodies

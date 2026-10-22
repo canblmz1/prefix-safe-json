@@ -572,6 +572,24 @@ jobs:
             )
           done
 
+      - name: Compare original identity with an application-owned raw check
+        run: |
+          PSJ_RAW_ID_DIR=$(mktemp -d)
+          cp examples/raw-id-policy/package.json examples/raw-id-policy/package-lock.json examples/raw-id-policy/compare.mjs "$PSJ_RAW_ID_DIR/"
+          (
+            cd "$PSJ_RAW_ID_DIR"
+            npm ci --ignore-scripts --strict-peer-deps --engine-strict --no-audit --no-fund
+            node compare.mjs > "$GITHUB_WORKSPACE/raw-id-policy-results.jsonl"
+          )
+          cat raw-id-policy-results.jsonl
+      - name: Retain the raw identity comparison
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: raw-id-policy-evaluation
+          path: raw-id-policy-results.jsonl
+          if-no-files-found: error
+          retention-days: 30
+
   runtime-package-smoke:
     name: Packed runtime smoke (Node ${{ matrix.node-version }})
     needs: package-smoke

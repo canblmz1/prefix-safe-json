@@ -1,0 +1,86 @@
+[
+  {
+    "key": "core30",
+    "status": 200,
+    "downloads": 3153,
+    "start": "2026-09-22",
+    "end": "2026-10-21",
+    "package": "prefix-safe-json"
+  },
+  {
+    "key": "corePrev30",
+    "status": 200,
+    "downloads": 5227,
+    "start": "2026-08-23",
+    "end": "2026-09-21",
+    "package": "prefix-safe-json"
+  },
+  {
+    "key": "coreDaily",
+    "status": 200,
+    "days": 30,
+    "sum": 3153,
+    "last7": [
+      {
+        "downloads": 0,
+        "day": "2026-10-15"
+      },
+      {
+        "downloads": 328,
+        "day": "2026-10-16"
+      },
+      {
+        "downloads": 366,
+        "day": "2026-10-17"
+      },
+      {
+        "downloads": 104,
+        "day": "2026-10-18"
+      },
+      {
+        "downloads": 0,
+        "day": "2026-10-19"
+      },
+      {
+        "downloads": 0,
+        "day": "2026-10-20"
+      },
+      {
+        "downloads": 0,
+        "day": "2026-10-21"
+      }
+    ]
+  },
+  {
+    "key": "companion30",
+    "status": 404,
+    "error": "package psj-ai-sdk not found"
+  },
+  {
+    "key": "coreRegistry",
+    "status": 200,
+    "name": "prefix-safe-json",
+    "version": "0.6.3",
+    "engines": {
+      "node": ">=18.0.0"
+    }
+  },
+  {
+    "key": "companionRegistry",
+    "status": 200,
+    "name": "psj-ai-sdk",
+    "version": "0.3.2",
+    "engines": {
+      "node": ">=22"
+    }
+  },
+  {
+    "key": "aiRegistry",
+    "status": 200,
+    "name": "ai",
+    "version": "7.0.148",
+    "engines": {
+      "node": ">=22"
+    }
+  }
+]

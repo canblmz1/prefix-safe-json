@@ -1,10 +1,19 @@
 # Own-project evaluation
 
+The [October 21 product snapshot](PRODUCT_BASELINE_20261021.md) records current
+downloads, dated historical retention evidence, development-trial candidates
+and a comparison with a raw-capable native alternative. A prepared pilot is
+separate from accepted use.
+
+The dated operator history below is retained. For current contact states,
+published versions and the next proposed messages, see
+[the October 21 outreach checkpoint](#october-21-2026-outreach-checkpoint-work-order-009).
+
 The new integration reduces the first supported AI SDK path to a provider
 factory and a normal call with ordinary tool callbacks. SDK-owned result
 serialization and continuation are exercised by the
 [installed guarded-chat example](../examples/guarded-chat/README.md).
-The 0.2 preview streams a conservative display-only prefix and can record
+Published companion 0.3.2 streams a conservative display-only prefix and can record
 refused responses locally for wire-policy replay. Its narrower tool policy,
 provisional text and replay scope remain costs to evaluate; the features do
 not establish that a developer will retain it.
@@ -36,7 +45,7 @@ Operator evidence:
   citation-picker and graph failures. The draft records that limitation and
   the additional serving warning in an unchanged-source browser control.
 
-The trial now pins the public integration preview **0.2.0** and adds three
+The earlier trial pinned the public integration preview **0.2.0** and added three
 Node-only checks beside those four cases: text before EOF while callbacks
 wait, a recorded token-limited response, and an interrupted recording that
 stays ineligible on offline replay. Healthy completion retains the original
@@ -44,8 +53,8 @@ result ID and final answer and creates no recording in default refused-only
 mode. Captures use temporary directories that are removed afterward. The
 source and installed provider remain at AI 7.0.29/provider 3.0.11.
 
-The focused nine checks, full 1,554-test unit suite and project typecheck pass
-in the operator's checkout. Only the preview package changes version; no
+The focused nine checks, full 1,554-test unit suite and project typecheck passed
+in that operator checkout. Only the preview package changed version; no
 other existing locked version changes or new package is added. Node imports
 follow the repository's existing test-only convention without widening its
 browser types. These are authored offline cases, not independent use or a
@@ -56,6 +65,85 @@ independently confirmed rerun after an actual SDK update or incident.
 The application's existing `prepareStep`, provider selection and permission
 flow stay in production. The proposed use is an offline SDK regression check;
 the first guarded-chat adapter does not replace that broader agent loop.
+
+### Published 0.3.2 candidate, October 20
+
+The [same draft PR](https://github.com/whitefoxx/localmd/pull/1) now advances
+`694e4146c14b589a79f0d3f39a54f62c4dda7479` to
+[`fefb45e6256f0bf057bb21e8bbb94a31663aca55`](https://github.com/canblmz1/localmd/commit/fefb45e6256f0bf057bb21e8bbb94a31663aca55).
+Manifest and lockfile pin npm-published **`psj-ai-sdk: "0.3.2"`**. All other
+locked versions and the three existing test files remain unchanged. Production
+code and the provider loop remain unchanged.
+
+Both the old and new candidates install from scratch on local Windows 11
+build 26200, Node 22.23.2 and npm 10.9.8, with separate empty caches, no prior
+`node_modules`, junction or overlay, and strict peer checks enabled. The command
+is `npm ci --ignore-scripts --strict-peer-deps --no-audit --no-fund --prefer-online`.
+Each installs 696 packages. The first new-candidate attempt failed with
+`ECONNRESET`; a different clean directory/cache then succeeded. The earlier
+`TAR_ENTRY_ERROR UNKNOWN` did not recur; its cause and resolution remain
+unproven. The clean new candidate passes all nine focused cases and typecheck.
+
+The [separate fork verification](https://github.com/canblmz1/localmd/actions/runs/39421488268)
+checks old/new sources on Windows and Ubuntu with Node 22.23.2/npm 10.9.8.
+All four jobs pass the nine focused cases, typecheck and 1,554 unit tests.
+The full browser results are:
+
+| Candidate | Windows browser cases | Ubuntu browser cases |
+| --- | ---: | ---: |
+| Old 0.2.0 pilot | 99/100 | 98/100 |
+| New 0.3.2 candidate | 100/100 | 97/100 |
+
+The new Windows job passes its final required-check gate. The overall workflow
+fails because the other browser jobs fail. Only DOCX fails in both Ubuntu
+controls; the other UI failures have not been attributed to a root cause.
+This is not a claim that every failure was pre-existing or that Linux is green.
+The workflow stays outside the upstream PR.
+
+Local Git `core.autocrlf=true` also changed site Markdown to CRLF and broke
+the existing static-page tests in both old and new sources. Restoring the
+committed LF bytes makes the old static-page control pass. The trial's clone
+command sets `core.autocrlf=false` and `core.eol=lf`; this was checked in a
+fresh source clone. No application parser change is proposed.
+
+The [maintainer instructions](https://github.com/canblmz1/localmd/blob/fefb45e6256f0bf057bb21e8bbb94a31663aca55/docs/tool-stream-regression.md)
+give the exact published install and nine-test command and ask whether this
+check earns its dependency during SDK upgrades. Technical preparation is
+complete. Independent evaluation and subsequent use remain unconfirmed.
+
+## agent-cutoff-bench: paired SDK completion policies
+
+A [new independent LangChain report](https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102)
+links a runnable cross-framework cutoff benchmark. It establishes a current
+native parsing problem; it does not report PSJ use. Its own Python patch already
+prevents the truncated writes, and its valid-sibling case prefers retaining
+the complete call instead of refusing the whole group.
+
+[Draft PR 1](https://github.com/simin-yuan/agent-cutoff-bench/pull/1), head
+`e28b5c42c7ae968c35130561d3225983d2559c83`, adds an optional isolated npm
+consumer with published companion 0.3.2/core 0.6.2 and paired native AI SDK
+7.0.146/provider 3.0.74. The existing server, four fixtures, LangChain versions
+and default matrix remain unchanged. This is not a LangChain production adapter.
+
+All eight cases pass in a source-only Windows consumer after strict-peer
+`npm ci` with a separate empty cache and no prior modules or links. Both
+clients write the healthy 2,120-byte report once, preserve `call_bench_1` in
+callback and continuation, and receive the final answer. Both clients release
+zero callbacks and write no file for `length`, `drop` and `reset`.
+
+On `length/drop`, native AI SDK sends an invalid-input tool result and the
+fake server then answers `Done.`; PSJ refuses without continuation. The server
+answers after any tool result, including errors; this does not mean the SDK
+reports a successful write. Inspecting native error results remains an
+alternative. There is **no additional callback/disk protection demonstrated**
+by PSJ on these fixtures. The
+[raw records and clean-install receipt](https://github.com/canblmz1/agent-cutoff-bench/tree/e28b5c42c7ae968c35130561d3225983d2559c83/harness/ai-sdk/results)
+preserve the operator run. No Linux or real-provider run is claimed.
+
+The draft asks whether the maintainer would retain the optional paired row
+for SDK upgrades or prefer the native row alone. No independent run, keep/remove
+decision or retained PSJ use has been reported. This adds zero developers to
+the five-developer count.
 
 ## AgentUse: raw batches through the existing Code Mode runner
 
@@ -261,7 +349,7 @@ and a specific integration blocker are distinct outcomes to record.
 Current stage: **operator-tested proposals, awaiting maintainer evaluation**.
 New independent developers confirmed by these pilots: **zero**. CI initiated by
 the PSJ maintainer, public downloads and a proposed patch do not change that
-count. The campaign's five-developer goal remains open.
+count. The campaign's goal of five independent projects remains open.
 
 The existing four-hour adoption workflow tracks the PRs and surfaces public
 feedback for manual review. It sends no reminders and does not infer adoption.
@@ -286,3 +374,259 @@ cases, 3,670 passing tests, 19 skips and two browser smoke cases. This is
 independent evidence that the older integration remains in maintained code
 and CI. It does not verify deployment, adoption of the proposed 0.6.1 upgrade,
 use of the new 0.2 preview features or another new developer for the campaign.
+
+## October 21, 2026 outreach checkpoint (work order 009)
+
+Status: **three approved messages sent on October 21; independent replies pending**.
+Two are first-contact development-test proposals to newly screened projects;
+one supplies new evidence to the existing Sandbase contact. No application
+integration, external PR, release or deployment was made.
+These are qualified evaluation offers, not confirmed unmet production needs.
+
+### Publication closure and measured baseline
+
+Reviewed PSJ main/tag `v0.6.3` is
+`deab898cf4eb96fa7600ef37926e3ceaddcadb77`.
+`pnpm verify:published-release 0.6.3` passed on Windows build 26200,
+Node 22.23.2 / pnpm 10.33.1. The existing verifier installed the registry
+package into an empty temporary consumer using npm 11.19.0, checked registry
+integrity and cryptographically verified its npm attestations. Provenance
+binds the exact package to that commit and
+[publish run 39645764793](https://github.com/canblmz1/prefix-safe-json/actions/runs/39645764793).
+All 181 published/rebuilt files agree; the tarballs are byte-identical.
+Registry tarball SHA-256:
+`ee7899a056da8701facd15e9d570f45de289ee724bce2297000c7d1fcf5d3c72`.
+Registry integrity:
+`sha512-g0yIn1I9juITXL8/BUjsx7FsXa5fTJ3dgEatK/SPGXYgJggGnK29OF5kL7JVrqtd+y/ZX55cSP3kQS21MghNcQ==`.
+The unchanged `scripts/runtime-package-smoke.mjs`, copied into that clean
+consumer and run there, passed public imports, parsing, gate/guard, adapters,
+one-shot authority and exports checks. Verification closed within 30 minutes;
+no full test matrix, mutation or long fuzz was rerun. The initial mistaken
+`--version 0.6.3` invocation failed usage and is not counted as successful.
+The [release](https://github.com/canblmz1/prefix-safe-json/releases/tag/v0.6.3)
+already existed; this task did not approve or perform publication.
+
+At approximately 20:19 UTC the
+[npm point API](https://api.npmjs.org/downloads/point/2026-09-21:2026-10-20/prefix-safe-json)
+returned **3,162** core downloads for September 21 through October 20 inclusive
+(30 completed UTC days), against the 200,000 goal. The companion
+[downloads endpoint](https://api.npmjs.org/downloads/point/2026-09-21:2026-10-20/psj-ai-sdk)
+returned HTTP 404: its download count is **unknown**, not zero. Published
+companion 0.3.2 remains a separate package. Downloads do not establish users.
+
+### Existing contacts and independent evidence
+
+The existing read-only watcher checked 30/30 main-configuration threads with
+zero API failures. Local receipts are retained under the ignored
+`artifacts/work-order-009-20261021/` audit directory. No outgoing message was
+sent by the watcher. Two LangChain replies report
+[a still-observed cutoff problem](https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6273127102)
+and [native fix work](https://github.com/langchain-ai/langchainjs/issues/11469#issuecomment-6294109525),
+not a PSJ trial; PR 90 already records their review classification. Sidecar
+[declined both a dependency and the demo](https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817);
+it is excluded from further invitations. Native fixes in multi-llm-ts,
+ai-sdk-ollama and harness-kernel remain native fixes, not PSJ adoption.
+
+| Existing contact | Current reviewed state | Action in this checkpoint |
+| --- | --- | --- |
+| [Sandbase 965](https://github.com/sandbaseai/sandbase-harness/pull/965) | Open, head `f2866b9f7bf331c0479ac93364234f4afc81653c`; no maintainer comment/review on upgrade PR | Sent the new equal-result update below; no request to rerun |
+| [localmd 1](https://github.com/whitefoxx/localmd/pull/1) | Draft, head `fefb45e6256f0bf057bb21e8bbb94a31663aca55`; companion 0.3.2 candidate; no independent response | Existing invitation stands; no repeat |
+| [AgentUse 25](https://github.com/agentuse/agentuse/pull/25) | Draft, head `7d8a66cb4aee6b9faa0dd65ec2c0f315ddd76a12`; no comments/reviews | Existing invitation stands; no repeat |
+| [Phoronis 12](https://github.com/skrylnikov/Phoronis-tg-bot/pull/12) | Open, head `b84198e03a86d779f56d2308655c203103f021b2`; no comments/reviews | Existing invitation stands; no repeat |
+
+Count projects once across core and companion: **one historical retained core
+project (Sandbase), zero newly confirmed projects in this campaign**. Sandbase
+[accepted its original integration on August 30](https://github.com/sandbaseai/sandbase-harness/pull/80)
+and [independently ran successful CI on October 12](https://github.com/sandbaseai/sandbase-harness/actions/runs/38202171387),
+43 days later; reviewed main still retains core 0.5.0. This establishes retained
+source/CI integration beyond 30 days, not production deployment or a new user.
+Neither another accepted integration nor five independent projects is verified.
+
+### Fifteen new projects screened; two selected
+
+These are source/issue reviews, not installed-application certifications.
+No new candidate's application or integration tests were run in this task.
+
+**Kept** — main
+[`c99019e6612beed307d1bc635251d35ddf79e996`](https://github.com/keptinventory/kept/tree/c99019e6612beed307d1bc635251d35ddf79e996).
+Its [write-proposal code](https://github.com/keptinventory/kept/blob/c99019e6612beed307d1bc635251d35ddf79e996/apps/server/src/assistant/proposals.ts)
+stores parsed arguments plus a canonical hash and later executes only after
+confirmation. [Existing SDK tests](https://github.com/keptinventory/kept/blob/c99019e6612beed307d1bc635251d35ddf79e996/apps/server/src/ai/call.tools.test.ts)
+construct argument strings with `JSON.stringify`, so those fixtures cannot
+represent duplicate argument members. This is a concrete argument-fidelity
+review opportunity, **not evidence that Kept has suffered such an incident**.
+[Node >=24 <25](https://github.com/keptinventory/kept/blob/c99019e6612beed307d1bc635251d35ddf79e996/package.json),
+AI 7.0.116 and compatible provider 3.0.57 are within the relevant core runtime
+and protocol conditions. Its model factory already accepts injected fetch;
+tools have no SDK `execute` callback, leaving admission before proposal storage.
+
+Smallest offer: one test file using published **prefix-safe-json@0.6.3** only
+as a development dependency, with the current compatible provider and a finite
+authored HTTP response. Feed the original `function.arguments` string to the
+public core parser before SDK projection, then keep Kept's existing schema,
+per-call sibling policy, confirmation, hash and replay controls. No companion
+or production-loop migration is proposed; Kept uses non-streaming generation.
+Compare healthy `update_thing` input with a duplicate `fields.name` member.
+Measure persisted proposal arguments and actual database changes before,
+after and on repeated confirmation. Proposed success: exact healthy proposal,
+zero changes before approval, one approved change, none on replay; ambiguous
+input is refused before persistence **if the maintainer wants that policy**.
+Current JSON/schema/finish checks already cover ordinary malformed, invalid
+and length cases. An equally informed native check with strict duplicate-member
+parsing can implement the same policy. PSJ necessity and maintenance savings
+are unproven. The maintainer reviews one scoped test and decides keep/remove;
+the existing test database setup is reused. No previous contact found in the
+watch record, existing drafts, discussion replies or account-authored issues.
+
+**Upstash AgentKit** — main
+[`7022274100404136bd92cb03e9bf67192d91158d`](https://github.com/upstash/agentkit/tree/7022274100404136bd92cb03e9bf67192d91158d),
+with [active SDK upgrade PR 73](https://github.com/upstash/agentkit/pull/73)
+at `68a2afc806fafd8b9d238192c7bb202f0217bcbc`.
+That PR explicitly performs recurring upstream-compatibility work; it is not
+PSJ interest. The [memory tests](https://github.com/upstash/agentkit/blob/7022274100404136bd92cb03e9bf67192d91158d/packages/ai-sdk/src/memory.test.ts)
+invoke callbacks directly, whereas
+[`save_memory`](https://github.com/upstash/agentkit/blob/7022274100404136bd92cb03e9bf67192d91158d/packages/ai-sdk/src/memory.ts)
+persists through `AgentMemory.add`. Testing the provider-to-write boundary is
+a specific possible addition to that upgrade review, not a claimed failure.
+Node 24, main AI 7.0.133 / OpenAI provider 4.0.71; PR 73 locks AI 7.0.148 /
+OpenAI 4.0.71. Keep each comparison on the same selected candidate lock.
+
+Smallest offer: one scripted-provider `save_memory` check using the existing
+isolated Redis user scope and cleanup, plus published core **0.6.3** as a dev
+dependency. Reuse core's existing Responses stream adapter and retain original
+call IDs/argument strings in the test fetch before the SDK consumes them.
+The demo uses `openai(...)`'s Responses path: **companion 0.3.2 is not a drop-in
+fit**, and no new adapter or route change is offered. Drain/preflight only the
+finite test response before releasing it to the unchanged SDK callbacks.
+Healthy success means one stored memory, original result ID and continuation;
+an original-ID collision is evaluated against a proposed zero-write admission
+policy, with equally informed raw-native and PSJ controls. Check Redis writes
+and contents, not callback count alone. The SDK already parses JSON and
+validates its tool schema; a native raw-ID/finish/schema ledger can enforce the
+same admission policy. No advantage is demonstrated on this project's Responses
+path yet. Reuse one memory index rather than creating an index per fixture;
+PR 73's Redis quota/timing failures are not bugs PSJ claims to solve. Maintainer
+burden: one focused test, an optional dev dependency and their existing test
+Redis credentials. No previous account contact or invitation was found.
+
+The remaining thirteen were not selected; absence of fit is not a claim that
+their entire application is correct:
+
+| Screened project / current primary evidence | Reason not to solicit a PSJ pilot now |
+| --- | --- |
+| [Mastra 27259](https://github.com/mastra-ai/mastra/issues/27259) | Transformed Standard Schema handling; PSJ deliberately does not promise transform support |
+| [VoltAgent 1373](https://github.com/VoltAgent/voltagent/issues/1373) | Native SDK API alignment, with AI 6 in current core; no demonstrated need for another execution wrapper |
+| [Dyad 4879](https://github.com/dyad-sh/dyad/issues/4879) | Sandbox/permission boundary; outside PSJ guarantees |
+| [Open Lovable 232](https://github.com/firecrawl/open-lovable/issues/232) | Authentication/shared-sandbox issue; PSJ would not fix it |
+| [Midday](https://github.com/midday-ai/midday) | No sufficiently specific current raw-argument need established in this screen |
+| [n8n 41604](https://github.com/n8n-io/n8n/issues/41604) | Node/tool interface mismatch; supported pre-execution raw seam not established |
+| [Cherry Studio 15244](https://github.com/CherryHQ/cherry-studio/issues/15244) | Capability exposure request, not evidence of argument-admission need |
+| [Activepieces 16487](https://github.com/activepieces/activepieces/issues/16487) | Trace storage/observability request; does not establish a PSJ admission need |
+| [Pi 11112](https://github.com/earendil-works/pi/issues/11112) / [9265](https://github.com/earendil-works/pi/issues/9265) | Current malformed calls already refuse execution; repair hooks and a separate incremental-performance patch are different work |
+| [T3 Code 22995](https://github.com/pingdotgg/t3code/issues/22995) | Approval-card information from an external CLI; no established original-wire seam before that CLI executes |
+| [Tambo backend](https://github.com/tambo-ai/tambo/blob/6e2c1bff3b68a00c094b6d876788cc8f33f7bb02/packages/backend/package.json) | AI 6/provider 2 excludes the companion; no specific need justifying core wiring was established |
+| [Convex Agent 417](https://github.com/convex/agent/issues/417) | Native TypeScript intersection failure; unrelated to raw execution evidence |
+| [Stagewise 1575](https://github.com/stagewise-io/stagewise/issues/1575) | PTY sentinel splitting, not tool-argument JSON |
+
+Pi's previous `badlogic/pi-mono` URL redirects to `earendil-works/pi`, and
+`get-convex/agent` redirects to `convex/agent`; each is counted once. No
+additional project was selected merely to reach five.
+
+### Fair comparison and outgoing approval package
+
+[PR 90](https://github.com/canblmz1/prefix-safe-json/pull/90) compares the same
+original-ID fixture with SDK defaults, equally informed raw-native controls
+and PSJ: updates **2 / 0 / 0**, healthy updates **2 / 2 / 2**. In
+[PR 93](https://github.com/canblmz1/prefix-safe-json/pull/93), actual Sandbase
+deferred approval/persistence/file execution meets the five selected policies
+in **5/5 PSJ and 5/5 small-native cases** (current native admission: 2/5).
+That experiment retains the application's locked AI 7.0.128 / PSJ 0.5.0; it
+does not certify a new runtime or another application's protocol. Both are
+scripted experiments, not frequency/production evidence. No lower maintenance
+cost or unique protection over the equally informed native alternative is
+proven. Neither comparison was rerun in this outreach task.
+
+The user approved all three exact comments below with "gonder" after reviewing
+the prepared package. Each destination was checked for new replies and duplicate
+messages before sending. API readback verified the posted author (`canblmz1`)
+and exact approved body for all three. No repeated invitations to localmd,
+AgentUse or Phoronis are included. No automatic follow-up is authorized.
+
+| Message | Sent at (UTC), October 21, 2026 | Verified comment |
+| --- | --- | --- |
+| K | 20:28:58 | [Kept](https://github.com/keptinventory/kept/discussions/183#discussioncomment-19108457) |
+| U | 20:29:07 | [Upstash AgentKit](https://github.com/upstash/agentkit/pull/73#issuecomment-6325845102) |
+| S | 20:29:11 | [Sandbase](https://github.com/sandbaseai/sandbase-harness/pull/965#issuecomment-6325846401) |
+
+Receipts and exact bodies are retained under the ignored audit directory's
+`sent/` subdirectory. The existing watch configuration now includes the two
+new public reply threads, prepared for the existing PR 90. Those additions
+are not yet active in main's scheduled watcher. Sending does not
+change the confirmed-project count.
+The focused live watcher query checked both new threads successfully; its
+existing Sandbase target timed out after 30 seconds (2/3 checked, one failure).
+That query is recorded as partial failure, not a clean watcher run. The separate
+GitHub comment readback above verified all three sends, including Sandbase.
+
+#### K — Kept first contact
+
+Destination: comment on
+<https://github.com/orgs/keptinventory/discussions/183> (the existing ideas thread).
+Discussion node: `D_kwDOUrd5ss4AqSoZ`. One idea; no new issue or PR.
+
+> I maintain Prefix-Safe JSON. Your [write proposals](https://github.com/keptinventory/kept/blob/c99019e6612beed307d1bc635251d35ddf79e996/apps/server/src/assistant/proposals.ts) bind parsed arguments to confirmation cards, while the [SDK tests](https://github.com/keptinventory/kept/blob/c99019e6612beed307d1bc635251d35ddf79e996/apps/server/src/ai/call.tools.test.ts) construct inputs with JSON.stringify.
+>
+> I'd offer one development-only update_thing check using published prefix-safe-json@0.6.3: compare duplicate-member handling before proposal storage with an equally informed small native check, retaining your current SDK pins, validation, approvals and replay controls. We'd inspect stored arguments and database changes before/after confirmation; no production migration or incident claim. I'd prepare the test; your task would be one focused run and a keep/remove decision. PSJ's maintenance advantage is unproven.
+>
+> Would that original-argument check be useful in your existing proposal tests?
+
+#### U — Upstash AgentKit first contact
+
+Destination: comment on <https://github.com/upstash/agentkit/pull/73>.
+No duplicate dependency-upgrade PR.
+
+> I maintain Prefix-Safe JSON. This SDK upgrade is a concrete place to evaluate an optional provider-boundary regression: [memory.test.ts](https://github.com/upstash/agentkit/blob/7022274100404136bd92cb03e9bf67192d91158d/packages/ai-sdk/src/memory.test.ts) calls execute directly, while save_memory persists through AgentMemory.add.
+>
+> I can prepare one scripted-provider test using published prefix-safe-json@0.6.3, your candidate's exact AI/OpenAI versions and existing isolated Redis setup. It would compare native, small raw-native and PSJ admission for healthy and duplicate-original-ID responses, checking stored memories, result IDs and continuation. Your Responses path calls for core's existing adapter, not the Chat Completions companion; no production route change. Small native checks may give identical results; this would not address the quota/timing failures reported here.
+>
+> Would one scoped save_memory test earn a place in your SDK-upgrade checks?
+
+#### S — Sandbase new comparison evidence
+
+Destination: comment on <https://github.com/sandbaseai/sandbase-harness/pull/965>.
+This is an evidence update to an existing adopter, not a new-user invitation.
+
+> PSJ maintainer update: [comparison #93](https://github.com/canblmz1/prefix-safe-json/pull/93) now evaluates your actual deferred-approval flow on its pinned AI SDK 7.0.128 / PSJ 0.5.0. Existing PSJ and a small native raw-lifecycle check satisfy the same policy in all five selected cases, including persisted arguments, file writes after approval and repeat approval. Permissions and persistent replay controls stay unchanged.
+>
+> These are scripted cases, not provider incidents; we have not demonstrated a maintenance-cost advantage for PSJ. No rerun is requested, and this does not repeat the dependency upgrade.
+>
+> Would you prefer to retain PSJ or own the small native check, and what drives that choice?
+
+Next action: review any independent response on these existing threads. A
+positive reply leads to one selected flow's smallest reviewable test patch;
+external PR permission is handled only when that diff is concrete. A decline
+is recorded without another solicitation. Silence remains pending. The approved
+send is complete; independent evaluation and the five-project goal remain open.
+
+### October 22 status check, 18:38 UTC
+
+No new independent PSJ acceptance or own-application run was verified. Kept's
+invitation has no replies (including nested replies); Sandbase 965 has only
+our evidence update. localmd 1, AgentUse 25 and Phoronis 12 still have no
+independent pilot response or review.
+
+Upstash collaborator `CahidArda`
+[closed PR 73 as superseded by PR 74](https://github.com/upstash/agentkit/pull/73#issuecomment-6339971296).
+This is upgrade-PR housekeeping, not acceptance or rejection of the PSJ offer.
+[PR 74](https://github.com/upstash/agentkit/pull/74) is open with no comments or
+reviews. No invitation was reposted there and no follow-up was sent. Newly
+confirmed projects remain zero; Sandbase remains historical evidence only.
+
+The roadmap stage 1 implementation preserves the existing 31 PR-branch
+topics and adds the two sent invitations: 33 unique topics. Its
+[reviewed live audit](evidence/2026-10-22/watch-reviewed.json) has zero API
+failures, zero integration reports and no unclassified reply remaining.
+The superseded AgentKit comment is acknowledged by its exact body hash,
+without increasing acceptance. [The maintenance queue and validation](ADOPTION_DIAGNOSIS.md#october-22-execution-checkpoint-roadmap-stage-1)
+are prepared in the same existing PR 90; scheduled main coverage still
+depends on review and merge.
