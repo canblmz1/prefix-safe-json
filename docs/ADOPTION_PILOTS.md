@@ -523,3 +523,17 @@ positive reply leads to one selected flow's smallest reviewable test patch;
 external PR permission is handled only when that diff is concrete. A decline
 is recorded without another solicitation. Silence remains pending. The approved
 send is complete; independent evaluation and the five-project goal remain open.
+
+### October 22 status check, 18:38 UTC
+
+No new independent PSJ acceptance or own-application run was verified. Kept's
+invitation has no replies (including nested replies); Sandbase 965 has only
+our evidence update. localmd 1, AgentUse 25 and Phoronis 12 still have no
+independent pilot response or review.
+
+Upstash collaborator `CahidArda`
+[closed PR 73 as superseded by PR 74](https://github.com/upstash/agentkit/pull/73#issuecomment-6339971296).
+This is upgrade-PR housekeeping, not acceptance or rejection of the PSJ offer.
+[PR 74](https://github.com/upstash/agentkit/pull/74) is open with no comments or
+reviews. No invitation was reposted there and no follow-up was sent. Newly
+confirmed projects remain zero; Sandbase remains historical evidence only.
