@@ -1,5 +1,9 @@
 # Adoption diagnosis — 2026-10-17
 
+The October 17 observations below are historical. The
+[October 22 continue/archive decision](#october-22-2026-continue-or-archive)
+uses current releases, fair native comparisons and dated response evidence.
+
 The strongest evidence is that several maintainers value the bug report but
 prefer a small native correction to a new runtime dependency. This does not
 establish why every other contacted developer has not tried PSJ. Most have
@@ -157,3 +161,92 @@ The three existing README execution tests, lint, JavaScript syntax check,
 invalid-argument checks, local Markdown link targets and `git diff --check`
 passed. The eight existing adoption-watcher contract tests had also passed
 with the reviewed Ollama response configuration.
+
+## October 22, 2026: continue or archive
+
+**Decision: retain the stable core, stop speculative feature expansion, and
+allow one 30-day demand-validation cycle through November 21. Do not archive
+now.** This is a bounded engineering decision, not evidence of product-market
+fit or a forecast of 200,000 monthly downloads. No repository archive setting,
+package deprecation, merge, release or external message was changed by this
+review. Technical and adoption evidence were reviewed separately; these are
+operator reviews, not new independent application evaluations.
+
+Reviewed remote main remains `deab898cf4eb96fa7600ef37926e3ceaddcadb77`.
+Registry releases are core **0.6.3** and companion **0.3.2**. The existing
+local `published-release-result.json` audit already verified integrity,
+signed provenance, clean consumer imports and source/package equivalence for
+[the published release](https://github.com/canblmz1/prefix-safe-json/actions/runs/39645764793).
+That receipt is a local audit artifact, not a file included in the published
+package. Full tests, mutation and fuzz were
+not rerun for this decision. Open evidence PRs
+[90](https://github.com/canblmz1/prefix-safe-json/pull/90) and
+[93](https://github.com/canblmz1/prefix-safe-json/pull/93) retain their reviewed
+heads `9dc7dbc30b2e21f8a37842dfea2ba35c0682d351` and
+`17007789e46c307c2dba8ed9a005c707f3333464`.
+
+### Evidence for and against continued investment
+
+| Observation as of October 22 | Implication |
+| --- | --- |
+| [npm API](https://api.npmjs.org/downloads/point/2026-09-22:2026-10-21/prefix-safe-json): **3,153** core downloads, September 22–October 21 inclusive; the 30 daily rows sum to the same number | 200,000 requires approximately **63.4 times** the recorded current volume; no channel delivering that growth is established |
+| [Previous non-overlapping 30 days](https://api.npmjs.org/downloads/point/2026-08-23:2026-09-21/prefix-safe-json): **5,227** | The recorded total is about 39.7% lower. This is not a measured decline in active users: installs can include CI/operator work, and reporting freshness is not independently established |
+| Companion [downloads API](https://api.npmjs.org/downloads/point/2026-09-22:2026-10-21/psj-ai-sdk) returns 404, while [registry metadata](https://registry.npmjs.org/psj-ai-sdk/latest) confirms 0.3.2 | Companion download count remains unknown, not zero |
+| Sandbase's independent [original integration PR 80](https://github.com/sandbaseai/sandbase-harness/pull/80), accepted August 30, and [independent CI on October 12](https://github.com/sandbaseai/sandbase-harness/actions/runs/38202171387) | One historical retained core project, beyond 30 days. It argues against immediate archive; production use and new adoption remain unverified |
+| New campaign projects independently reporting an own-application run/keep decision: **zero** | Installation and our fixtures do not establish dependency demand |
+| PR 90 original-ID comparison: native / equally informed native / PSJ effects **2 / 0 / 0**, healthy **2 / 2 / 2**; PR 93 actual deferred approval: **5/5 PSJ and 5/5 small native** | Reusable evidence/identity policy is demonstrated, but superior protection or lower maintenance cost over the reasonable native alternatives is not |
+| [Sidecar](https://github.com/nedonatelli/sidecar/issues/164#issuecomment-6179590817) confirmed the problem but declined the dependency/demo; [harness-kernel](https://github.com/rarebit-one/harness-kernel/issues/76#issuecomment-6264504755) published its own fix | Finding a real bug is not sufficient to sell the package; do not repeat declined invitations |
+| Companion preserves native callbacks and continuation within its supported Chat Completions path, but excludes Responses/Messages, approval continuation and transforming schemas | First-use friction has been reduced, not eliminated; compatibility expansion still requires an actual adopter need |
+
+GitHub's authenticated 14-day traffic snapshot reports 36 views / 8 unique
+visitors, and 4,066 clones / 443 unique cloners for October 8–21. These are
+different metrics; they do not isolate CI, operator traffic or customers.
+No conversion rate is inferred. The repository has zero stars/forks at this
+snapshot; popularity counters are not the decision criterion.
+
+### Work permitted during the bounded continuation
+
+- Maintain current core correctness, published installation and verified SDK
+  compatibility. Fix a reproduced defect, an accepted pilot's concrete blocker
+  or a proven regression; do not create features to fill the waiting period.
+- Keep companion feature scope stable. Add no adapter or framework family
+  without a willing project's specific integration requirement.
+- Complete only the smallest flow chosen by a willing maintainer. Preserve
+  their native checks, approvals and continuation, and compare the reasonable
+  native alternative with the same original evidence. Accept a native choice
+  as a valid negative result for the dependency.
+- Record an own-project run, acceptance, later retention and 30-day retention
+  separately. Count a project once across core and companion. The historical
+  Sandbase project is not a new campaign win.
+- Keep 200,000 rolling-30-day core downloads as the long-term objective and
+  track companion separately. Do not generate installation loops or interpret
+  downloads as active projects. The immediate decision metric is a verified
+  new project's keep/remove result, not another release or another fixture.
+
+The existing [read-only adoption workflow](https://github.com/canblmz1/prefix-safe-json/actions/runs/39790676971)
+is active and its latest reviewed scheduled run passed. Its main configuration
+still watches 30 threads. The two new Kept/AgentKit targets are prepared only
+on this local branch; they are **not yet part of main's scheduled coverage**.
+They were checked directly during this review. The existing review/merge
+process must carry that small tracking diff; no protection or approval is
+bypassed. No automatic outgoing reminders are authorized.
+
+### Stop and continue criteria
+
+By **November 21, 2026**, require at least one **new independent project** to
+run the package in its own application and explicitly choose to retain the
+integration, with a concrete reason. A positive response requesting a patch
+is useful pipeline evidence but is not acceptance. Our PR, CI, fixtures or
+download total cannot meet this gate. Subsequent use and 30-day retention
+remain later evidence, not assumptions made at the first run.
+
+If that gate is not met, stop active acquisition/feature investment and keep
+only bounded maintenance for known users and reported defects. Reconsider
+full archive when the known retained integration no longer needs the package
+or sustainable maintenance cannot be provided. Silence from the two fresh
+invitations after roughly one day is insufficient to make that decision.
+Any actual archive/deprecation action is a separate explicit decision.
+
+Current approved contacts and response classifications remain in
+[the existing pilot log](ADOPTION_PILOTS.md#october-22-status-check-1838-utc).
+This review sent no messages, created no new pilot and changed no runtime.
