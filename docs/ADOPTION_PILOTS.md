@@ -7,7 +7,7 @@ separate from accepted use.
 
 The dated operator history below is retained. For current contact states,
 published versions and the next proposed messages, see
-[the October 21 outreach checkpoint](#october-21-2026-outreach-checkpoint-work-order-009).
+[the October 23 discovery checkpoint](#october-23-2026-discovery-checkpoint).
 
 The new integration reduces the first supported AI SDK path to a provider
 factory and a normal call with ordinary tool callbacks. SDK-owned result
@@ -684,3 +684,73 @@ The superseded AgentKit comment is acknowledged by its exact body hash,
 without increasing acceptance. [The maintenance queue and validation](ADOPTION_DIAGNOSIS.md#october-22-execution-checkpoint-roadmap-stage-1)
 are prepared in the same existing PR 90; scheduled main coverage still
 depends on review and merge.
+
+## October 23, 2026 discovery checkpoint
+
+The existing watcher read all **33/33** topics without API failures at
+06:48 UTC. One new response required review:
+[TanStack maintainer confirmation](https://github.com/TanStack/ai/issues/1689#issuecomment-6357854447)
+that [native PR #1750](https://github.com/TanStack/ai/pull/1750) is released and
+malformed arguments now produce an error result without executing the tool.
+This is native problem resolution, not PSJ acceptance. Its exact body hash is
+reviewed; an edited response will require review again. No reminder was sent.
+The updated benchmark PR #1 still has no independent run or keep/remove response.
+
+The [npm downloads endpoint](https://api.npmjs.org/downloads/point/2026-09-23:2026-10-22/prefix-safe-json)
+reports **3,146** core download events for September 23–October 22, checked at
+07:07 UTC. The companion's corresponding endpoint returns 404, so its count
+remains unknown, not zero. Neither number measures independent users. The
+200,000-download goal and five-project goal remain unmet.
+
+Two parallel source reviews and a parent review found no demonstrated unmet
+need requiring a PSJ dependency in the additional screen:
+
+| Source | Current reason not to pitch a runtime dependency |
+| --- | --- |
+| [Kimi3220](https://github.com/MoonshotAI/kimi-code/issues/3220) | Bad tool names already refuse execution; valid model no-op intent cannot be inferred by PSJ |
+| [Cherry Studio22467](https://github.com/CherryHQ/cherry-studio/issues/22467) | Rechecked for a different issue; approved native22479 handles replay. Original bad writer/prevention need remains unestablished |
+| [Luoyu23](https://github.com/loater-opt/luoyu-open/issues/23) | Closed host/uni-app environment, no supported Node raw-execution seam established |
+| [Anima363](https://github.com/anima-research/agent-framework/issues/363) | Existing unparseable-input flag supports a small local check; no independent PSJ need established |
+| [Evener2725](https://github.com/prime-radiant-inc/evener/issues/2725) | Go adapter/rescue boundary, outside the selected Node surface |
+| [bramburn/pi1088](https://github.com/bramburn/pi/issues/1088) | Requests tolerance for trailing data; current native refusal already matches PSJ's strict policy |
+| [Nodal781](https://github.com/Kwintspiracy/nodal-agents/issues/781) | Post-write provenance/SQL/path questions, not original-argument admission |
+| [OpenClaw63210](https://github.com/openclaw/openclaw/issues/63210) | Reported missing required field already fails schema validation; Bedrock route is not the existing raw adapter |
+| [NVIDIA NIM25](https://github.com/BaUka0/nvidia-nim-provider/pull/25) | Native truncated-argument correction merged October3 |
+| [vicoop209](https://github.com/planetarium/vicoop-bridge/issues/209) | Native dispatch correction212 merged May19 |
+| [Meridian source](https://github.com/yunus-0x/meridian/blob/5ab14b476e4e8d25c58f989c77b161721e1a505f/agent.js#L264) | Repair code alone does not prove an unwanted policy; no independent malformed-admission report or isolated test established |
+| [oh-my-pi11104](https://github.com/can1357/oh-my-pi/issues/11104) | Reporter confirmed stale version; native replay fix shipped. Separate execution tolerance is already an explicit policy choice |
+| [codex-router797](https://github.com/duolahypercho/codex-router/issues/797) | Native800 already merged and refuses malformed completed calls |
+| [Continue13223](https://github.com/continuedev/continue/issues/13223) | Our own earlier report, not new independent demand; native consumer/producer PRs13278/13373 are open. Actual effect protection not demonstrated |
+
+Cherry and Continue are rechecks, not new independent discoveries. A narrow
+search for all-before-any-effect policies found no additional qualified
+project. These exclusions are not claims that the applications are generally
+correct or that unreported/private PSJ use is impossible. A separate public
+indexed-manifest search found only the historical Sandbase dependency and
+no companion manifest; this is bounded search evidence, not a census.
+
+### Strands: prepare a first needs-discovery question
+
+The independent reporter in [issue #4158](https://github.com/strands-agents/harness-sdk/issues/4158)
+already supplied the right native precedence fix in approved, still-open
+[PR #4159](https://github.com/strands-agents/harness-sdk/pull/4159).
+The real npm SDK **1.22.0** still contains that precedence issue; this was
+checked in the actual registry artifact, not inferred from an old repository.
+The first-contact question is whether a reusable raw reference earns a place
+in upgrade tests, not whether another fix PR should replace the native work.
+
+The [ready standalone reference](evidence/2026-10-23/strands-reference/README.md)
+uses that reporter's two cutoff fixtures and one healthy control through the
+actual published `Agent`, public model and callback. Two separate clean Windows
+consumers pass **9/9 each** with SDK 1.22.0 / OpenAI 6.45.0 / core 0.6.3 / Zod 4.6.7.
+The optional-schema no-argument cutoff calls once with `{}` natively; a public
+subclass applying the native PR's condition and PSJ both call zero times.
+Partial JSON already calls zero times natively. Healthy ID and continuation
+are retained. This is scripted, memory-only callback evidence, not a file write
+or hosted-provider incident. The native PR itself was not installed or changed.
+
+Native `MaxTokensError` and PSJ's refusal wrapped as `ModelError` have different
+recovery/history behavior. No extra callback protection or maintenance benefit
+over the small native control was demonstrated. A discovery offer is prepared;
+no new external message has been sent at this checkpoint. Maintainer interest,
+own-project run, retention and newly confirmed projects all remain unverified.
