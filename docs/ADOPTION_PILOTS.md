@@ -730,7 +730,7 @@ correct or that unreported/private PSJ use is impossible. A separate public
 indexed-manifest search found only the historical Sandbase dependency and
 no companion manifest; this is bounded search evidence, not a census.
 
-### Strands: prepare a first needs-discovery question
+### Strands: one authorized needs-discovery question sent
 
 The independent reporter in [issue #4158](https://github.com/strands-agents/harness-sdk/issues/4158)
 already supplied the right native precedence fix in approved, still-open
@@ -752,7 +752,16 @@ or hosted-provider incident. The native PR itself was not installed or changed.
 
 Native `MaxTokensError` and PSJ's refusal wrapped as `ModelError` expose
 different error contracts; recovery equivalence was not evaluated. No extra
-callback protection or maintenance benefit
-over the small native control was demonstrated. A discovery offer is prepared;
-no new external message has been sent at this checkpoint. Maintainer interest,
-own-project run, retention and newly confirmed projects all remain unverified.
+callback protection or maintenance benefit over the small native control was
+demonstrated.
+
+After explicit approval for this one new destination, the
+[single discovery comment](https://github.com/strands-agents/harness-sdk/issues/4158#issuecomment-6359696128)
+was sent at **07:20:43 UTC**. Its author and exact body were read back from
+GitHub. It links the tested reference at immutable source
+`aacabe2ca6a411f9a4ac502111cf2b23ce2ad15a`, acknowledges native equivalence,
+and asks whether an optional raw reference would be retained for SDK upgrades.
+No external PR, native-fix change or reminder was sent. This thread is added
+to the existing read-only watcher; a sent question does not increment its
+confirmed count. Maintainer interest, own-project run, retention and newly
+confirmed projects all remain unverified.
