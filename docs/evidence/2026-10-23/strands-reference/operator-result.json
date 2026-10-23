@@ -1,0 +1,798 @@
+{
+  "source": "https://github.com/strands-agents/harness-sdk/issues/4158",
+  "packageVersions": {
+    "@strands-agents/sdk": "1.22.0",
+    "openai": "6.45.0",
+    "prefix-safe-json": "0.6.3",
+    "zod": "4.6.7"
+  },
+  "node": "v22.23.2",
+  "fixtures": {
+    "healthy": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a",
+    "partial": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7",
+    "no-args": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf"
+  },
+  "nativeControl": "Public stream() subclass applies only #4159's maxTokens precedence condition; PR source is not installed",
+  "effects": "The reporter's memory-only callback counter; no disk, network or production effects",
+  "records": [
+    {
+      "fixture": "healthy",
+      "path": "native",
+      "fixtureSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a",
+      "callbacks": [
+        {
+          "id": "call_1",
+          "name": "write_file",
+          "input": {
+            "path": "notes.md",
+            "content": "Saved notes."
+          }
+        }
+      ],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a"
+        },
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            },
+            {
+              "type": "function_call",
+              "call_id": "call_1",
+              "name": "write_file",
+              "arguments": "{\"path\":\"notes.md\",\"content\":\"Saved notes.\"}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call_1",
+              "output": "wrote 12 bytes to notes.md"
+            }
+          ],
+          "responseSha256": "c5f67853825a00482fe348989830fec08303fd5a93d818b06d2f2bff4a209c12"
+        }
+      ],
+      "modelStops": [
+        "toolUse",
+        "endTurn"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "returned",
+      "stopReason": "endTurn",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "bff4e957-adb4-483d-8b42-4e14f3495d63"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "toolUse": {
+                "name": "write_file",
+                "toolUseId": "call_1",
+                "input": {
+                  "path": "notes.md",
+                  "content": "Saved notes."
+                }
+              }
+            }
+          ],
+          "trackingId": "43940c6e-8046-455e-91e8-7324b46aa086",
+          "metadata": {
+            "usage": {
+              "inputTokens": 10,
+              "outputTokens": 50,
+              "totalTokens": 60
+            }
+          }
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "toolResult": {
+                "toolUseId": "call_1",
+                "status": "success",
+                "content": [
+                  {
+                    "text": "wrote 12 bytes to notes.md"
+                  }
+                ]
+              }
+            }
+          ],
+          "trackingId": "068fec78-bb4f-4442-9c1b-a3c3c64253ff"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "text": "Done."
+            }
+          ],
+          "trackingId": "71503afe-6741-43c3-9597-957fca57450f",
+          "metadata": {
+            "usage": {
+              "inputTokens": 20,
+              "outputTokens": 2,
+              "totalTokens": 22
+            }
+          }
+        }
+      ]
+    },
+    {
+      "fixture": "healthy",
+      "path": "native-control",
+      "fixtureSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a",
+      "callbacks": [
+        {
+          "id": "call_1",
+          "name": "write_file",
+          "input": {
+            "path": "notes.md",
+            "content": "Saved notes."
+          }
+        }
+      ],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a"
+        },
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            },
+            {
+              "type": "function_call",
+              "call_id": "call_1",
+              "name": "write_file",
+              "arguments": "{\"path\":\"notes.md\",\"content\":\"Saved notes.\"}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call_1",
+              "output": "wrote 12 bytes to notes.md"
+            }
+          ],
+          "responseSha256": "c5f67853825a00482fe348989830fec08303fd5a93d818b06d2f2bff4a209c12"
+        }
+      ],
+      "modelStops": [
+        "toolUse",
+        "endTurn"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "returned",
+      "stopReason": "endTurn",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "c005a790-32d5-4bfd-9b60-b274dd840df6"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "toolUse": {
+                "name": "write_file",
+                "toolUseId": "call_1",
+                "input": {
+                  "path": "notes.md",
+                  "content": "Saved notes."
+                }
+              }
+            }
+          ],
+          "trackingId": "8bfd3072-d3b8-4ee3-91e2-f2dd96483680",
+          "metadata": {
+            "usage": {
+              "inputTokens": 10,
+              "outputTokens": 50,
+              "totalTokens": 60
+            }
+          }
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "toolResult": {
+                "toolUseId": "call_1",
+                "status": "success",
+                "content": [
+                  {
+                    "text": "wrote 12 bytes to notes.md"
+                  }
+                ]
+              }
+            }
+          ],
+          "trackingId": "088df02a-978c-45ce-8eb8-6652e7bebdaa"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "text": "Done."
+            }
+          ],
+          "trackingId": "17b68a60-bcbd-480d-b723-b1c8f63c1d48",
+          "metadata": {
+            "usage": {
+              "inputTokens": 20,
+              "outputTokens": 2,
+              "totalTokens": 22
+            }
+          }
+        }
+      ]
+    },
+    {
+      "fixture": "healthy",
+      "path": "psj",
+      "fixtureSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a",
+      "callbacks": [
+        {
+          "id": "call_1",
+          "name": "write_file",
+          "input": {
+            "path": "notes.md",
+            "content": "Saved notes."
+          }
+        }
+      ],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "95a9d3455cdc1f8f8aa2950a79f7b920aa7fd57b0e7d105bb2ff99039672e05a"
+        },
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            },
+            {
+              "type": "function_call",
+              "call_id": "call_1",
+              "name": "write_file",
+              "arguments": "{\"path\":\"notes.md\",\"content\":\"Saved notes.\"}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call_1",
+              "output": "wrote 12 bytes to notes.md"
+            }
+          ],
+          "responseSha256": "c5f67853825a00482fe348989830fec08303fd5a93d818b06d2f2bff4a209c12"
+        }
+      ],
+      "modelStops": [
+        "toolUse",
+        "endTurn"
+      ],
+      "gateDecisions": [
+        [
+          {
+            "id": "call_1",
+            "name": "write_file",
+            "executable": true,
+            "reason": "complete"
+          }
+        ],
+        []
+      ],
+      "authorityConsumed": 1,
+      "authoritySecondTake": 0,
+      "outcome": "returned",
+      "stopReason": "endTurn",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "dcbd535a-9dcb-4c90-9f05-0e62c1668a1b"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "toolUse": {
+                "name": "write_file",
+                "toolUseId": "call_1",
+                "input": {
+                  "path": "notes.md",
+                  "content": "Saved notes."
+                }
+              }
+            }
+          ],
+          "trackingId": "879fdac3-8292-484c-be01-cffeb104ec18",
+          "metadata": {
+            "usage": {
+              "inputTokens": 10,
+              "outputTokens": 50,
+              "totalTokens": 60
+            }
+          }
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "toolResult": {
+                "toolUseId": "call_1",
+                "status": "success",
+                "content": [
+                  {
+                    "text": "wrote 12 bytes to notes.md"
+                  }
+                ]
+              }
+            }
+          ],
+          "trackingId": "f96f2cc6-2a9d-47f5-8699-c187a15b145b"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "text": "Done."
+            }
+          ],
+          "trackingId": "ea1624ac-5c34-4462-a635-e4fdf00cc6df",
+          "metadata": {
+            "usage": {
+              "inputTokens": 20,
+              "outputTokens": 2,
+              "totalTokens": 22
+            }
+          }
+        }
+      ]
+    },
+    {
+      "fixture": "partial",
+      "path": "native",
+      "fixtureSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7",
+      "callbacks": [],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7"
+        }
+      ],
+      "modelStops": [
+        "toolUse"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "raised",
+      "error": {
+        "name": "ModelError",
+        "message": "unable to parse tool input JSON",
+        "cause": {
+          "name": "SyntaxError",
+          "message": "Unterminated string in JSON at position 48 (line 1 column 49)"
+        }
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "f97e41b3-38c1-4063-8ac5-094cded9925e"
+        }
+      ]
+    },
+    {
+      "fixture": "partial",
+      "path": "native-control",
+      "fixtureSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7",
+      "callbacks": [],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7"
+        }
+      ],
+      "modelStops": [
+        "maxTokens"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "raised",
+      "error": {
+        "name": "MaxTokensError",
+        "message": "Model reached maximum token limit. This is an unrecoverable state that requires intervention."
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "8dc70e9f-69ff-40a4-9f23-98ad46c07a55"
+        }
+      ]
+    },
+    {
+      "fixture": "partial",
+      "path": "psj",
+      "fixtureSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7",
+      "callbacks": [],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "7d17a101639b9ee5ff34110d448151a8877d85ce0fa0181c7fad224b5a8eabf7"
+        }
+      ],
+      "modelStops": [],
+      "gateDecisions": [
+        [
+          {
+            "id": "call_1",
+            "name": "write_file",
+            "executable": false,
+            "reason": "truncated"
+          }
+        ]
+      ],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "raised",
+      "error": {
+        "name": "ModelError",
+        "message": "PSJ refused the original response before SDK tool execution",
+        "cause": {
+          "name": "PSJRefusal",
+          "message": "PSJ refused the original response before SDK tool execution"
+        }
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "d07a8038-6947-4559-886c-1a1fd0894ead"
+        }
+      ]
+    },
+    {
+      "fixture": "no-args",
+      "path": "native",
+      "fixtureSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf",
+      "callbacks": [
+        {
+          "id": "call_1",
+          "name": "write_file",
+          "input": {}
+        }
+      ],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf"
+        },
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            },
+            {
+              "type": "function_call",
+              "call_id": "call_1",
+              "name": "write_file",
+              "arguments": "{}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "call_1",
+              "output": "wrote 0 bytes to undefined"
+            }
+          ],
+          "responseSha256": "c5f67853825a00482fe348989830fec08303fd5a93d818b06d2f2bff4a209c12"
+        }
+      ],
+      "modelStops": [
+        "toolUse",
+        "endTurn"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "returned",
+      "stopReason": "endTurn",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "b596216d-3629-491c-87e1-2a740d0a7414"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "toolUse": {
+                "name": "write_file",
+                "toolUseId": "call_1",
+                "input": {}
+              }
+            }
+          ],
+          "trackingId": "6e017d05-024b-4d79-804e-99bd05c0db52",
+          "metadata": {
+            "usage": {
+              "inputTokens": 10,
+              "outputTokens": 50,
+              "totalTokens": 60
+            }
+          }
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "toolResult": {
+                "toolUseId": "call_1",
+                "status": "success",
+                "content": [
+                  {
+                    "text": "wrote 0 bytes to undefined"
+                  }
+                ]
+              }
+            }
+          ],
+          "trackingId": "3f81ceb3-1949-4879-a7fa-5ae1acdda1ab"
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "text": "Done."
+            }
+          ],
+          "trackingId": "4262670a-c3c7-4b35-9c48-64969551d284",
+          "metadata": {
+            "usage": {
+              "inputTokens": 20,
+              "outputTokens": 2,
+              "totalTokens": 22
+            }
+          }
+        }
+      ]
+    },
+    {
+      "fixture": "no-args",
+      "path": "native-control",
+      "fixtureSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf",
+      "callbacks": [],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf"
+        }
+      ],
+      "modelStops": [
+        "maxTokens"
+      ],
+      "gateDecisions": [],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "raised",
+      "error": {
+        "name": "MaxTokensError",
+        "message": "Model reached maximum token limit. This is an unrecoverable state that requires intervention."
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "02d4e45d-f73e-4cb1-9850-873d82765d63"
+        }
+      ]
+    },
+    {
+      "fixture": "no-args",
+      "path": "psj",
+      "fixtureSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf",
+      "callbacks": [],
+      "requests": [
+        {
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "save my notes"
+                }
+              ]
+            }
+          ],
+          "responseSha256": "2d3fcb12b55fabeb5996a2fe50f1493f8e820a128dca33cf252e496a1b4ef0bf"
+        }
+      ],
+      "modelStops": [],
+      "gateDecisions": [
+        [
+          {
+            "id": "call_1",
+            "name": "write_file",
+            "executable": false,
+            "reason": "truncated"
+          }
+        ]
+      ],
+      "authorityConsumed": 0,
+      "authoritySecondTake": 0,
+      "outcome": "raised",
+      "error": {
+        "name": "ModelError",
+        "message": "PSJ refused the original response before SDK tool execution",
+        "cause": {
+          "name": "PSJRefusal",
+          "message": "PSJ refused the original response before SDK tool execution"
+        }
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "text": "save my notes"
+            }
+          ],
+          "trackingId": "2e1a2ff8-e200-494e-8b30-81e7b5bccaf1"
+        }
+      ]
+    }
+  ],
+  "conclusion": "Native precedence control and PSJ both prevent the no-argument callback; no PSJ superiority or adoption is established"
+}

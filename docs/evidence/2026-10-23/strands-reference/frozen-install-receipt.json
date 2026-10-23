@@ -1,0 +1,50 @@
+{
+  "reviewedAt": "2026-10-23T07:06:03.832Z",
+  "consumer": "<clean-consumer>",
+  "publicCopy": "Local paths redacted; the original operator receipt is retained locally. Source hashes and measured results are unchanged.",
+  "sourceFilesUnchanged": true,
+  "registryPackagesAreLinks": false,
+  "environment": {
+    "consumer": "<clean-consumer>",
+    "cache": "<fresh-empty-cache>",
+    "sourceOnlyFiles": [
+      "evaluate.mjs",
+      "package-lock.json",
+      "package.json"
+    ],
+    "node": "v22.23.2",
+    "npm": "10.9.8",
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "files": [
+      {
+        "Path": "evaluate.mjs",
+        "Hash": "C897532549FD14E3786E91F3B26879EE6A52A8D876B2459BBEC927CA9ED919F9"
+      },
+      {
+        "Path": "package-lock.json",
+        "Hash": "6ED33B0D094B0DB54ADB6D9B9575C97779FA93BE97E2A55CA2787A2C714D0D14"
+      },
+      {
+        "Path": "package.json",
+        "Hash": "E92039954D58E1F404CF974EC9ACF4D9B47CA15B75430FF60879A1229BF520A5"
+      }
+    ]
+  },
+  "install": {
+    "command": "npm ci --ignore-scripts --strict-peer-deps --engine-strict --no-audit --no-fund --cache <fresh-empty-cache>",
+    "exitCode": 0,
+    "packagesAdded": 54,
+    "log": "strands-frozen-review-install.log"
+  },
+  "run": {
+    "command": "npm test",
+    "exitCode": 0,
+    "invocations": 1,
+    "cases": 9,
+    "result": "strands-frozen-review-run-1.json",
+    "log": "strands-frozen-review-run-1.log"
+  },
+  "matchesFirstRunBehavior": true,
+  "scope": "Scripted Responses events through public OpenAIModel and Agent; original memory-only callback, no production file writes, no native PR installation",
+  "review": "No concrete source or fairness blocker for these bounded claims; small native stop-reason control and PSJ produce equal callback counts, different error/history behavior"
+}

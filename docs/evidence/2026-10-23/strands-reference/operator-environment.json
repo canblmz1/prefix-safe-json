@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-10-23T07:04:24.823Z",
+  "node": "v22.23.2",
+  "npm": "10.9.8",
+  "platform": "win32",
+  "release": "10.0.26200",
+  "arch": "x64",
+  "initialInstall": {
+    "command": "npm install --ignore-scripts --strict-peer-deps --engine-strict --no-audit --no-fund --cache <new empty task cache>",
+    "exit": 0,
+    "priorNodeModules": false,
+    "overlay": false
+  },
+  "run": {
+    "command": "npm test",
+    "exit": 0,
+    "cases": 9,
+    "fixtureSource": "Strands issue4158, plus one healthy control",
+    "sourceSha256": "c897532549fd14e3786e91f3b26879ee6a52a8d876b2459bbec927ca9ed919f9",
+    "lockSha256": "6ed33b0d094b0db54adb6d9b9575c97779fa93be97e2a55ca2787a2c714d0d14"
+  },
+  "noLiveModelCalls": true,
+  "noDiskEffects": true,
+  "independentMaintainerEvaluation": false
+}

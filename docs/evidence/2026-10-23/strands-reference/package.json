@@ -1,0 +1,13 @@
+{
+  "name": "psj-strands-discovery-check",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node evaluate.mjs" },
+  "dependencies": {
+    "@strands-agents/sdk": "1.22.0",
+    "openai": "6.45.0",
+    "prefix-safe-json": "0.6.3",
+    "zod": "4.6.7"
+  }
+}

@@ -148,7 +148,13 @@
       "invitationUrl": "https://github.com/TanStack/ai/issues/1689#issuecomment-6217941748",
       "since": "2026-10-16T14:41:54Z",
       "purpose": "psj-project-trial",
-      "reviewedResponses": []
+      "reviewedResponses": [
+        {
+          "url": "https://github.com/TanStack/ai/issues/1689#issuecomment-6357854447",
+          "bodySha256": "911d20855b49cce6ab93baa36a7683be51225231a644fe2964f68550227a3476",
+          "classification": "maintainer confirms released native malformed-argument refusal via PR1750; no PSJ evaluation or adoption reported"
+        }
+      ]
     },
     {
       "repository": "anthropics/anthropic-sdk-typescript",
@@ -353,6 +359,15 @@
           "classification": "upgrade PR superseded by PR 74; housekeeping, neither acceptance nor rejection of the PSJ trial"
         }
       ]
+    },
+    {
+      "repository": "strands-agents/harness-sdk",
+      "number": 4158,
+      "kind": "issue",
+      "invitationUrl": "https://github.com/strands-agents/harness-sdk/issues/4158#issuecomment-6359696128",
+      "since": "2026-10-23T07:20:43Z",
+      "purpose": "sdk-comparison-evaluation",
+      "reviewedResponses": []
     }
   ]
 }
