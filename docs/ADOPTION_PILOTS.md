@@ -702,8 +702,9 @@ reports **3,146** core download events for September 23–October 22, checked at
 remains unknown, not zero. Neither number measures independent users. The
 200,000-download goal and five-project goal remain unmet.
 
-Two parallel source reviews and a parent review found no demonstrated unmet
-need requiring a PSJ dependency in the additional screen:
+Two parallel source reviews and a parent review assessed 15 repositories:
+13 new assessments and two rechecks. They found no demonstrated unmet need
+requiring a PSJ dependency in the additional screen:
 
 | Source | Current reason not to pitch a runtime dependency |
 | --- | --- |
@@ -749,8 +750,9 @@ Partial JSON already calls zero times natively. Healthy ID and continuation
 are retained. This is scripted, memory-only callback evidence, not a file write
 or hosted-provider incident. The native PR itself was not installed or changed.
 
-Native `MaxTokensError` and PSJ's refusal wrapped as `ModelError` have different
-recovery/history behavior. No extra callback protection or maintenance benefit
+Native `MaxTokensError` and PSJ's refusal wrapped as `ModelError` expose
+different error contracts; recovery equivalence was not evaluated. No extra
+callback protection or maintenance benefit
 over the small native control was demonstrated. A discovery offer is prepared;
 no new external message has been sent at this checkpoint. Maintainer interest,
 own-project run, retention and newly confirmed projects all remain unverified.

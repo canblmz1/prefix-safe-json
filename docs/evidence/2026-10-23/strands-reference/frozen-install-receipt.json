@@ -1,11 +1,12 @@
 {
   "reviewedAt": "2026-10-23T07:06:03.832Z",
-  "consumer": "C:/dev/psj-strands-frozen-review-20261023",
+  "consumer": "<clean-consumer>",
+  "publicCopy": "Local paths redacted; the original operator receipt is retained locally. Source hashes and measured results are unchanged.",
   "sourceFilesUnchanged": true,
   "registryPackagesAreLinks": false,
   "environment": {
-    "consumer": "C:\\dev\\psj-strands-frozen-review-20261023",
-    "cache": "C:\\Users\\cumac\\AppData\\Local\\Temp\\psj-strands-frozen-cache-d0307512688e4826af27587336a107cf",
+    "consumer": "<clean-consumer>",
+    "cache": "<fresh-empty-cache>",
     "sourceOnlyFiles": [
       "evaluate.mjs",
       "package-lock.json",
@@ -16,15 +17,15 @@
     "os": "Microsoft Windows NT 10.0.26200.0",
     "files": [
       {
-        "Path": "C:\\dev\\psj-strands-frozen-review-20261023\\evaluate.mjs",
+        "Path": "evaluate.mjs",
         "Hash": "C897532549FD14E3786E91F3B26879EE6A52A8D876B2459BBEC927CA9ED919F9"
       },
       {
-        "Path": "C:\\dev\\psj-strands-frozen-review-20261023\\package-lock.json",
+        "Path": "package-lock.json",
         "Hash": "6ED33B0D094B0DB54ADB6D9B9575C97779FA93BE97E2A55CA2787A2C714D0D14"
       },
       {
-        "Path": "C:\\dev\\psj-strands-frozen-review-20261023\\package.json",
+        "Path": "package.json",
         "Hash": "E92039954D58E1F404CF974EC9ACF4D9B47CA15B75430FF60879A1229BF520A5"
       }
     ]

@@ -56,8 +56,9 @@ PSJ preflights this finite response before releasing events to the SDK, then
 matches original ID, tool name and exact value in the callback. This is a
 single-call fixture helper, not a new production adapter or concurrency,
 approval, transport, cancellation or persistence guarantee. Native control
-and PSJ have equal callback outcomes here, but their error and recovery
-contracts differ; neither is claimed to be a drop-in substitute for the other.
+and PSJ have equal callback outcomes here, but expose different error contracts.
+Recovery equivalence was not evaluated; neither is claimed to be a drop-in
+substitute for the other.
 
 ## Evidence and decision
 
@@ -80,7 +81,9 @@ empty cache installed 54 packages, exit 0; one `npm test` invocation passed
 **9/9**, exit 0. Sources stayed unchanged and registry package directories were
 not links. `frozen-install-receipt.json` and `frozen-result.json` preserve that
 second operator validation; callback/request/error/identity records match the
-first. These **18 checks** are two operator runs, not two independent users.
+first. Local paths in the public receipt are replaced with placeholders;
+the original local record is preserved. These **18 checks** are two operator
+runs, not two independent users.
 
 The hypothesis to ask the maintainer is whether an optional independent raw
 reference earns a place in SDK-upgrade checks, or their small native regression
