@@ -1,10 +1,10 @@
 {
-  "date": "2026-10-23",
-  "run": "twenty-fifth",
+  "date": "2026-10-24",
+  "run": "twenty-sixth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 25 in a row). Unauthenticated curl to api.github.com is intercepted by the session proxy with the identical 403 message. Advisory requires gh api specifically per task instructions (non-public triage state), so no further fallback attempted; a quick WebFetch against the public advisory URL again returns 404, consistent with private triage state."
+      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 26 in a row). Unauthenticated curl to api.github.com is intercepted by the session proxy with the identical 403 message. Advisory requires gh api specifically per task instructions (non-public triage state), so no further fallback attempted; WebFetch against the public advisory URL again returns 404, consistent with private triage state."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
@@ -21,7 +21,7 @@
       "comments": 1,
       "review_comments": 0,
       "last_activity": "2026-10-22",
-      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Comment count (1, canblmz1's Sep 9 rebase note) and review count (0) unchanged from the 2026-10-22 snapshot. NEW since last snapshot: a cross-reference timeline event dated Oct 22, 2026, where vercel/ai PR #23861 (shpetimhaxhiu, 'docs: await parsing in the jsonrepair cookbook') mentioned this PR. No new comments or reviews were posted on #18770 itself -- this is a passive mention from another PR, not an action on #18770 -- but it bumps the PR's actual last-activity/updated_at past the previously recorded 2026-09-09 baseline, so recorded here for visibility."
+      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Comment count (1, canblmz1's Sep 9 rebase note) and review count (0) unchanged from the 2026-10-23 snapshot. The Oct 22, 2026 cross-reference from vercel/ai PR #23861 (noted in the prior snapshot) is still the most recent dated activity -- no new comments or reviews on #18770 itself since last run."
     },
     "5_vercel_ai_pr_20519": {
       "status": "checked (via public PR page, not gh api)",
@@ -30,7 +30,7 @@
       "comments": 0,
       "review_comments": 0,
       "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. Re-verified with a stricter prompt after an initial pass miscounted the PR description as a comment; confirmed 0 real comments, 0 reviews. Only other timeline event is the ai-sdk-factory[bot] label on Sep 9, 2026 and an undated commit. No change from the 2026-10-22 snapshot."
+      "reason": "same method/blockers as item 4. Confirmed 0 real comments, 0 reviews. Only timeline events remain the ai-sdk-factory[bot] label on Sep 9, 2026 and the single commit. No change from the 2026-10-23 snapshot."
     },
     "6_actions_runner_pr_4694": {
       "status": "checked (via public PR page, not gh api)",
