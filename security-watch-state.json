@@ -1,45 +1,31 @@
 {
-  "date": "2026-10-26",
-  "run": "twenty-eighth",
+  "date": "2026-10-27",
+  "run": "twenty-ninth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 28 in a row). Unauthenticated curl to api.github.com is intercepted by the session proxy with the identical 403 message. Advisory requires gh api specifically per task instructions (non-public triage state), so no further fallback attempted; WebFetch against the public advisory URL again returns 404, consistent with private triage state."
+      "reason": "gh api returns 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm (HTTP 403, session-side, not GitHub-side) -- same as every prior run (now 29 in a row). Unauthenticated curl to api.github.com is intercepted by the session proxy with the identical 403 message. Advisory requires gh api specifically per task instructions (non-public triage state), so no further fallback attempted."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message. WebFetch against the public PR URL returns 404 (private GHSA collaboration fork has no public page). No fallback available."
+      "reason": "gh api blocked (session-side 403, same as item 1); unauthenticated curl to api.github.com also intercepted by the session proxy with the identical 403 message. GitHub MCP server (pull_request_read) also refused: repository not configured for this session. No fallback available."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
-      "reason": "same blockers as item 1, for desktop/desktop. WebFetch against the public advisory URL also returns 404, consistent with a private triage-state advisory."
+      "reason": "same blockers as item 1, for desktop/desktop."
     },
     "4_vercel_ai_pr_18770": {
-      "status": "checked (via public PR page, not gh api)",
-      "state": "open",
-      "merged": false,
-      "comments": 1,
-      "review_comments": 0,
-      "last_activity": "2026-09-09",
-      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403). Data obtained via WebFetch against the public github.com PR page. Comment count (1, canblmz1's Sep 9 rebase note) and review count (0) unchanged from the 2026-10-25 snapshot. No new comments or reviews on #18770 itself since last run; the Oct 22 cross-reference from vercel/ai PR #23861 noted in prior snapshots is a mention, not activity on this PR."
+      "status": "could not check (no GitHub auth)",
+      "reason": "gh api and unauthenticated curl both blocked (session/proxy 403, repo not in this session's scope). GitHub MCP server (mcp__github__pull_request_read) also refused with 'repository not configured for this session'. Session is scoped to canblmz1/prefix-safe-json only this run; attaching vercel/ai would require push-level credentials, which was not requested and is out of scope for a read-only status check, so no live comment/review counts were obtained this run."
     },
     "5_vercel_ai_pr_20519": {
-      "status": "checked (via public PR page, not gh api)",
-      "state": "open",
-      "merged": false,
-      "comments": 0,
-      "review_comments": 0,
-      "last_activity": "2026-09-09",
-      "reason": "same method/blockers as item 4. Confirmed 0 real comments, 0 reviews. Only timeline events remain the ai-sdk-factory[bot] label on Sep 9, 2026 and the single commit. No change from the 2026-10-25 snapshot."
+      "status": "could not check (no GitHub auth)",
+      "reason": "same blockers/method as item 4."
     },
     "6_actions_runner_pr_4694": {
-      "status": "checked (via public PR page, not gh api)",
-      "state": "open",
-      "merged": false,
-      "comments": 2,
-      "review_comments": 6,
-      "last_activity": "2026-09-11",
-      "reason": "same method/blockers as item 4. Page scrape again shows the same review set (Copilot reviews + salmanmkc, canblmz1 replies) already captured in prior snapshots; most recent activity still Sep 11, 2026 (push of commits bfaea34 + merge 5fa130b) -- no new activity since then. Comment/review counts carried forward from stored baseline (known page-scrape undercount, actors/dates match)."
+      "status": "could not check (no GitHub auth)",
+      "reason": "same blockers/method as item 4."
     }
-  }
+  },
+  "note": "All 6 items unchecked this run -- same session-scoping block (API access limited to canblmz1/prefix-safe-json) seen in all prior runs. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
 }
