@@ -1,10 +1,10 @@
 {
-  "date": "2026-10-29",
-  "run": "thirty-first",
+  "date": "2026-10-30",
+  "run": "thirty-second",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api and unauthenticated curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 31 in a row)."
+      "reason": "gh api and unauthenticated curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 32 in a row)."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
@@ -16,7 +16,7 @@
     },
     "4_vercel_ai_pr_18770": {
       "status": "could not check (no GitHub auth)",
-      "reason": "gh api and unauthenticated curl both blocked (session 403)."
+      "reason": "gh api and unauthenticated curl both blocked (session 403). Also gh auth status shows GH_TOKEN is invalid."
     },
     "5_vercel_ai_pr_20519": {
       "status": "could not check (no GitHub auth)",
@@ -27,5 +27,5 @@
       "reason": "same blocker as item 4."
     }
   },
-  "note": "All 6 items unchecked this run -- same session-scoping block seen in 31 consecutive runs to date. This session's GitHub access is scoped only to canblmz1/prefix-safe-json; gh api and unauthenticated curl to api.github.com are both denied at the session/proxy level for BerriAI/litellm, BerriAI/litellm-ghsa-gcmc-j4g5-42gw, desktop/desktop, vercel/ai, and actions/runner. Prior runs already established that add_repo cannot fix this: anonymous git clone/fetch for public repos does not grant GitHub REST API access, and push-level attach is correctly refused for repos we don't own. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
+  "note": "All 6 items unchecked this run -- same session-scoping block seen in 32 consecutive runs to date. This session's GitHub access is scoped only to canblmz1/prefix-safe-json; gh api and unauthenticated curl to api.github.com are both denied at the session/proxy level for BerriAI/litellm, BerriAI/litellm-ghsa-gcmc-j4g5-42gw, desktop/desktop, vercel/ai, and actions/runner. gh auth status additionally reports the GH_TOKEN itself is invalid. Prior runs already established that add_repo cannot fix this: anonymous git clone/fetch for public repos does not grant GitHub REST API access, and push-level attach is correctly refused for repos we don't own; this run did not re-attempt add_repo given that established finding. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
 }
