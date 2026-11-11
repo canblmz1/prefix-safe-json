@@ -1,10 +1,10 @@
 {
-  "date": "2026-11-07",
-  "run": "fortieth",
+  "date": "2026-11-11",
+  "run": "forty-first",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api and unauthenticated curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 40 in a row)."
+      "reason": "gh api and unauthenticated curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 41 in a row)."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
@@ -16,7 +16,7 @@
     },
     "4_vercel_ai_pr_18770": {
       "status": "could not check (no GitHub auth)",
-      "reason": "gh api and unauthenticated curl both blocked (session 403)."
+      "reason": "gh api and unauthenticated curl both blocked (session 403). Confirmed add_repo(vercel/ai, access:read) says anonymous git clone is available but explicitly does not cover GitHub API/PR tools; add_repo(access:push) refused with 'you need push access to vercel/ai' -- this is not our repo, so the API block cannot be lifted from this session."
     },
     "5_vercel_ai_pr_20519": {
       "status": "could not check (no GitHub auth)",
@@ -27,5 +27,5 @@
       "reason": "same blocker as item 4."
     }
   },
-  "note": "All 6 items unchecked this run -- same session-scoping block seen in 40 consecutive runs to date. This session's GitHub access is scoped only to canblmz1/prefix-safe-json; gh api and unauthenticated curl to api.github.com are both denied at the session/proxy level for BerriAI/litellm, BerriAI/litellm-ghsa-gcmc-j4g5-42gw, desktop/desktop, vercel/ai, and actions/runner. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
+  "note": "All 6 items unchecked this run -- same session-scoping block seen in 41 consecutive runs to date. This run additionally confirmed via add_repo that the block cannot be lifted: read-only anonymous git clone of vercel/ai is available but explicitly does not cover GitHub API/PR data, and attaching with push access is refused because this session (canblmz1) has no push access to vercel/ai, desktop/desktop, actions/runner, or BerriAI/litellm -- none of which are canblmz1's own repos. This session's GitHub App access is scoped only to canblmz1/prefix-safe-json; checking these 6 external items would require either the repo owners granting canblmz1 collaborator/advisory access (for the 2 advisories + the private litellm-ghsa PR) or a session/environment reconfiguration granting broader GitHub API scope. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
 }
