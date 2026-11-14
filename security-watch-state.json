@@ -1,14 +1,14 @@
 {
-  "date": "2026-11-13",
-  "run": "forty-third",
+  "date": "2026-11-14",
+  "run": "forty-fourth",
   "items": {
     "1_litellm_advisory_GHSA-gcmc-j4g5-42gw": {
       "status": "could not check",
-      "reason": "gh api and unauthenticated curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 43 in a row). add_repo confirms anonymous git-read access to berriai/litellm is available, but GitHub API tools require an attached repo, and add_repo with access:\"push\" refuses with 'you need push access to berriai/litellm for Claude to make changes there' -- this session cannot attach the repo for API reads."
+      "reason": "gh api and curl to api.github.com both return the session-side 403 'GitHub access to this repository is not enabled for this session' for BerriAI/litellm -- same as every prior run (now 44 in a row). gh auth status also reports the GH_TOKEN itself is invalid."
     },
     "2_litellm_ghsa_pr_1_repos/BerriAI/litellm-ghsa-gcmc-j4g5-42gw/pulls/1": {
       "status": "could not check",
-      "reason": "Same session-side 403 as item 1. Unauthenticated curl retry also blocked by the same session scoping (not a GitHub-side auth failure)."
+      "reason": "Same session-side 403 as item 1. curl retry (including unauthenticated) also blocked by the same session scoping (not a GitHub-side auth failure)."
     },
     "3_desktop_advisory_GHSA-9m43-c2vf-cfj6": {
       "status": "could not check",
@@ -27,5 +27,5 @@
       "reason": "same blocker as item 4."
     }
   },
-  "note": "All 6 items unchecked this run -- same session-scoping block seen in 43 consecutive runs to date. gh auth status also reports the GH_TOKEN itself is invalid. This run additionally confirmed via add_repo that the block is structural: this session's GitHub API access cannot be extended to these repos without push-level access, which canblmz1 does not have on them (reporter-only relationship). Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
+  "note": "All 6 items unchecked this run -- same session-scoping block seen in 44 consecutive runs to date. Last known values remain those recorded in the 2026-10-26 snapshot (run twenty-eighth): both advisories in triage with no cve_id/accepted credit; PR #18770 open/comments=1/review_comments=0; PR #20519 open/comments=0/review_comments=0; PR #4694 open/comments=2/review_comments=6."
 }
