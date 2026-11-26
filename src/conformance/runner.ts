@@ -52,6 +52,24 @@ export function runToolCallIntegrityFixture(fixture: ConformanceFixture): Confor
         `which this runner does not support (only "normalized-gate" exists in v1). See docs/CONFORMANCE.md.`,
     );
   }
+  // `events`/`expected` are typed as arrays, but that is a compile-time
+  // guarantee only - fixtures are ordinary JSON read off disk (or
+  // constructed by a JS caller), so both are checked at runtime here
+  // rather than trusted from the type. Without this, a missing or
+  // non-array field fails later with a generic iteration error that
+  // names neither the fixture nor the offending field.
+  if (!Array.isArray(fixture.events)) {
+    throw new Error(
+      `prefix-safe-json: fixture "${fixture.id}" has a missing or non-array "events" field; ` +
+        `fixtures must declare an array of normalized events. See docs/CONFORMANCE.md.`,
+    );
+  }
+  if (!Array.isArray(fixture.expected)) {
+    throw new Error(
+      `prefix-safe-json: fixture "${fixture.id}" has a missing or non-array "expected" field; ` +
+        `fixtures must declare an array of expected outcomes. See docs/CONFORMANCE.md.`,
+    );
+  }
   const gate = createToolCallExecutionGate(undefined, undefined, fixture.toolSchemas);
   for (const event of fixture.events) gate.push(event);
   const { decisions } = gate.finish();
