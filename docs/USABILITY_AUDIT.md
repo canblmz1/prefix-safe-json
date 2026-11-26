@@ -86,7 +86,7 @@ published a native termination fix and raw argument metadata. These support
 native correction and protocol fit as real alternatives. They do not establish
 why other maintainers have not replied.
 
-The [retained Sandbase integration](ADOPTION_PILOTS.md#existing-adopter-maintenance)
+The [retained Sandbase integration](CASE_STUDY_SANDBASE.md)
 shows that PSJ can remain in a maintained application and independent CI.
 The new preview still needs a maintainer's own run, a keep/remove decision and
 a later independently confirmed use after an actual dependency update or

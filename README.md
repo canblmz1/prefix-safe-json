@@ -4,56 +4,30 @@
 [![CI](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml/badge.svg)](https://github.com/canblmz1/prefix-safe-json/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
-Keep an incomplete or ambiguously identified LLM tool call from reaching your
-application's tools. `prefix-safe-json` checks the original argument stream,
-completion signals and schema **before your application runs a tool**, even
-when the SDK's parsed arguments look usable.
+**Don't run an LLM tool call whose arguments were cut off.**
 
-The core package returns one-shot decisions; your application performs the
-side effect. The separate integration below keeps tool execution in the SDK.
-Provider signals must accurately describe completion;
-see the [provider-honesty limit](examples/openai-consumer/README.md).
+When a model streams a tool call and the response hits its token limit or the
+stream ends early, the arguments arrive incomplete. A JSON repair step, or a
+parse that happens to succeed, can still hand your code a value that looks
+usable, and the tool writes half a file or runs half a command.
+`prefix-safe-json` checks the original argument stream, the provider's
+completion signal and your schema before a tool runs. Your code receives a
+call only when it is complete; anything it cannot confirm is refused.
 
-For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
-[guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
-`execute` callbacks and the SDK's automatic tool-result continuation:
+This class of bug has been reproduced in several agent runtimes; see
+[real-world failures](docs/REAL_WORLD_FAILURES.md).
 
-For a new application, install the separately versioned companion and a tested SDK/provider
-pair together. In an existing application, keep your supported locked peer
-versions; see the integration's installation instructions.
+## Install
 
 ```sh
-npm install --save-exact psj-ai-sdk@0.3.2 prefix-safe-json@0.6.2 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
+npm install prefix-safe-json
 ```
 
-```typescript
-import { createGuardedChat } from "psj-ai-sdk";
-import { stepCountIs } from "ai";
-
-const chat = createGuardedChat({ name: "provider", baseURL, apiKey });
-const result = chat({ model: modelId, tools, prompt, stopWhen: stepCountIs(5) });
-```
-
-Text/reasoning can stream while tool calls wait for the entire response and
-batch validation. Optional local recording saves refused responses for
-offline wire-policy replay and explicit CI expectations. See the integration's
-supported policies and provisional-text limits. Run the [offline example](examples/guarded-chat/)
-without a key. The core runtime gains no AI SDK dependency.
-
-For prepublication review, use the two packed
-artifacts described in the [evaluation kit](docs/COMPANION_EVALUATION.md).
-The [whole-batch contract](docs/BATCH_CONTRACT.md) distinguishes the fixed
-0.3.2 policy from older previews. The kit also compares identical responses
-through the current native SDK, a small native check and the companion.
-
-For caller-owned dispatch, install `prefix-safe-json` from npm and use the
-[complete TypeScript agent-loop example](examples/typed-agent-loop/):
-[download its ZIP](https://github.com/canblmz1/prefix-safe-json/releases/download/v0.6.1/prefix-safe-json-0.6.1-typed-loop.zip),
-extract it, then run `npm install --engine-strict --no-audit --no-fund` and
-`npm start` with Node 22+. It uses published PSJ `0.6.1`, runs tools, sends
-their matched results back to the model, and returns a final answer. Five
-authored scenarios use memory counters; no API key or repository build is needed.
-[Choose another SDK](examples/README.md).
+Node 18 or newer. Includes adapters for the Vercel AI SDK, OpenAI, Anthropic,
+Gemini, OpenRouter and OpenAI-compatible endpoints
+([provider adapters](#provider-adapters)); runnable examples for each SDK are in
+[examples](examples/README.md). Provider signals must accurately describe
+completion; see the [provider-honesty limit](examples/openai-consumer/README.md).
 
 ## Safe execution example
 
@@ -103,6 +77,40 @@ if (decisions.length === 0 && diagnostics.length > 0) {
 `model` and `prompt` are yours. The lock stops the SDK from running `write_file` itself; the guard checks each streamed call against the same schema and hands out a one-shot decision. The caller owns dispatch, and a call the guard doesn't hand out never runs.
 
 Using `jsonSchema()` from `ai` instead of Zod? Give the guard the raw schema inside it: `schemas: { write_file: writeFileSchema.jsonSchema }`. The wrapper itself is refused at construction, because it would otherwise validate nothing.
+
+## Keep tool execution in the SDK: AI SDK companion
+
+For AI SDK 7 with OpenAI-compatible Chat Completions, the experimental
+[guarded chat integration](packages/ai-sdk/README.md) keeps your ordinary
+`execute` callbacks and the SDK's automatic tool-result continuation:
+
+For a new application, install the separately versioned companion and a tested SDK/provider
+pair together. In an existing application, keep your supported locked peer
+versions; see the integration's installation instructions.
+
+```sh
+npm install --save-exact psj-ai-sdk@0.3.2 prefix-safe-json@0.6.2 ai@7.0.143 @ai-sdk/openai-compatible@3.0.71
+```
+
+```typescript
+import { createGuardedChat } from "psj-ai-sdk";
+import { stepCountIs } from "ai";
+
+const chat = createGuardedChat({ name: "provider", baseURL, apiKey });
+const result = chat({ model: modelId, tools, prompt, stopWhen: stepCountIs(5) });
+```
+
+Text/reasoning can stream while tool calls wait for the entire response and
+batch validation. Optional local recording saves refused responses for
+offline wire-policy replay and explicit CI expectations. See the integration's
+supported policies and provisional-text limits. Run the [offline example](examples/guarded-chat/)
+without a key. The core runtime gains no AI SDK dependency.
+
+For prepublication review, use the two packed
+artifacts described in the [evaluation kit](docs/COMPANION_EVALUATION.md).
+The [whole-batch contract](docs/BATCH_CONTRACT.md) distinguishes the fixed
+0.3.2 policy from older previews. The kit also compares identical responses
+through the current native SDK, a small native check and the companion.
 
 ## Typed inputs and a complete agent loop
 
