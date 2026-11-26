@@ -52,6 +52,11 @@ export function runToolCallIntegrityFixture(fixture: ConformanceFixture): Confor
         `which this runner does not support (only "normalized-gate" exists in v1). See docs/CONFORMANCE.md.`,
     );
   }
+  for (const field of ["events", "expected"] as const) {
+    if (!Array.isArray(fixture[field])) {
+      throw new Error(`prefix-safe-json: fixture "${fixture.id}" requires "${field}" to be an array.`);
+    }
+  }
   const gate = createToolCallExecutionGate(undefined, undefined, fixture.toolSchemas);
   for (const event of fixture.events) gate.push(event);
   const { decisions } = gate.finish();

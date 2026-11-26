@@ -75,6 +75,21 @@ describe("Tool Call Integrity conformance corpus", () => {
 });
 
 describe("runToolCallIntegrityFixture - runner mechanics (not corpus content)", () => {
+  it.each([
+    ["events", undefined],
+    ["events", "not an array"],
+    ["expected", undefined],
+    ["expected", "not an array"],
+  ] as const)("rejects invalid array field %s (%s) with a fixture diagnostic", (field, value) => {
+    const valid = cleanCallFixture("invalid-arrays", "t");
+    const fixture = value === undefined
+      ? Object.fromEntries(Object.entries(valid).filter(([key]) => key !== field))
+      : { ...valid, [field]: value };
+    expect(() => runToolCallIntegrityFixture(fixture as unknown as ConformanceFixture)).toThrow(
+      `prefix-safe-json: fixture "invalid-arrays" requires "${field}" to be an array.`,
+    );
+  });
+
   it("schemaVersion 1 is supported", () => {
     const fixture: unknown = { ...cleanCallFixture("schema-version-1", "t"), schemaVersion: 1 };
     expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).not.toThrow();
