@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
 coverage) a version bump requires.
 
-## [0.6.3] - Unreleased
+## [0.7.0] - 2026-11-26
 
 ### Added
 
