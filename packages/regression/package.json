@@ -32,7 +32,7 @@
   "peerDependencies": {
     "ai": ">=7.0.77 <8",
     "@ai-sdk/openai-compatible": ">=3.0.0 <4",
-    "prefix-safe-json": ">=0.6.1 <0.7"
+    "prefix-safe-json": ">=0.6.1 <0.8"
   },
   "devDependencies": {
     "ai": "7.0.143",
