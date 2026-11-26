@@ -106,6 +106,43 @@ describe("runToolCallIntegrityFixture - runner mechanics (not corpus content)", 
     expect(() => runToolCallIntegrityFixture(fixture)).toThrow(/does not support/);
   });
 
+  it("a missing events field is rejected, naming the fixture and the field", () => {
+    const fixture = { ...cleanCallFixture("events-missing", "t") } as Record<string, unknown>;
+    delete fixture.events;
+    expect(() => runToolCallIntegrityFixture(fixture as unknown as ConformanceFixture)).toThrow(
+      /prefix-safe-json: fixture "events-missing" has a missing or non-array "events" field/,
+    );
+  });
+
+  it("a non-array events field is rejected, naming the fixture and the field", () => {
+    const fixture: unknown = { ...cleanCallFixture("events-not-array", "t"), events: "not-an-array" };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).toThrow(
+      /prefix-safe-json: fixture "events-not-array" has a missing or non-array "events" field/,
+    );
+  });
+
+  it("a missing expected field is rejected, naming the fixture and the field", () => {
+    const fixture = { ...cleanCallFixture("expected-missing", "t") } as Record<string, unknown>;
+    delete fixture.expected;
+    expect(() => runToolCallIntegrityFixture(fixture as unknown as ConformanceFixture)).toThrow(
+      /prefix-safe-json: fixture "expected-missing" has a missing or non-array "expected" field/,
+    );
+  });
+
+  it("a non-array expected field is rejected, naming the fixture and the field", () => {
+    const fixture: unknown = { ...cleanCallFixture("expected-not-array", "t"), expected: { action: "execute" } };
+    expect(() => runToolCallIntegrityFixture(fixture as ConformanceFixture)).toThrow(
+      /prefix-safe-json: fixture "expected-not-array" has a missing or non-array "expected" field/,
+    );
+  });
+
+  it("a valid fixture still returns its declared outcome", () => {
+    const result = runToolCallIntegrityFixture(cleanCallFixture("events-expected-valid", "t"));
+    expect(result.pass).toBe(true);
+    expect(result.calls).toHaveLength(1);
+    expect(result.calls[0]?.pass).toBe(true);
+  });
+
   it("reports \"no matching decision was produced\" when an expected entry names a call that never happened", () => {
     const fixture = {
       ...cleanCallFixture("no-match", "real_tool"),
