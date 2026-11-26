@@ -12,13 +12,15 @@ coverage) a version bump requires.
 
 - Experimental `prefix-safe-json/langchain` subpath: `guardChatOpenAI()` protects LangChain / LangGraph.js `ChatOpenAI` tool calls with two lines (`configuration: guard.configuration`, `tools: guard.guardTools([...])`). A tool runs only when the raw Chat Completions or Responses stream confirms its arguments were complete; cut-off and dropped streams are refused. No new runtime dependencies.
 
+## [0.6.3] - 2026-10-21
+
 ### Fixed
 
 - Empty chunks no longer prevent recognition of a leading UTF-8 BOM. Incomplete leading `EF` or `EF BB` sequences report `E_INCOMPLETE_UTF8` at EOF, including when split across chunks.
 - Preserve completed JSON values and committed events before the first malformed UTF-8 sequence, including when the verified prefix and error arrive in one chunk. The parser does not interpret data after the error.
 - Reject available invalid continuation bytes in short three- or four-byte UTF-8 tails as `E_INVALID_UTF8` consistently across the covered chunk boundaries. Valid unfinished sequences retain `E_INCOMPLETE_UTF8`.
 
-Malformed inputs remain non-executable. Existing public APIs, dependencies and companion package versions are unchanged.
+Malformed inputs remain non-executable. Public APIs, dependencies and companion package versions are unchanged.
 
 ## [0.6.2] - 2026-10-19
 
