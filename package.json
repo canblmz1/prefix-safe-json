@@ -47,6 +47,11 @@
       "types": "./dist/conformance.d.ts",
       "import": "./dist/conformance.js",
       "default": "./dist/conformance.js"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js",
+      "default": "./dist/langchain.js"
     }
   },
   "files": [
@@ -90,7 +95,8 @@
     "example:ai-sdk-v5-safe-boundary": "node examples/ai-sdk-v5-safe-boundary.mjs",
     "example:ai-sdk-v6-safe-boundary": "node examples/ai-sdk-v6-safe-boundary.mjs",
     "example:ai-sdk-v7-safe-boundary": "node examples/ai-sdk-v7-safe-boundary.mjs",
-    "example:ai-sdk-lifecycle-proof": "node examples/ai-sdk-lifecycle-proof.mjs"
+    "example:ai-sdk-lifecycle-proof": "node examples/ai-sdk-lifecycle-proof.mjs",
+    "example:langchain-cutoff": "node examples/langchain-cutoff-guard.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.123.0",

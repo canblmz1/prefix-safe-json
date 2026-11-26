@@ -28,6 +28,11 @@ const EXPECTED_EXPORTS = {
     import: "./dist/conformance.js",
     default: "./dist/conformance.js",
   },
+  "./langchain": {
+    types: "./dist/langchain.d.ts",
+    import: "./dist/langchain.js",
+    default: "./dist/langchain.js",
+  },
 };
 const INSTALL_LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "prepare"];
 const ALLOWED_ROOT_FILES = new Set([
