@@ -8,7 +8,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["scripts/*.mjs", "test/scripts/adoption-watch.test.mjs"],
+          allowDefaultProject: ["scripts/*.mjs"],
         },
         tsconfigRootDir: import.meta.dirname,
       },

@@ -150,5 +150,4 @@ Ask the independent maintainer to record:
 Record a later independent application run or maintained integration before
 calling this recurring use. Our fixture results, clean consumer, fork CI,
 evaluation PR and downloads do not establish that outcome. Historical core
-usage is separate from adoption of this companion version; the
-[adoption notes](ADOPTION_PILOTS.md) preserve that distinction.
+usage is separate from adoption of this companion version.

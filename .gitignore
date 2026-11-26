@@ -14,3 +14,6 @@ artifacts/
 .psj/
 test/docs/.generated/
 examples/typed-agent-loop/readme-check.mts
+
+# Local agent instructions (kept out of the public repo)
+CLAUDE.md
