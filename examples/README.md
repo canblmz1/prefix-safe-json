@@ -2,7 +2,7 @@
 
 For normal AI SDK `execute` callbacks and automatic tool-result continuation,
 start with the [guarded chat example](guarded-chat/). It installs the separate
-experimental integration preview alongside published PSJ `0.6.1`. Its complete
+experimental integration preview alongside published PSJ `0.6.2`. Its complete
 case reaches a final answer; three refused batch cases run no callbacks.
 The integration streams a display-only text/reasoning prefix; tool calls still
 wait for the entire response and whole-batch validation.
