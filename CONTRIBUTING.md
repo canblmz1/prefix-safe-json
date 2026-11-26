@@ -11,6 +11,21 @@ pnpm test
 pnpm lint
 ```
 
+## Good first contributions
+
+Issues labeled
+[`good first issue`](https://github.com/canblmz1/prefix-safe-json/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+are scoped so you can finish them without prior knowledge of the codebase.
+Each one lists the files to look at and the command that must pass. Comment
+on the issue to claim it, then open a pull request when you're ready.
+
+These kinds of changes are always welcome, no prior discussion needed:
+
+- tests, including coverage for validators and providers we already support;
+- conformance fixtures and provider stream envelopes;
+- documentation fixes and clearer examples;
+- bug fixes with a regression test.
+
 ## Project Principles
 
 - **Dependency discipline**: Keep the core parser small and deterministic. New runtime dependencies need a clear correctness or safety justification; JSON Schema validation currently uses AJV.
@@ -20,9 +35,10 @@ pnpm lint
 - **Honest diagnostics**: Never fabricate or guess missing data.
 - **Execution integrity**: A syntactically repairable or schema-shaped value must not be treated as executable unless the stream state confirms it is complete.
 
-## Current Development Posture
+## Public API changes
 
-Runtime or public-API expansion currently requires at least one of:
+Tests, fixtures, docs and fixes don't need this step. Runtime or public-API
+expansion currently requires at least one of:
 
 - a verified security or correctness defect;
 - a real adopter compatibility blocker;
@@ -56,7 +72,7 @@ fixtures covering that provider's own streaming shape, and ideally a
 `conformance/fixtures/` case if it exercises a genuinely new
 execution-authority scenario the existing corpus doesn't cover. Open an
 issue describing the provider and its streaming shape before submitting a
-PR, per "Current Development Posture" above.
+PR, per "Public API changes" above.
 
 ## Commit Messages
 
