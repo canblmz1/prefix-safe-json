@@ -173,7 +173,7 @@ function redact(observed: Observation): ProfileReport {
 
 /** Run real installed SDK parsers against local transport bytes and reviewed expectations. */
 export async function runSuite(options: RegressionOptions): Promise<RegressionReport> {
-  if (!doctor().ready) throw new RegressionInputError("E_PEERS", "Install Node 22+, AI SDK 7, OpenAI-compatible provider 3 and PSJ 0.6.x; run doctor for details.");
+  if (!doctor().ready) throw new RegressionInputError("E_PEERS", "Install Node 22+, AI SDK 7, OpenAI-compatible provider 3 and PSJ 0.6.x or 0.7.x; run doctor for details.");
   const fixture = parseFixture(await readJson(options.fixture));
   const expected = options.expect ? parseExpectations(await readJson(options.expect)) : undefined;
   const responses = await readResponses(options.fixture, fixture);

@@ -38,6 +38,6 @@ export function doctor() {
     return foundMajor === major && (foundMinor > minor || (foundMinor === minor && foundPatch >= patch));
   };
   const ready = Number(process.versions.node.split(".")[0]) >= 22 && atLeast(installed.ai, 7, 0, 77) &&
-    atLeast(installed.provider, 3, 0, 0) && atLeast(installed.psj, 0, 6, 0) && installed.psj?.startsWith("0.6.") === true;
+    atLeast(installed.provider, 3, 0, 0) && atLeast(installed.psj, 0, 6, 0) && /^0\.[67]\./u.test(installed.psj ?? "");
   return { formatVersion: 1, ready, mode: "offline-fixtures", auth: "not-required", versions: installed };
 }

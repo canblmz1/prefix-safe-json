@@ -20,7 +20,7 @@ Commands:
   psj-regression check suite.json --expect expected.json [--json]
       Compare inputs, effects, result IDs, continuation and PSJ decisions in CI.
 
-Node 22+, ai 7.x, @ai-sdk/openai-compatible 3.x and prefix-safe-json 0.6.x.
+Node 22+, ai 7.x, @ai-sdk/openai-compatible 3.x and prefix-safe-json 0.6.x or 0.7.x.
 Only raw OpenAI-compatible Chat Completions SSE is supported in this prototype.
 No application tools run. Reports omit argument values and final text.
 Exit: 0 diagnostic success/matching expectations; 1 mismatch; 2 setup/input error.
