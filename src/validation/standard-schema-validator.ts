@@ -194,8 +194,8 @@ export function createStandardSchemaValidator(schema: StandardSchemaV1Like, unch
   };
 }
 
-/** Compare JSON structure without depending on object property order. */
-function sameJsonValue(raw: unknown, output: unknown): boolean {
+/** @internal Compare JSON structure without depending on object property order. */
+export function sameJsonValue(raw: unknown, output: unknown): boolean {
   const pending: Array<[unknown, unknown]> = [[raw, output]];
   while (pending.length > 0) {
     const [left, right] = pending.pop() as [unknown, unknown];

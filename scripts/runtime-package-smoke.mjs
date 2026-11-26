@@ -3,6 +3,7 @@ import * as pkg from "prefix-safe-json";
 import * as ajvSubpath from "prefix-safe-json/ajv";
 import * as standardSchemaSubpath from "prefix-safe-json/standard-schema";
 import * as conformanceSubpath from "prefix-safe-json/conformance";
+import * as langchainSubpath from "prefix-safe-json/langchain";
 
 const {
   createParser,
@@ -15,6 +16,7 @@ const {
 const { createAjvValidator } = ajvSubpath;
 const { fromStandardSchema } = standardSchemaSubpath;
 const { runToolCallIntegrityFixture, runToolCallIntegritySuite } = conformanceSubpath;
+const { guardChatOpenAI, LangChainGuardRefusal } = langchainSubpath;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,6 +33,8 @@ for (const [name, value] of Object.entries({
   fromStandardSchema,
   runToolCallIntegrityFixture,
   runToolCallIntegritySuite,
+  guardChatOpenAI,
+  LangChainGuardRefusal,
 })) {
   assert(typeof value === "function", `missing public export ${name}`);
 }
@@ -326,6 +330,7 @@ if (requireEsmSupported) {
   assert(typeof require("prefix-safe-json/ajv").createAjvValidator === "function", "require(prefix-safe-json/ajv) failed");
   assert(typeof require("prefix-safe-json/standard-schema").fromStandardSchema === "function", "require(prefix-safe-json/standard-schema) failed");
   assert(typeof require("prefix-safe-json/conformance").runToolCallIntegritySuite === "function", "require(prefix-safe-json/conformance) failed");
+  assert(typeof require("prefix-safe-json/langchain").guardChatOpenAI === "function", "require(prefix-safe-json/langchain) failed");
   requireResult = "pass";
 }
 

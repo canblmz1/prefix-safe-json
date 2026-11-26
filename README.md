@@ -112,6 +112,43 @@ The [whole-batch contract](docs/BATCH_CONTRACT.md) distinguishes the fixed
 0.3.2 policy from older previews. The kit also compares identical responses
 through the current native SDK, a small native check and the companion.
 
+## LangChain / LangGraph.js drop-in
+
+For `ChatOpenAI` with `createReactAgent` / `ToolNode` (Chat Completions and
+Responses API, streaming and non-streaming), `prefix-safe-json/langchain`
+verifies the raw HTTP/SSE stream incrementally and blocks tool execution unless
+the arguments were genuinely complete and schema-valid:
+
+```javascript
+import { ChatOpenAI } from "@langchain/openai";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import { guardChatOpenAI } from "prefix-safe-json/langchain";
+
+const guard = guardChatOpenAI();
+const llm = new ChatOpenAI({ model: "gpt-4o", streaming: true, configuration: guard.configuration });
+const agent = createReactAgent({ llm, tools: guard.guardTools([writeFile]) });
+```
+
+`guardChatOpenAI()` adds zero runtime dependencies, auto-validates each tool's
+Zod, Standard Schema, or JSON Schema definition, streams SSE bytes through
+incrementally without buffering the whole response, and enforces one-shot
+call-ID authority across turns. Create one guard per sequential agent run (or
+`chatOptions()` to wrap a custom `fetch`); provider completion signals must still
+be honest.
+
+Checked against real `@langchain/openai` 1.6.2 and `@langchain/langgraph` 1.5.1
+with [agent-faultbench](https://github.com/simin-yuan/agent-faultbench)'s fake
+server, streaming, for both Chat Completions and Responses: without the guard a
+`length` or dropped-stream cutoff wrote 866 of 2,120 bytes and the agent finished
+with "Done."; with the guard nothing was written, and the complete call still
+wrote all 2,120 bytes.
+
+Run the offline cutoff reproduction without an API key:
+
+```sh
+pnpm run example:langchain-cutoff
+```
+
 ## Typed inputs and a complete agent loop
 
 Experimental `createTypedAiSdkExecutionGuard` in
@@ -390,6 +427,7 @@ Runnable examples:
 - [`examples/anthropic-truncation-safety.mjs`](examples/anthropic-truncation-safety.mjs)
 - [`examples/ai-sdk-execution-gate.mjs`](examples/ai-sdk-execution-gate.mjs)
 - [`examples/ai-sdk-lifecycle-proof.mjs`](examples/ai-sdk-lifecycle-proof.mjs)
+- [`examples/langchain-cutoff-guard.mjs`](examples/langchain-cutoff-guard.mjs)
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the development workflow.
 
