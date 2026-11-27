@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a new capability for prefix-safe-json.
+labels: [enhancement]
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature. Small, evidence-backed additions are welcome; see CONTRIBUTING.md on public-API changes. Share only information you are comfortable making public.
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What problem would this solve, and for whom? What happens today without it?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Supporting evidence
+      description: A real adopter case, a failing provider shape, a reproduction, or a link to prior discussion showing the need.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: How you imagine this working, if you have an idea. Optional — a use case with evidence is enough.

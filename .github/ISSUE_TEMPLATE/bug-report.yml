@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a defect in prefix-safe-json.
+labels: [bug]
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Share only information you are comfortable making public. Never paste API keys or sensitive raw tool arguments.
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Node, prefix-safe-json, and provider or SDK version.
+      placeholder: "Node 22; prefix-safe-json 0.6.1; ai/provider versions"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal redacted reproduction
+      description: The smallest code or fixture that shows the bug, with secrets and real tool arguments removed.
+      placeholder: |
+        ```js
+        import { createParser } from "prefix-safe-json";
+        // minimal steps that reproduce the problem
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should have happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead, including any error message or wrong output.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Optional redacted logs, test output, or a link to a failing case.
