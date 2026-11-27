@@ -9,9 +9,12 @@ const {
   createParser,
   createToolCallExecutionGate,
   createAiSdkExecutionGuard,
-  GeminiStreamAdapter,
+  createToolCallStreamCoordinator,
+  OpenAIStreamAdapter,
   OpenAICompatibleStreamAdapter,
   AnthropicStreamAdapter,
+  GeminiStreamAdapter,
+  OpenRouterStreamAdapter,
 } = pkg;
 const { createAjvValidator } = ajvSubpath;
 const { fromStandardSchema } = standardSchemaSubpath;
@@ -26,9 +29,12 @@ for (const [name, value] of Object.entries({
   createParser,
   createToolCallExecutionGate,
   createAiSdkExecutionGuard,
-  GeminiStreamAdapter,
+  createToolCallStreamCoordinator,
+  OpenAIStreamAdapter,
   OpenAICompatibleStreamAdapter,
   AnthropicStreamAdapter,
+  GeminiStreamAdapter,
+  OpenRouterStreamAdapter,
   createAjvValidator,
   fromStandardSchema,
   runToolCallIntegrityFixture,
