@@ -59,7 +59,6 @@ export default defineConfig({
         "**/index.ts",
         "**/stryker.config.json",
         "*.config.*",
-        "test-import.js",
       ],
     },
   },
