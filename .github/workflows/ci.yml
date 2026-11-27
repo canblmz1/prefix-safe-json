@@ -107,6 +107,25 @@ jobs:
   # platform-conditional branches that would make per-OS coverage numbers
   # differ - and multiplied the instrumented-run cost ninefold for nothing.
   # Coverage stays a required PR/push gate; it just runs once.
+  python-langchain-guard:
+    name: Python LangChain guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The end-to-end tests run real LangGraph/LangChain against the bundled
+      # cutoff server; pin the versions they were verified with.
+      - name: Install the Python companion and its test dependencies
+        run: |
+          python3 -m venv .venv-python
+          .venv-python/bin/python -m pip install --upgrade pip
+          .venv-python/bin/python -m pip install -e "python[dev]" "langgraph==1.2.16" "langchain-core==1.6.12" "langchain-openai==1.7.2" "langchain==1.4.6"
+
+      - name: Run the Python tests
+        run: .venv-python/bin/python -m pytest python/tests -q -p no:cacheprovider
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

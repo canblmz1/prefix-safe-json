@@ -149,6 +149,15 @@ Run the offline cutoff reproduction without an API key:
 pnpm run example:langchain-cutoff
 ```
 
+## Python (LangChain / LangGraph)
+
+For Python (`langchain-core`, LangChain v1 `create_agent`, and LangGraph
+`create_react_agent`), see the self-contained companion package
+[`prefix-safe-json-langchain`](python/README.md) (`psj_langchain` in `python/`).
+It provides `CutoffGuardMiddleware` (an `AgentMiddleware` `after_model` hook)
+and `guard_cut_off_tool_calls` / `post_model_cutoff_guard` so truncated or
+dropped-stream tool calls are moved to `invalid_tool_calls` before execution.
+
 ## Typed inputs and a complete agent loop
 
 Experimental `createTypedAiSdkExecutionGuard` in
