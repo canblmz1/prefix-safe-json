@@ -353,13 +353,13 @@ import {
 const adapter = new OpenAIStreamAdapter();
 const gate = createToolCallExecutionGate();
 
-for (const rawChunk of stream) {
+for await (const rawChunk of stream) {
   for (const event of adapter.push(rawChunk)) {
     gate.push(event);
   }
 }
 
-for (const event of adapter.finish({ reason: "complete" })) {
+for (const event of adapter.finish()) {
   gate.push(event);
 }
 
@@ -375,6 +375,11 @@ Validation is optional and validator-agnostic. You can use JSON Schema/Ajv, Stan
 `schemas` takes plain JSON Schema documents (TypeBox schemas count). Zod and other Standard Schema libraries go through `validators` with `fromStandardSchema()` from `prefix-safe-json/standard-schema`. Handing `schemas` a Zod schema or an AI SDK `jsonSchema()` wrapper throws at construction instead of silently validating nothing.
 
 ```typescript
+import { z } from "zod";
+import { createToolCallExecutionGate } from "prefix-safe-json";
+
+const WriteFileSchema = z.object({ path: z.string(), content: z.string() }).strict();
+
 const gate = createToolCallExecutionGate(undefined, undefined, undefined, {
   write_file: {
     validate: (value) =>
