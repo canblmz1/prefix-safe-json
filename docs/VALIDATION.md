@@ -195,7 +195,7 @@ awaited or ignored Promise, and never a hang.
 
 Schema values may be objects or callable functions exposing a valid
 `~standard` interface. Callable ArkType `2.2.8` schemas are exercised with real
-valid/invalid inputs and typed guard authority in the test suite. Their
+valid/invalid inputs and typed guard authority in the test suite. Valibot `1.5.0` schemas are exercised with real valid, invalid, and transforming inputs through both Standard Schema adapters. Their
 callability does not relax the v1 metadata checks or add asynchronous,
 coercion or transformation support to the typed execution boundary.
 
