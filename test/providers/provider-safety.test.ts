@@ -278,17 +278,12 @@ describe("Provider Safety Regressions", () => {
     expect(snap.diagnostics.some(d => d.code === "E_PROVIDER_IDENTITY_CONFLICT")).toBe(true);
   });
 
-  it("Delta after call end (per-call tool_call_end alone does not close the argument stream)", () => {
-    // Verified, real, and easy to misread as a gap: a per-call
-    // `tool_call_end` does NOT by itself move `call.status` off
-    // "collecting" (only a stream-level provider_stream_end/finish()
-    // does - see finishCall()/handleStreamEnd() and the identical
-        // documented fact in coordinator-sdk-execution-observed.test.ts). So an
-    // argument delta arriving after a call's own tool_call_end, but before
-    // the stream itself ends, is silently merged in rather than flagged.
-    // This pins that down as an explicit, observed contract (through
-    // takeDecision(), the real security-relevant question) instead of
-    // leaving it as an untested assumption in either direction.
+  it("Delta after call end (a per-call tool_call_end closes the argument stream; later evidence rejects the call)", () => {
+    // A per-call `tool_call_end` leaves `call.status` "collecting" until the
+    // stream ends (see finishCall()/handleStreamEnd()), but it closes the
+    // call's name and arguments. An argument delta after it is late,
+    // contradictory evidence: the call is refused as a protocol violation,
+    // the same as the adapters' E_TOOL_ARGUMENTS_AFTER_END (#122).
     const gate = createToolCallExecutionGate();
     const callRef = { sourceKey: "id0" };
     gate.push({ type: "tool_call_start", callRef, toolIndex: 0, provider: "openai", name: "f" } as unknown as NormalizedToolStreamEvent);
@@ -296,9 +291,9 @@ describe("Provider Safety Regressions", () => {
     gate.push({ type: "tool_call_arguments_delta", callRef, toolIndex: 0, delta: "{}" } as unknown as NormalizedToolStreamEvent);
     const final = gate.finish({ reason: "complete" });
     const decision = expectDefined(final.decisions[0]);
-    expect(decision.action).toBe("execute");
-    const authority = expectDefined(gate.takeDecision(decision.internalId));
-    expect(authority.value).toEqual({});
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("protocol_violation");
+    expect(final.diagnostics.some((d) => d.code === "E_ARGUMENT_DELTA_AFTER_END")).toBe(true);
   });
 
   it("Event after provider stream end", () => {

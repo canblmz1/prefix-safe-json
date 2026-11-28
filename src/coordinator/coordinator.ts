@@ -14,8 +14,10 @@ import {
   CoordinatorDiagnostic,
 } from "./types.js";
 import {
+  ARGUMENT_DELTA_AFTER_END_DIAGNOSTIC_CODE,
   AUTHORITY_PROTOCOL_VIOLATION_CODES,
   DUPLICATE_TOOL_CALL_START_DIAGNOSTIC_CODE,
+  NAME_DELTA_AFTER_END_DIAGNOSTIC_CODE,
   SDK_EXECUTION_OBSERVED_DIAGNOSTIC_CODE,
   SDK_EXECUTION_ERROR_DIAGNOSTIC_CODE,
   EVENT_AFTER_STREAM_END_DIAGNOSTIC_CODE,
@@ -355,9 +357,11 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     const call = this.getCall(internalId);
     if (!call) return;
 
-    if (call.status !== "collecting") {
+    // tool_call_end closes the name and arguments but leaves the call
+    // "collecting" until the stream ends, so check those flags too.
+    if (call.status !== "collecting" || call.nameComplete) {
       this.addDiagnostic({
-        code: "E_NAME_DELTA_AFTER_END",
+        code: NAME_DELTA_AFTER_END_DIAGNOSTIC_CODE,
         severity: "error",
         internalId: call.internalId,
         message: "Name delta after call ended",
@@ -392,9 +396,9 @@ export class DefaultToolCallStreamCoordinator implements ToolCallStreamCoordinat
     const call = this.getCall(internalId);
     if (!call) return;
 
-    if (call.status !== "collecting") {
+    if (call.status !== "collecting" || call.argumentStreamClosed) {
       this.addDiagnostic({
-        code: "E_ARGUMENT_DELTA_AFTER_END",
+        code: ARGUMENT_DELTA_AFTER_END_DIAGNOSTIC_CODE,
         severity: "error",
         internalId: call.internalId,
         message: "Argument delta after call ended",

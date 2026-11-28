@@ -377,6 +377,24 @@ describe("execution gate — concurrency and protocol edge cases", () => {
     expect(diagnostics.some((d) => d.code === "E_DUPLICATE_TOOL_CALL_START")).toBe(true);
   });
 
+  it.each([
+    ["an arguments delta", argsDelta("call-0", " "), "E_ARGUMENT_DELTA_AFTER_END"],
+    ["a name delta", nameDelta("call-0", "_v2"), "E_NAME_DELTA_AFTER_END"],
+  ])("%s after tool_call_end rejects the call as a protocol violation (#122)", (_label, late, code) => {
+    const gate = gateWith();
+    gate.push(start("call-0", "write_file"));
+    gate.push(argsDelta("call-0", '{"path":"a.txt","content":"hi"}'));
+    gate.push(callEnd("call-0"));
+    gate.push(late);
+    gate.push(streamEnd("complete"));
+
+    const { decisions, diagnostics } = gate.finish();
+    const decision = expectDefined(decisions[0]);
+    expect(decision.action).toBe("reject");
+    expect(decision.reason).toBe("protocol_violation");
+    expect(diagnostics.some((d) => d.code === code)).toBe(true);
+  });
+
   it("snapshot() before finish() is always fail-closed: no in-flight call is ever 'execute'", () => {
     const gate = gateWith();
     gate.push(start("call-0", "write_file"));

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 See [RELEASE.md](RELEASE.md) for the quantitative bar (mutation score,
 coverage) a version bump requires.
 
+## [Unreleased]
+
+### Changed
+
+- The execution gate now refuses a call (`reject` / `protocol_violation`) when a normalized `tool_call_arguments_delta` or `tool_call_name_delta` arrives after that call's `tool_call_end`. Such deltas were previously merged into the arguments or name, so a late delta could still produce `execute`. The provider adapters already refused this shape (`E_TOOL_ARGUMENTS_AFTER_END`); `E_ARGUMENT_DELTA_AFTER_END` and `E_NAME_DELTA_AFTER_END` now disqualify the call the same way. (#122)
+
 ## [0.7.0] - 2026-11-26
 
 ### Added
