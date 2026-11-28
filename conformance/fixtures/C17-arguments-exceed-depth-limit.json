@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "profile": "normalized-gate",
+  "id": "C17-arguments-exceed-depth-limit",
+  "description": "A terminal-confirmed call whose arguments nest 129 containers, one past the default 128-container depth cap (maxDepth 128): the gate must refuse it with resource_limit instead of executing it.",
+  "provenance": {
+    "classification": "synthetic-adversarial"
+  },
+  "events": [
+    {
+      "type": "tool_call_start",
+      "sequence": 1,
+      "provider": "openai",
+      "callRef": {
+        "sourceKey": "call:0"
+      },
+      "toolIndex": 0,
+      "toolCallId": "call_1",
+      "name": "get_weather"
+    },
+    {
+      "type": "tool_call_arguments_delta",
+      "sequence": 2,
+      "provider": "openai",
+      "callRef": {
+        "sourceKey": "call:0"
+      },
+      "delta": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"
+    },
+    {
+      "type": "tool_call_end",
+      "sequence": 3,
+      "provider": "openai",
+      "callRef": {
+        "sourceKey": "call:0"
+      },
+      "reason": "complete"
+    },
+    {
+      "type": "provider_stream_end",
+      "sequence": 4,
+      "provider": "openai",
+      "reason": "complete"
+    }
+  ],
+  "expected": [
+    {
+      "name": "get_weather",
+      "action": "reject",
+      "reason": "resource_limit"
+    }
+  ]
+}

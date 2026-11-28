@@ -130,7 +130,7 @@ worth stating plainly rather than leaving implicit: the *runner* is a
 supported runtime dependency; the *corpus* is project documentation and
 test data, not a runtime asset.
 
-## Initial corpus (v1, 15 fixtures)
+## Initial corpus (v1, 16 fixtures)
 
 | ID | Class | Classification |
 | --- | --- | --- |
@@ -149,9 +149,10 @@ test data, not a runtime asset.
 | C14 | malformed-json | protocol-realistic |
 | C15 | schema-invalid | protocol-realistic |
 | C16 | clean-multi-call (sequential, as distinct from C07) | protocol-realistic |
+| C17 | arguments-exceed-depth-limit (129 nested containers vs the default 128-container cap) | synthetic-adversarial |
 
-15 fixtures, not 16 - see "C10" immediately below. Quality of claim over
-count: a 16th case was not manufactured to round the number up.
+16 fixtures — C17 was added because the depth policy had no coverage, not to round
+the number up. See "C10" immediately below.
 
 ### C10 — Provider-adapter conformance — future profile / not covered by normalized-gate v1
 
